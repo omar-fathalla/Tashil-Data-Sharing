@@ -20,6 +20,7 @@ import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/testing/test_semantics.dart';
 import '../../data/sell_out_explorer_repository.dart';
+import '../../domain/branch_growth.dart';
 import '../../domain/sell_out_upload_flow.dart';
 import '../../domain/archive_delete_copy.dart';
 import '../../../../core/network/backend_http.dart';
@@ -164,6 +165,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     _priceColMargin,
   ];
 
+  static const double _branchRankWidth = 28.0;
+
+  /// Branch-growth table column shares: grouped rank+branch, 2026, 2025, diff,
+  /// YoY %, monthly average, status.
+  static const List<double> _branchGrowthFlex = [2.6, 1.3, 1.3, 1.0, 1.1, 1.1, 1.1];
+
   @override
   void onBackendDataChanged() {
     _loadAllData();
@@ -208,6 +215,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   /// Selected-year totals restricted to months present last year — YoY only.
   Map<String, StoreBenchmarkItem> _yoyCurrentBranchMap = const {};
   double _yoyCurrentTotalChainRevenue = 0.0;
+  /// Calendar months compared like-for-like (present in both years); empty when unknown.
+  List<int> _matchedYoyMonths = const [];
 
   // Tab 1: Performance & Branch Analytics State
   String _perfChain = 'all';
@@ -321,6 +330,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         _prevYearTotalChainRevenue = 0.0;
         _yoyCurrentBranchMap = const {};
         _yoyCurrentTotalChainRevenue = 0.0;
+        _matchedYoyMonths = const [];
       });
       // clearSnackBars after the first frame — initState's first load cannot depend on
       // ScaffoldMessenger yet.
@@ -405,6 +415,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         _prevYearTotalChainRevenue = prevTotalRev;
         _yoyCurrentBranchMap = yoyCurMap;
         _yoyCurrentTotalChainRevenue = yoyCurRev;
+        _matchedYoyMonths = data.matchedMonths;
         if (_availableCategories.isEmpty || _chainStores.isEmpty) {
           final cats = <String>{};
           final storesByChain = <String, List<Map<String, String>>>{};
@@ -1777,16 +1788,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(child: cards[0]),
-                          M3Spacing.hGapSM,
-                          Expanded(child: cards[1]),
-                          M3Spacing.hGapSM,
-                          Expanded(child: cards[2]),
-                          M3Spacing.hGapSM,
-                          Expanded(child: cards[3]),
-                        ],
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: cards[0]),
+                            M3Spacing.hGapSM,
+                            Expanded(child: cards[1]),
+                            M3Spacing.hGapSM,
+                            Expanded(child: cards[2]),
+                            M3Spacing.hGapSM,
+                            Expanded(child: cards[3]),
+                          ],
+                        ),
                       ),
                       if (selectedStoreId != null) ...[
                         const SizedBox(height: 8.0),
@@ -1989,7 +2003,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     // card is one step higher on the same surface scale.
     return Container(
       key: ValueKey('insight_badge_$label'),
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      constraints: const BoxConstraints(minHeight: 72.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
       decoration: BoxDecoration(
         color: isHighlighted
             ? colorScheme.surfaceContainerHigh
@@ -1997,36 +2012,49 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         borderRadius: M3Shape.radiusMd,
         border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(6.0),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: M3Shape.radiusSm,
-            ),
-            child: Icon(icon, size: 18.0, color: color),
-          ),
-          const SizedBox(width: 8.0),
-          Expanded(
-            child: Text(
-              '$label: $branchName',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.onSurface),
-            ),
-          ),
-          const SizedBox(width: 6.0),
-          Flexible(
-            child: M3ChipSurface(
-              color: colorScheme.surfaceContainerHighest,
-              child: Text(
-                valueText,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6.0),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: M3Shape.radiusSm,
+                ),
+                child: Icon(icon, size: 18.0, color: color),
               ),
-            ),
+              const SizedBox(width: 8.0),
+              Expanded(
+                child: Text(
+                  label,
+                  style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6.0),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  branchName,
+                  style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.onSurface),
+                ),
+              ),
+              const SizedBox(width: 8.0),
+              M3ChipSurface(
+                color: colorScheme.surfaceContainerHighest,
+                child: Text(
+                  valueText,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -2108,51 +2136,26 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final int compYear = (_selectedYear > 0 ? _selectedYear : _currentYear) - 1;
     final int currYearLabel = _selectedYear > 0 ? _selectedYear : _currentYear;
 
-    // Build Branch YoY & MoM Growth Matrix
-    // Displayed current revenue stays full-period; YoY % uses like-for-like months.
-    final branchGrowthMatrix = branchList.map((b) {
-      StoreBenchmarkItem? prevItem = _prevYearBranchMap[b.storeId];
-      if (prevItem == null) {
-        for (final entry in _prevYearBranchMap.values) {
-          if (entry.storeName == b.storeName) {
-            prevItem = entry;
-            break;
-          }
-        }
-      }
-      StoreBenchmarkItem? yoyCurItem = _yoyCurrentBranchMap[b.storeId];
-      if (yoyCurItem == null) {
-        for (final entry in _yoyCurrentBranchMap.values) {
-          if (entry.storeName == b.storeName) {
-            yoyCurItem = entry;
-            break;
-          }
-        }
-      }
-      final prevRev = prevItem?.totalRevenue ?? 0.0;
-      final prevUnits = prevItem?.totalUnits ?? 0;
-      final yoyCurRev = yoyCurItem?.totalRevenue ?? 0.0;
-      final varianceEgp = yoyCurRev - prevRev;
-      final double? yoyGrowthPct = likeForLikeYoyPct(yoyCurRev, prevRev);
-      final String status = prevRev <= 0
-          ? (b.revenue > 0 ? 'new_branch' : 'declining')
-          : ((yoyGrowthPct ?? 0.0) >= 0 ? 'growing' : 'declining');
-      final double monthlyRunRate = _selectedMonth > 0 ? b.revenue : (b.revenue / 12.0);
-      return (
-        storeId: b.storeId,
-        storeName: b.storeName,
-        chain: b.chain,
-        region: b.region != '—' ? b.region : (prevItem?.region ?? '—'),
-        currentRevenue: b.revenue,
-        prevRevenue: prevRev,
-        varianceEgp: varianceEgp,
-        yoyGrowthPct: yoyGrowthPct,
-        monthlyRunRate: monthlyRunRate,
-        currentUnits: b.units,
-        prevUnits: prevUnits,
-        status: status,
-      );
-    }).toList();
+    // Branch growth table: the 2026 / 2025 sales columns, the difference and the
+    // YoY % all use the SAME matched-month window (see buildBranchGrowthRows).
+    final branchGrowthMatrix = buildBranchGrowthRows(
+      branches: [
+        for (final b in branchList)
+          BranchGrowthBase(
+            storeId: b.storeId,
+            storeName: b.storeName,
+            chain: b.chain,
+            region: b.region,
+            units: b.units,
+            revenue: b.revenue,
+          ),
+      ],
+      prevByStore: _prevYearBranchMap,
+      currentLikeForLikeByStore: _yoyCurrentBranchMap,
+    );
+    final bool compareMatchedMonths = _selectedMonth == 0 &&
+        selectedDateRange == null &&
+        _matchedYoyMonths.isNotEmpty;
 
     final filteredGrowthBranches = branchGrowthMatrix.where((item) {
       if (_perfGrowthStatusFilter != 'all' && item.status != _perfGrowthStatusFilter) {
@@ -2172,8 +2175,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final growingBranchesCount = branchGrowthMatrix.where((b) => b.status == 'growing').length;
     final decliningBranchesCount = branchGrowthMatrix.where((b) => b.status == 'declining').length;
     final newBranchesCount = branchGrowthMatrix.where((b) => b.status == 'new_branch').length;
-    // Full-period current total for the strip value; YoY % is like-for-like.
-    final totalCurrMatrixRev = branchGrowthMatrix.fold<double>(0.0, (s, b) => s + b.currentRevenue);
+    final totalCurrMatrixRev = _yoyCurrentTotalChainRevenue;
     final totalPrevMatrixRev = _prevYearTotalChainRevenue;
     final totalMatrixVarianceEgp = _yoyCurrentTotalChainRevenue - totalPrevMatrixRev;
     final double? totalMatrixYoYPct =
@@ -2711,9 +2713,11 @@ onChanged: m3Legacy<String>((v) {
                               ),
                               const SizedBox(height: 2.0),
                               Text(
-                                'نمو الفروع (سنوي وشهري) • $perfPeriodBadgeAr',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                compareMatchedMonths
+                                    ? 'مقارنة نفس الشهور: ${matchedMonthsLabelAr(_matchedYoyMonths)} • سنة $currYearLabel مقابل $compYear'
+                                    : 'نمو الفروع (سنوي وشهري) • $perfPeriodBadgeAr',
+                                key: const ValueKey('branch_growth_subtitle'),
+                                maxLines: 2,
                                 style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                             ],
@@ -2810,7 +2814,9 @@ onChanged: m3Legacy<String>((v) {
                     ];
 
                     if (box.maxWidth >= 900) {
-                      return Row(
+                      return IntrinsicHeight(
+                        child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(child: stripCards[0]),
                           const SizedBox(width: 8.0),
@@ -2820,6 +2826,7 @@ onChanged: m3Legacy<String>((v) {
                           const SizedBox(width: 8.0),
                           Expanded(child: stripCards[3]),
                         ],
+                        ),
                       );
                     }
                     return Wrap(
@@ -2833,45 +2840,74 @@ onChanged: m3Legacy<String>((v) {
                 ),
               ),
 
-              // Matrix DataTable
+              // Matrix DataTable: centred headings + flex shares fill the full width;
+              // rank and branch/region live in ONE grouped first column.
               TableScrollContainer(
+                key: const ValueKey('branch_growth_table'),
                 controller: _skuPerfTableScrollController,
-                showSwipeHint: true,
+                showSwipeHint: false,
                 padding: const EdgeInsets.all(12.0),
+                columnFlex: _branchGrowthFlex,
                 child: DataTable(
                   headingRowColor: WidgetStatePropertyAll(
                     colorScheme.surfaceContainerHigh.withOpacity(0.5),
                   ),
+                  headingTextStyle: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  columnSpacing: M3Spacing.xs,
+                  horizontalMargin: M3Spacing.xs,
                   columns: [
-                    const DataColumn(label: Text('#')),
-                    const DataColumn(label: Text('الفرع والمنطقة')),
-                    DataColumn(
-                      label: Text('مبيعات $currYearLabel (ج.م)'),
-                      numeric: true,
+                    const DataColumn(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: _branchRankWidth,
+                            child: Text('#', textAlign: TextAlign.center),
+                          ),
+                          SizedBox(width: M3Spacing.xs),
+                          Text('الفرع والمنطقة'),
+                        ],
+                      ),
                     ),
                     DataColumn(
-                      label: Text('مبيعات $compYear (ج.م)'),
-                      numeric: true,
+                      label: Text('مبيعات $currYearLabel (ج.م)', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
+                    ),
+                    DataColumn(
+                      label: Text('مبيعات $compYear (ج.م)', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
                     ),
                     const DataColumn(
-                      label: Text('الفرق'),
-                      numeric: true,
+                      label: Text('الفرق', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
                     ),
                     const DataColumn(
-                      label: Text('النمو السنوي %'),
-                      numeric: true,
+                      label: Text('النمو السنوي %', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
                     ),
                     DataColumn(
-                      label: Text(_selectedMonth > 0 ? 'مبيعات الشهر الحالي' : 'المتوسط الشهري'),
-                      numeric: true,
+                      label: Text(
+                        _selectedMonth > 0 ? 'مبيعات الشهر الحالي' : 'المتوسط الشهري',
+                        textAlign: TextAlign.center,
+                      ),
+                      headingRowAlignment: MainAxisAlignment.center,
                     ),
-                    const DataColumn(label: Text('الحالة')),
+                    const DataColumn(
+                      label: Text('الحالة', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
+                    ),
                   ],
                   rows: filteredGrowthBranches.asMap().entries.map((entry) {
                     final rank = entry.key + 1;
                     final item = entry.value;
                     final isPositive = item.varianceEgp >= 0;
                     final yoyPct = item.yoyGrowthPct;
+                    final monthlyRunRate = _selectedMonth > 0
+                        ? item.fullPeriodRevenue
+                        : item.fullPeriodRevenue / 12.0;
 
                     Color statusBg;
                     Color statusFg;
@@ -2898,33 +2934,46 @@ onChanged: m3Legacy<String>((v) {
                     return DataRow(
                       cells: [
                         DataCell(
-                          Text(
-                            '$rank',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                _displayStore(item.storeName),
-                                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyMedium)),
+                              SizedBox(
+                                key: ValueKey('branch_growth_rank_${item.storeId}'),
+                                width: _branchRankWidth,
+                                child: Text(
+                                  '$rank',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
                               ),
-                              Text(
-                                '${item.chain.toUpperCase()} • ${item.region}',
-                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.labelSmall,                                   color: colorScheme.onSurfaceVariant,                                 )),
+                              const SizedBox(width: M3Spacing.xs),
+                              Flexible(
+                                child: Column(
+                                  key: ValueKey('branch_growth_name_${item.storeId}'),
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _displayStore(item.storeName),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyMedium)),
+                                    ),
+                                    Text(
+                                      '${item.chain.toUpperCase()} • ${item.region}',
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant)),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
                         DataCell(
                           Text(
-                            CurrencyFormatter.formatEGP(item.currentRevenue),
+                            item.currentRevenue > 0 ? CurrencyFormatter.formatEGP(item.currentRevenue) : '—',
+                            key: ValueKey('branch_growth_cur_${item.storeId}'),
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: colorScheme.primary,
@@ -2933,9 +2982,8 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         DataCell(
                           Text(
-                            item.prevRevenue > 0
-                                ? CurrencyFormatter.formatEGP(item.prevRevenue)
-                                : '—',
+                            item.hasPrevYear ? CurrencyFormatter.formatEGP(item.prevRevenue) : '—',
+                            key: ValueKey('branch_growth_prev_${item.storeId}'),
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurfaceVariant,
@@ -2945,6 +2993,7 @@ onChanged: m3Legacy<String>((v) {
                         DataCell(
                           Text(
                             '${isPositive ? "+" : ""}${CurrencyFormatter.formatCompactEGP(item.varianceEgp)}',
+                            key: ValueKey('branch_growth_diff_${item.storeId}'),
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: isPositive ? colorScheme.primary : colorScheme.error,
@@ -2980,14 +3029,14 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         DataCell(
                           Text(
-                            CurrencyFormatter.formatCompactEGP(item.monthlyRunRate),
+                            CurrencyFormatter.formatCompactEGP(monthlyRunRate),
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                         DataCell(
                           M3ChipSurface(
-                              color: statusBg,
-                              child: Row(
+                            color: statusBg,
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(statusIcon, size: 18.0, color: statusFg),

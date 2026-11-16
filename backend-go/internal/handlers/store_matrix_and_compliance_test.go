@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -539,3 +540,52 @@ func TestPricingCompliancePaginationAndCategoryNormalization(t *testing.T) {
 
 
 
+
+func TestStoreMatrixMatchedMonthsHandler(t *testing.T) {
+	handler, bq := setupTestAnalyticsHandler()
+	mk := func(id, date string) domain.SellOutFact {
+		return domain.SellOutFact{
+			RecordID: id, TenantID: "tenant-mm", RetailerChain: "gomla", StoreID: "s1", StoreName: "s1",
+			Barcode: "6220000000001", SKUName: "Item 1", QuantitySold: 1, NetRevenue: 10,
+			TransactionDate: date, IsOwnBrand: true,
+		}
+	}
+	if err := bq.ReplaceTenantFacts(context.Background(), "tenant-mm", []domain.SellOutFact{
+		mk("a", "2025-01-10"), mk("b", "2025-02-10"),
+		mk("c", "2026-01-10"), mk("d", "2026-02-10"), mk("e", "2026-03-10"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := httptest.NewRecorder()
+	handler.HandleStoreMatrixMatchedMonths(rec, authenticatedRequest(http.MethodGet,
+		"/api/v1/analytics/store-matrix/matched-months?year=2026&comp_year=2025&chain=gomla", "tenant-mm"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200 got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Year     int   `json:"year"`
+		CompYear int   `json:"comp_year"`
+		Months   []int `json:"months"`
+	}
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Year != 2026 || body.CompYear != 2025 || len(body.Months) != 2 || body.Months[0] != 1 || body.Months[1] != 2 {
+		t.Fatalf("unexpected body: %+v", body)
+	}
+
+	bad := httptest.NewRecorder()
+	handler.HandleStoreMatrixMatchedMonths(bad, authenticatedRequest(http.MethodGet,
+		"/api/v1/analytics/store-matrix/matched-months?year=2026", "tenant-mm"))
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("missing comp_year: want 400 got %d", bad.Code)
+	}
+
+	empty := httptest.NewRecorder()
+	handler.HandleStoreMatrixMatchedMonths(empty, authenticatedRequest(http.MethodGet,
+		"/api/v1/analytics/store-matrix/matched-months?year=2026&comp_year=2019&chain=gomla", "tenant-mm"))
+	if empty.Code != http.StatusOK || !json.Valid(empty.Body.Bytes()) || !strings.Contains(empty.Body.String(), `"months":[]`) {
+		t.Fatalf("no overlap should return months:[]: %d %s", empty.Code, empty.Body.String())
+	}
+}

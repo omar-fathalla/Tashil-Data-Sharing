@@ -43,6 +43,8 @@ class ApiEndpoints {
   static String get targets => '$baseUrl/api/v1/analytics/targets';
   static String get targetsUpload => '$baseUrl/api/v1/analytics/targets/upload';
   static String get storeMatrix => '$baseUrl/api/v1/analytics/store-matrix';
+  static String get storeMatrixMatchedMonths =>
+      '$baseUrl/api/v1/analytics/store-matrix/matched-months';
   static String get pricingCompliance => '$baseUrl/api/v1/analytics/pricing-compliance';
   static String get cpfrDashboard => '$baseUrl/api/v1/analytics/cpfr';
   static String get oosMonitor => '$baseUrl/api/v1/analytics/oos-monitor';
