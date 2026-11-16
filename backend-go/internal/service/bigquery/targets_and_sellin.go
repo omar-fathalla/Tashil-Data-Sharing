@@ -388,6 +388,8 @@ func (c *Client) GetTargetsSummary(ctx context.Context, tenantID, targetType, ch
 	savedTargets := c.targets[normTenant]
 	var items []domain.TargetComparisonItem
 	var totalTargetRev, totalActualRev, totalTargetUnits, totalActualUnits float64
+	var compTargetRev, compActualRev, compTargetUnits, compActualUnits, noDataTargetRev, noDataTargetUnits float64
+	var compCount, noDataCount int
 	var totalTargetTons, totalActualTons, totalExpRev, totalExpUnits, totalGrossRev, totalGrossUnits float64
 	branchesSet := make(map[string]bool)
 	skusSet := make(map[string]bool)
@@ -410,6 +412,17 @@ func (c *Client) GetTargetsSummary(ctx context.Context, tenantID, targetType, ch
 		totalActualRev += item.ActualRevenueEGP
 		totalTargetUnits += item.TargetUnits
 		totalActualUnits += item.ActualUnits
+		if item.HasActuals {
+			compTargetRev += item.TargetRevenueEGP
+			compActualRev += item.ActualRevenueEGP
+			compTargetUnits += item.TargetUnits
+			compActualUnits += item.ActualUnits
+			compCount++
+		} else {
+			noDataCount++
+			noDataTargetRev += item.TargetRevenueEGP
+			noDataTargetUnits += item.TargetUnits
+		}
 		totalTargetTons += item.TargetWeightTons
 		totalActualTons += item.ActualWeightTons
 		totalExpRev += item.ExpectedRevenueEGP
@@ -439,11 +452,13 @@ func (c *Client) GetTargetsSummary(ctx context.Context, tenantID, targetType, ch
 		items = []domain.TargetComparisonItem{}
 	}
 
+	// Achievement and variance only compare periods that have actual data; a future-year target
+	// stays in the target total but never counts as "0% achieved".
 	overallAch := 0.0
-	if totalTargetRev > 0 {
-		overallAch = math.Round((totalActualRev/totalTargetRev)*1000) / 10
-	} else if totalTargetUnits > 0 {
-		overallAch = math.Round((totalActualUnits/totalTargetUnits)*1000) / 10
+	if compTargetRev > 0 {
+		overallAch = math.Round((compActualRev/compTargetRev)*1000) / 10
+	} else if compTargetUnits > 0 {
+		overallAch = math.Round((compActualUnits/compTargetUnits)*1000) / 10
 	}
 
 	avgCasePrice, _ := c.inferChainUnitPriceAndTonsLocked(normTenant, tType, chainFilter)
@@ -453,7 +468,7 @@ func (c *Client) GetTargetsSummary(ctx context.Context, tenantID, targetType, ch
 		TargetType:                 tType,
 		TotalTargetRevenueEGP:      round2(totalTargetRev),
 		TotalActualRevenueEGP:      round2(totalActualRev),
-		TotalVarianceEGP:           round2(totalActualRev - totalTargetRev),
+		TotalVarianceEGP:           round2(compActualRev - compTargetRev),
 		OverallAchievementPct:      overallAch,
 		TotalTargetUnits:           round2(totalTargetUnits),
 		TotalActualUnits:           round2(totalActualUnits),
@@ -466,6 +481,12 @@ func (c *Client) GetTargetsSummary(ctx context.Context, tenantID, targetType, ch
 		AvgCasePriceEGP:            round2(avgCasePrice),
 		TotalBranchesCovered:       len(branchesSet),
 		TotalSKUsCovered:           len(skusSet),
+		ComparableTargetRevenueEGP: round2(compTargetRev),
+		ComparableActualRevenueEGP: round2(compActualRev),
+		ComparableTargetsCount:     compCount,
+		NoDataTargetsCount:         noDataCount,
+		NoDataTargetRevenueEGP:     round2(noDataTargetRev),
+		NoDataTargetUnits:          round2(noDataTargetUnits),
 		Items:                      items,
 	}, nil
 }
@@ -599,7 +620,7 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 
 	// If targetType is sell_out, preserve fast sell_out comparison
 	if t.TargetType != "sell_in" {
-		actualRev, actualUnits := c.computeActualForTargetLocked(normTenant, t)
+		actualRev, actualUnits, actualRows := c.computeActualForTargetLocked(normTenant, t)
 		varianceRev := round2(actualRev - targetRev)
 		varianceUnits := round2(actualUnits - targetUnits)
 		achRevPct := 0.0
@@ -615,6 +636,10 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 			checkPct = achUnitsPct
 		}
 		status, statusAr := classifyTargetStatus(checkPct)
+		if actualRows == 0 {
+			varianceRev, varianceUnits, achRevPct, achUnitsPct = 0, 0, 0, 0
+			status, statusAr = "no_data", "لا توجد مبيعات بعد"
+		}
 		return domain.TargetComparisonItem{
 			ID:                  t.ID,
 			TenantID:            normTenant,
@@ -635,6 +660,7 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 			VarianceUnits:       varianceUnits,
 			AchievementUnitsPct: achUnitsPct,
 			AvgCasePriceEGP:     round2(avgCasePrice),
+			HasActuals:          actualRows > 0,
 			Status:              status,
 			StatusAr:            statusAr,
 			Notes:               t.Notes,
@@ -1571,6 +1597,7 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		CCTargetRevenueEGP:      ccTargetRev,
 		BranchesCount:           len(branchesBreakdown),
 		ActiveSKUsCount:         len(chainSKUTotals),
+		HasActuals:              len(periodRecs) > 0,
 		Status:                  status,
 		StatusAr:                statusAr,
 		Notes:                   t.Notes,
@@ -1583,7 +1610,9 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 	}
 }
 
-func (c *Client) computeActualForTargetLocked(normTenant string, t domain.TargetRecord) (float64, float64) {
+// computeActualForTargetLocked returns the actual revenue, units and the number of matching rows
+// (rows == 0 means the target period has no data in scope, e.g. a future year).
+func (c *Client) computeActualForTargetLocked(normTenant string, t domain.TargetRecord) (float64, float64, int) {
 	ch := strings.ToLower(strings.TrimSpace(t.RetailerChain))
 	if ch == "all" || ch == "الكل" {
 		ch = ""
@@ -1599,6 +1628,7 @@ func (c *Client) computeActualForTargetLocked(normTenant string, t domain.Target
 
 	if t.TargetType == "sell_in" {
 		var rev, cases float64
+		var matched int
 		for _, r := range c.sellInRecords[normTenant] {
 			rChain := strings.ToLower(strings.TrimSpace(r.RetailerChain))
 			if rChain == "" {
@@ -1627,13 +1657,14 @@ func (c *Client) computeActualForTargetLocked(normTenant string, t domain.Target
 			}
 			rev += r.NetValueEGP
 			cases += r.NetQtyCases
+			matched++
 		}
-		return rev, cases
+		return rev, cases, matched
 	}
 
 	// Default: "sell_out"
 	var rev float64
-	var units int
+	var units, matched int
 	yrPrefix := fmt.Sprintf("%04d-", t.Year)
 	ymPrefix := fmt.Sprintf("%04d-%02d", t.Year, t.Month)
 
@@ -1666,8 +1697,9 @@ func (c *Client) computeActualForTargetLocked(normTenant string, t domain.Target
 		}
 		rev += r.NetRevenue
 		units += r.QuantitySold
+		matched++
 	}
-	return rev, float64(units)
+	return rev, float64(units), matched
 }
 
 // EnrichSellInRecords applies the in-memory Sell-In enrichment (chain resolver, product master prices,

@@ -336,7 +336,7 @@ func importTargetRowsToRepo(
 	}
 
 	if defaultYear <= 0 {
-		defaultYear = 2025
+		defaultYear = time.Now().Year()
 	}
 	if defaultChain == "" || defaultChain == "الكل" {
 		defaultChain = "fathalla"
