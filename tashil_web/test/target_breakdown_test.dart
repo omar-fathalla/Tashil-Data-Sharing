@@ -516,7 +516,9 @@ void main() {
       expect(textIn(tester, 'targets_kpi_card_مستهدف المبيعات', index: 1), contains('330'));
       expect(find.text('يشمل مستهدفات سنوات قادمة'), findsOneWidget);
       // 84.8% (not 38.5%) and −22.86M (not −202.86M).
-      expect(find.text('84.8%'), findsOneWidget);
+      // The comparison table repeats 84.8% without the status phrase.
+      expect(textIn(tester, 'targets_kpi_card_نسبة التحقيق', index: 1), '84.8%');
+      expect(find.text('84.8%'), findsWidgets);
       expect(find.textContaining('38.5'), findsNothing);
       final gap = textIn(tester, 'targets_kpi_card_الفرق', index: 1);
       expect(gap, contains('22.86'));
@@ -538,7 +540,9 @@ void main() {
       await pumpPanel(tester);
       await tester.tap(find.widgetWithText(TextField, 'كل السنوات'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('2027').last);
+      // The table period is also "2027". DropdownMenu mounts the entry
+      // twice; either copy selects the year.
+      await tester.tap(find.widgetWithText(MenuItemButton, '2027').last);
       await tester.pumpAndSettle();
       expect(textIn(tester, 'targets_kpi_card_المحقق', index: 1), '—');
       expect(textIn(tester, 'targets_kpi_card_نسبة التحقيق', index: 1), '—');
@@ -548,7 +552,7 @@ void main() {
     testWidgets('tapping a row opens the breakdown; the back button closes it',
         (tester) async {
       final repo = await pumpPanel(tester);
-      await tester.tap(find.text('سنة 2026'));
+      await tester.tap(find.byKey(const ValueKey('targets_period_t26')));
       await tester.pumpAndSettle();
       expect(repo.breakdownRequests, ['t26']);
       expect(find.byKey(const ValueKey('target_breakdown_dialog')), findsOneWidget);

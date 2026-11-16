@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:tashil_web/core/widgets/m3_search_field.dart';
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_text_variants.dart';
@@ -10,6 +12,7 @@ import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
 import '../../data/target_repository.dart';
 import '../../domain/target_kpi.dart';
+import '../../domain/target_table_format.dart';
 import 'target_breakdown_dialog.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -82,6 +85,87 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   String _displayBranch(String raw) {
     if (raw.isEmpty || raw == 'كل الفروع' || raw == '—') return raw;
     return _branchDisplay[raw] ?? raw;
+  }
+
+  /// Caps so the 9-column Sell-Out table fits the live 1280 shell
+  /// (250dp sidebar + 24dp page padding each side ≈ 982dp) without
+  /// horizontal scrolling. Sum of caps stays under that width minus
+  /// the 4dp margins and column gaps.
+  static const _sellOutColMax = <double>[
+    72, // السلسلة
+    100, // الفترة (Period)
+    80, // النطاق
+    88, // المستهدف
+    116, // المحقق
+    96, // الفرق
+    168, // الكمية
+    84, // نسبة التحقيق
+    88, // إجراءات
+  ];
+
+  Widget _sellOutCap(int column, Widget child) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: _sellOutColMax[column]),
+      child: child,
+    );
+  }
+
+  Widget _maybeSellOutCap(int column, Widget child) =>
+      _isSellIn ? child : _sellOutCap(column, child);
+
+  /// One-line cell. [tooltip] is the full exact value (money / quantity)
+  /// or the unclipped label (chain / scope / period).
+  Widget _sellOutLine(
+    String text, {
+    required int column,
+    String? tooltip,
+    Key? key,
+    TextStyle? style,
+  }) {
+    final line = Text(
+      text,
+      key: key,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.center,
+      style: style,
+    );
+    return _sellOutCap(
+      column,
+      tooltip == null ? line : Tooltip(message: tooltip, child: line),
+    );
+  }
+
+  Widget _targetIconButton({
+    required String tooltip,
+    required IconData icon,
+    required FutureOr<void> Function() onPressed,
+    Key? key,
+    Color? color,
+  }) {
+    final compact = !_isSellIn;
+    return IconButton(
+      key: key,
+      tooltip: tooltip,
+      onPressed: () {
+        onPressed();
+      },
+      visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+      padding: compact ? EdgeInsets.zero : null,
+      constraints: compact
+          ? const BoxConstraints.tightFor(width: 28, height: 32)
+          : null,
+      style: compact
+          ? IconButton.styleFrom(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(28, 32),
+              visualDensity: VisualDensity.compact,
+            )
+          : null,
+      icon: Icon(icon, size: compact ? 16 : 18, color: color),
+    );
   }
 
   List<RetailChainModel> _companyChains = const [];
@@ -1341,17 +1425,36 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         TableScrollContainer(
                           key: const ValueKey('targets_main_table'),
+                          // Scroll arrows appear only while the table
+                          // actually overflows. Sell-Out columns are capped
+                          // to fit a 1280 desktop, so the hint stays hidden.
                           showSwipeHint: true,
                           columnFlex: _isSellIn
                               ? const [1.3, 0.9, 1.3, 1.0, 1.0, 1.0, 1.2, 1.0, 1.3, 1.2]
-                              : const [1.2, 0.8, 1.5, 1.0, 1.1, 1.0, 1.3, 1.4, 1.2],
+                              : _sellOutColMax,
                           child: DataTable(
                             showCheckboxColumn: false,
                             headingRowColor: WidgetStatePropertyAll(
                               colorScheme.surfaceContainerHigh.withOpacity(0.5),
                             ),
+                            columnSpacing: _isSellIn ? null : M3Spacing.xxs,
+                            horizontalMargin: _isSellIn ? null : M3Spacing.xxs,
+                            headingRowHeight: _isSellIn ? null : 40,
+                            dataRowMinHeight: _isSellIn ? null : 40,
+                            dataRowMaxHeight: _isSellIn ? null : 64,
+                            headingTextStyle: _isSellIn
+                                ? null
+                                : theme.textTheme.labelMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            dataTextStyle: _isSellIn
+                                ? null
+                                : theme.textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurface,
+                                  ),
                             columns: [
-                              for (final h in [
+                              for (final (i, h) in [
                                 'السلسلة (Chain)',
                                 'الفترة (Period)',
                                 'النطاق',
@@ -1362,10 +1465,20 @@ onChanged: m3Legacy<String>((v) {
                                 if (_isSellIn) 'الوزن بالطن (فعلي / مستهدف)',
                                 'نسبة التحقيق %',
                                 'إجراءات',
-                              ])
+                              ].indexed)
                                 DataColumn(
                                   headingRowAlignment: M3TableText.headingAlignment,
-                                  label: M3TableText(h, maxLines: 2),
+                                  label: _isSellIn
+                                      ? M3TableText(h, maxLines: 2)
+                                      : _sellOutCap(
+                                          i,
+                                          M3TableText(
+                                            // Sell-Out drops the English
+                                            // "(Chain)" so the header is one line.
+                                            i == 0 ? 'السلسلة' : h,
+                                            maxLines: 1,
+                                          ),
+                                        ),
                                 ),
                             ],
                             rows: summary.items.map((item) {
@@ -1380,6 +1493,16 @@ onChanged: m3Legacy<String>((v) {
                                       : (item.achievementRevPct >= 85
                                           ? M3StatusColors.of(context).accents.caution
                                           : colorScheme.error);
+                              final periodLabel = TargetTableFormat.period(
+                                year: item.year,
+                                month: item.month,
+                                monthLabel: item.monthLabel,
+                              );
+                              final scopeLabel = TargetTableFormat.scope(
+                                branch: _displayBranch(item.branchName),
+                                category: item.category,
+                              );
+                              final periodTip = item.monthLabel.trim();
                               Widget centered(Widget child) =>
                                   Align(alignment: Alignment.center, child: child);
                               return DataRow(
@@ -1398,30 +1521,55 @@ onChanged: m3Legacy<String>((v) {
                                 cells: [
                                   DataCell(
                                     centered(
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          if (isSelected && _isSellIn)
-                                            Padding(
-                                              padding: const EdgeInsetsDirectional
-                                                  .only(end: 6.0),
-                                              child: Icon(
-                                                Icons.check_circle_rounded,
-                                                size: 18.0,
-                                                color: colorScheme.primary,
+                                      _isSellIn
+                                          ? Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (isSelected)
+                                                  Padding(
+                                                    padding: const EdgeInsetsDirectional
+                                                        .only(end: 6.0),
+                                                    child: Icon(
+                                                      Icons.check_circle_rounded,
+                                                      size: 18.0,
+                                                      color: colorScheme.primary,
+                                                    ),
+                                                  ),
+                                                Text(
+                                                  item.chainDisplayName,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : _sellOutLine(
+                                              item.chainDisplayName,
+                                              column: 0,
+                                              tooltip: item.chainDisplayName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
                                               ),
                                             ),
-                                          Text(
-                                            item.chainDisplayName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
                                     ),
                                   ),
-                                  DataCell(centered(Text(item.monthLabel))),
+                                  DataCell(
+                                    centered(
+                                      _isSellIn
+                                          ? Text(item.monthLabel)
+                                          : _sellOutLine(
+                                              periodLabel,
+                                              column: 1,
+                                              key: ValueKey(
+                                                'targets_period_${item.id}',
+                                              ),
+                                              tooltip: periodTip.isNotEmpty &&
+                                                      periodTip != periodLabel
+                                                  ? periodTip
+                                                  : null,
+                                            ),
+                                    ),
+                                  ),
                                   DataCell(
                                     centered(
                                       _isSellIn && item.branchesCount > 0
@@ -1441,86 +1589,182 @@ onChanged: m3Legacy<String>((v) {
                                                 style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.primary),
                                               ),
                                             )
-                                          : Text(
-                                              '${_displayBranch(item.branchName)} • ${item.category}',
-                                              textAlign: TextAlign.center,
+                                          : _isSellIn
+                                              ? Text(
+                                                  '${_displayBranch(item.branchName)} • ${item.category}',
+                                                  textAlign: TextAlign.center,
+                                                )
+                                              : _sellOutLine(
+                                                  scopeLabel,
+                                                  column: 2,
+                                                  key: ValueKey(
+                                                    'targets_scope_${item.id}',
+                                                  ),
+                                                  tooltip: scopeLabel,
+                                                ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    centered(
+                                      _isSellIn
+                                          ? Text(
+                                              CurrencyFormatter.formatEGP(
+                                                item.targetRevenueEgp,
+                                              ),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            )
+                                          : _sellOutLine(
+                                              TargetTableFormat.money(
+                                                item.targetRevenueEgp,
+                                              ),
+                                              column: 3,
+                                              key: ValueKey(
+                                                'targets_target_money_${item.id}',
+                                              ),
+                                              tooltip: TargetTableFormat.moneyExact(
+                                                item.targetRevenueEgp,
+                                              ),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                              ),
                                             ),
                                     ),
                                   ),
                                   DataCell(
                                     centered(
-                                      Text(
-                                        CurrencyFormatter.formatEGP(
-                                          item.targetRevenueEgp,
-                                        ),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    centered(
                                       noSales
-                                          ? Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  '—',
-                                                  key: ValueKey('targets_actual_dash_${item.id}'),
+                                          ? _maybeSellOutCap(
+                                              4,
+                                              Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    '—',
+                                                    key: ValueKey('targets_actual_dash_${item.id}'),
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w800,
+                                                      color: colorScheme.onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'لا توجد مبيعات بعد',
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    textAlign: TextAlign.center,
+                                                    style: theme.textTheme.bodySmall?.copyWith(
+                                                      color: colorScheme.onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : _isSellIn
+                                              ? Text(
+                                                  CurrencyFormatter.formatEGP(
+                                                    item.actualRevenueEgp,
+                                                  ),
                                                   style: TextStyle(
                                                     fontWeight: FontWeight.w800,
-                                                    color: colorScheme.onSurfaceVariant,
+                                                    color: colorScheme.primary,
+                                                  ),
+                                                )
+                                              : _sellOutLine(
+                                                  TargetTableFormat.money(
+                                                    item.actualRevenueEgp,
+                                                  ),
+                                                  column: 4,
+                                                  key: ValueKey(
+                                                    'targets_actual_money_${item.id}',
+                                                  ),
+                                                  tooltip: TargetTableFormat.moneyExact(
+                                                    item.actualRevenueEgp,
+                                                  ),
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w800,
+                                                    color: colorScheme.primary,
                                                   ),
                                                 ),
-                                                Text(
-                                                  'لا توجد مبيعات بعد',
-                                                  style: theme.textTheme.bodySmall?.copyWith(
-                                                    color: colorScheme.onSurfaceVariant,
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          : Text(
-                                              CurrencyFormatter.formatEGP(
-                                                item.actualRevenueEgp,
-                                              ),
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w800,
-                                                color: colorScheme.primary,
-                                              ),
-                                            ),
                                     ),
                                   ),
                                   DataCell(
                                     centered(
                                       noSales
-                                          ? Text(
-                                              '—',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                color: colorScheme.onSurfaceVariant,
+                                          ? _maybeSellOutCap(
+                                              5,
+                                              Text(
+                                                '—',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  color: colorScheme.onSurfaceVariant,
+                                                ),
                                               ),
                                             )
-                                          : Text(
-                                              '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(item.varianceRevenueEgp)}',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                color: isPositive
-                                                    ? M3StatusColors.of(context).accents.positive
-                                                    : colorScheme.error,
-                                              ),
-                                            ),
+                                          : _isSellIn
+                                              ? Text(
+                                                  '${isPositive ? '+' : ''}${CurrencyFormatter.formatEGP(item.varianceRevenueEgp)}',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isPositive
+                                                        ? M3StatusColors.of(context).accents.positive
+                                                        : colorScheme.error,
+                                                  ),
+                                                )
+                                              : _sellOutLine(
+                                                  item.varianceRevenueEgp >= 0.5
+                                                      ? '\u2066+${TargetTableFormat.money(item.varianceRevenueEgp)}\u2069'
+                                                      : TargetTableFormat.money(
+                                                          item.varianceRevenueEgp,
+                                                        ),
+                                                  column: 5,
+                                                  key: ValueKey(
+                                                    'targets_gap_money_${item.id}',
+                                                  ),
+                                                  tooltip: TargetTableFormat.moneyExact(
+                                                    item.varianceRevenueEgp,
+                                                  ),
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isPositive
+                                                        ? M3StatusColors.of(context).accents.positive
+                                                        : colorScheme.error,
+                                                  ),
+                                                ),
                                     ),
                                   ),
                                   DataCell(
                                     centered(
-                                      Text(
-                                        '${noSales ? '—' : CurrencyFormatter.formatNumber(item.actualUnits.round())} / ${CurrencyFormatter.formatNumber(item.targetUnits.round())} $_unitLabelAr',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
+                                      _isSellIn
+                                          ? Text(
+                                              '${noSales ? '—' : CurrencyFormatter.formatNumber(item.actualUnits.round())} / ${CurrencyFormatter.formatNumber(item.targetUnits.round())} $_unitLabelAr',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            )
+                                          : _sellOutLine(
+                                              TargetTableFormat.quantity(
+                                                actual: noSales
+                                                    ? null
+                                                    : item.actualUnits,
+                                                target: item.targetUnits,
+                                                unit: _unitLabelAr,
+                                              ),
+                                              column: 6,
+                                              key: ValueKey(
+                                                'targets_qty_${item.id}',
+                                              ),
+                                              tooltip: TargetTableFormat.quantityExact(
+                                                actual: noSales
+                                                    ? null
+                                                    : item.actualUnits,
+                                                target: item.targetUnits,
+                                                unit: _unitLabelAr,
+                                              ),
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
                                     ),
                                   ),
                                   if (_isSellIn)
@@ -1537,20 +1781,31 @@ onChanged: m3Legacy<String>((v) {
                                     ),
                                   DataCell(
                                     centered(
-                                      M3ChipSurface(
-                                        color: badgeColor.withOpacity(0.12),
-                                        child: Text(
-                                          noSales
-                                              ? '—'
-                                              : '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
-                                          key: ValueKey('targets_achievement_${item.id}'),
-                                          style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: badgeColor),
+                                      _maybeSellOutCap(
+                                        7,
+                                        M3ChipSurface(
+                                          color: badgeColor.withOpacity(0.12),
+                                          child: Text(
+                                            _isSellIn
+                                                ? '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})'
+                                                : TargetTableFormat.achievement(
+                                                    pct: item.achievementRevPct,
+                                                    hasActuals: !noSales,
+                                                  ),
+                                            key: ValueKey('targets_achievement_${item.id}'),
+                                            maxLines: 1,
+                                            softWrap: false,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: badgeColor),
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
                                   DataCell(
                                     centered(
+                                      _maybeSellOutCap(
+                                      8,
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -1575,33 +1830,24 @@ onChanged: m3Legacy<String>((v) {
                                               label: const Text('تفاصيل الفروع'),
                                             )
                                           else
-                                            IconButton(
+                                            _targetIconButton(
                                               key: ValueKey('targets_breakdown_${item.id}'),
                                               tooltip: 'توزيع المستهدف على الفروع والأصناف',
-                                              icon: const Icon(
-                                                Icons.account_tree_rounded,
-                                                size: 18.0,
-                                              ),
+                                              icon: Icons.account_tree_rounded,
                                               onPressed: () => _openBreakdown(item),
                                             ),
-                                          IconButton(
+                                          _targetIconButton(
                                             tooltip: 'تعديل المستهدف',
-                                            icon: const Icon(
-                                              Icons.edit_rounded,
-                                              size: 18.0,
-                                            ),
+                                            icon: Icons.edit_rounded,
                                             onPressed: () =>
                                                 _openTargetFormDialog(
                                               existing: item,
                                             ),
                                           ),
-                                          IconButton(
+                                          _targetIconButton(
                                             tooltip: 'حذف المستهدف',
-                                            icon: Icon(
-                                              Icons.delete_outline_rounded,
-                                              size: 18.0,
-                                              color: colorScheme.error,
-                                            ),
+                                            icon: Icons.delete_outline_rounded,
+                                            color: colorScheme.error,
                                             onPressed: () async {
                                               try {
                                                 await widget.apiClient
@@ -1626,6 +1872,7 @@ onChanged: m3Legacy<String>((v) {
                                             },
                                           ),
                                         ],
+                                      ),
                                       ),
                                     ),
                                   ),
