@@ -212,12 +212,14 @@ void main() {
         reason: 'item code must be fully visible on one line at 1280');
     expect(find.text('6221133000181'), findsWidgets,
         reason: 'barcode must be fully visible on one line at 1280');
+    // Barcode and item code share one column; carton / unit-excl prices are
+    // behind the columns menu at 1280 so the table fits without h-scroll.
     for (final header in [
-      'كود الصنف',
-      'الباركود',
-      'سعر الوحدة',
+      'الباركود / الكود',
+      'اسم الصنف',
       'السعر ش.ض',
-      'سعر الكرتونة',
+      'الصافي',
+      'النوع / السحب',
     ]) {
       final f = find.text(header);
       expect(f, findsWidgets, reason: 'missing header $header');

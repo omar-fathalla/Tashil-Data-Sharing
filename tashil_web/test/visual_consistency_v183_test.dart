@@ -80,7 +80,7 @@ void main() {
     expect(find.textContaining('Pricing & Promo Compliance'), findsNothing);
   });
 
-  testWidgets('Product Master «مسحوب» chip stays one line (no مسحو/ب clip)',
+  testWidgets('Product Master type chip and «مسحوب» caption stay one line (no مسحو/ب clip)',
       (tester) async {
     final errors = await pumpProductMaster(
       tester,
@@ -90,34 +90,21 @@ void main() {
     );
     expect(errors, isEmpty);
 
-    final chips = find.byWidgetPredicate(
-      (w) =>
-          w is M3ChipSurface &&
-          find
-              .descendant(
-                of: find.byWidget(w),
-                matching: find.text('مسحوب'),
-              )
-              .evaluate()
-              .isNotEmpty,
-    );
-    expect(chips, findsWidgets);
-    for (final e in chips.evaluate()) {
-      final text = tester.widget<Text>(
-        find.descendant(of: find.byWidget(e.widget), matching: find.text('مسحوب')),
-      );
+    // Type chip («عادي» / «عرض») and the «مسحوب» caption under it stay one line.
+    final chip = find.byKey(const ValueKey('pm_row_type_chip_FGCL-0550-0001'));
+    expect(tester.widget(chip), isA<M3ChipSurface>());
+    for (final f in [
+      find.descendant(of: chip, matching: find.text('عادي')),
+      find.byKey(const ValueKey('pm_row_pull_FGCL-0550-0001')),
+    ]) {
+      final text = tester.widget<Text>(f);
       expect(text.maxLines, 1);
-      expect(text.softWrap, isFalse);
       final para = tester.renderObject<RenderParagraph>(
-        find.descendant(
-          of: find.byWidget(e.widget),
-          matching: find.text('مسحوب'),
-        ),
-      );
+          find.descendant(of: f, matching: find.byType(RichText)));
       expect(para.didExceedMaxLines, isFalse);
-      expect(para.size.height, lessThan(28),
-          reason: 'مسحوب must paint on a single chip line');
+      expect(para.size.height, lessThan(28));
     }
+    expect(find.text('مسحوب'), findsWidgets);
   });
 
   testWidgets(

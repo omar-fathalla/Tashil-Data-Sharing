@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tashil_web/core/storage/session_storage.dart';
 import 'package:tashil_web/core/data/app_cache.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/utils/currency_formatter.dart';
@@ -164,8 +165,9 @@ void main() {
   });
 
   testWidgets(
-      'Product Master KPI titles stay fully visible and are not ellipsized',
+      'Product Master opened from Pricing shows title + tabs (no KPI grid) and leaves the page URL alone',
       (tester) async {
+    SessionStorage.replaceBrowserQueryParam('tab', null);
     final api = _FitApiClient();
     await pumpPricing(
       tester,
@@ -181,21 +183,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(ProductMasterScreen), findsOneWidget);
-    final grid = find.byKey(const ValueKey('product_master_kpi_grid'));
-    expect(grid, findsOneWidget);
-
-    for (final title in [
-      'إجمالي الأصناف',
-      'أصناف البيع العادي',
-      'أصناف العروض',
-      'الباركودات الفريدة',
-      'التغطية بالسلاسل',
-    ]) {
-      expect(find.text(title), findsOneWidget, reason: title);
-      expect(_onScreen(tester, find.text(title)), isTrue, reason: title);
-    }
-
-    expect(_ellipsizedBefore(tester, grid, 1), isEmpty);
+    expect(find.byKey(const ValueKey('product_master_kpi_grid')), findsNothing);
+    final tabs = find.byKey(const ValueKey('product_master_tabs'));
+    expect(tabs, findsOneWidget);
+    expect(_onScreen(tester, tabs), isTrue);
+    await tester.tap(find.byKey(const ValueKey('pm_tab_sheets')));
+    await tester.pumpAndSettle();
+    expect(SessionStorage.browserQueryParam('tab'), isNull,
+        reason: 'the embedded dialog must not write ?tab= into the Pricing URL');
   });
 
   testWidgets('هامش السلسلة uses formatSignedPct so the minus stays on the left',

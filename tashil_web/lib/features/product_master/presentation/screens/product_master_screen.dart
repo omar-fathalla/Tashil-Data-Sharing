@@ -1,37 +1,33 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/theme/m3_palette.dart';
 import 'package:tashil_web/core/theme/m3_typography.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../../core/network/api_client.dart';
 import '../../data/product_master_repository.dart';
 import '../../data/chain_discount_repository.dart';
 import '../widgets/chain_discount_profiles_card.dart';
+import '../widgets/pm_catalog_table.dart';
+import '../../../../core/storage/session_storage.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/utils/web_file_helper.dart';
 import '../../../../core/data/data_refresh_mixin.dart';
-import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/arabic_plural.dart';
 import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/utils/app_date_format.dart';
-import '../../../../core/widgets/hyphenated_code_text.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/m3_button.dart';
-import '../../../../core/widgets/m3_button_group.dart';
 import '../../../../core/widgets/m3_chip_surface.dart';
-import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_feedback.dart';
-import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/m3_search_field.dart';
-import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_toolbar_button.dart';
 import '../../../../core/widgets/m3_wrap_text.dart';
-import '../../../../core/widgets/table_scroll_container.dart';
 
 /// Adeco Canonical Product Master & Official Price List Screen (`كارتة الأصناف والأسعار`).
 /// Provides:
@@ -50,7 +46,11 @@ class ProductMasterScreen extends StatefulWidget {
     this.initialSearchQuery,
     this.repository,
     this.chainRepository,
+    this.persistTabInUrl = true,
   });
+
+  /// Keep the selected tab in the `?tab=` URL query (off when embedded in a dialog).
+  final bool persistTabInUrl;
 
   /// Optional injected chain-terms repository (tests).
   final ChainDiscountRepository? chainRepository;
@@ -116,20 +116,47 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   bool _chainProfilesLoading = false;
   bool _chainProfilesSaving = false;
   String? _chainProfilesError;
+  bool _chainProfilesErrorOnLoad = true;
+
+  /// User choices from the columns menu (true = show); others follow the width.
+  final Map<PmCatalogColumn, bool> _columnOverrides = {};
+
+  /// `?tab=` values, in tab order.
+  static const List<String> tabSlugs = ['catalog', 'sheets', 'calculator'];
+  static const String tabQueryParam = 'tab';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    final urlTab = widget.persistTabInUrl
+        ? tabSlugs.indexOf(SessionStorage.browserQueryParam(tabQueryParam) ?? '')
+        : -1;
+    _tabController = TabController(
+        length: 3, vsync: this, initialIndex: urlTab < 0 ? 0 : urlTab);
     _tabController.addListener(() {
-      if (mounted && !_tabController.indexIsChanging) setState(() {});
+      if (!mounted || _tabController.indexIsChanging) return;
+      setState(() {});
+      _writeTabToUrl();
     });
+    if (urlTab > 0) {
+      // AppShell re-asserts the page path after the first frame (dropping the query).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _writeTabToUrl();
+      });
+    }
     if (widget.initialSearchQuery != null &&
         widget.initialSearchQuery!.trim().isNotEmpty) {
       _searchController.text = widget.initialSearchQuery!.trim();
     }
     _loadData();
     _loadChainProfiles();
+  }
+
+  void _writeTabToUrl() {
+    if (!widget.persistTabInUrl) return;
+    final i = _tabController.index;
+    SessionStorage.replaceBrowserQueryParam(
+        tabQueryParam, i == 0 ? null : tabSlugs[i]);
   }
 
   Future<void> _loadChainProfiles() async {
@@ -143,7 +170,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       setState(() => _chainProfiles = list);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _chainProfilesError = e.toString());
+      setState(() {
+        _chainProfilesError = friendlyChainDiscountError(e);
+        _chainProfilesErrorOnLoad = true;
+      });
     } finally {
       if (mounted) setState(() => _chainProfilesLoading = false);
     }
@@ -160,7 +190,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       setState(() => _chainProfiles = saved);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _chainProfilesError = e.toString());
+      setState(() {
+        _chainProfilesError = friendlyChainDiscountError(e);
+        _chainProfilesErrorOnLoad = false;
+      });
     } finally {
       if (mounted) setState(() => _chainProfilesSaving = false);
     }
@@ -398,250 +431,6 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     M3Feedback.showSuccess(
       context,
       'تم حذف الشيت "${file.fileName}" وإلغاء تأثيراته واسترجاع الأسعار السابقة بنجاح.',
-    );
-  }
-
-  Future<void> _showFileSheetsModal() async {
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            final theme = Theme.of(ctx);
-            final cs = theme.colorScheme;
-            final files = _archivedMasterFiles;
-            return Directionality(
-              textDirection: TextDirection.rtl,
-              child: AlertDialog(
-                titlePadding:
-                    const EdgeInsetsDirectional.fromSTEB(20, 18, 20, 8),
-                contentPadding:
-                    const EdgeInsetsDirectional.fromSTEB(20, 8, 20, 16),
-                title: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8.0),
-                      decoration: BoxDecoration(
-                        color: cs.primaryContainer,
-                        borderRadius: M3Shape.radiusSm,
-                      ),
-                      child: Icon(
-                        Icons.folder_copy_rounded,
-                        color: cs.primary,
-                        size: 22.0,
-                      ),
-                    ),
-                    const SizedBox(width: 10.0),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'شيتات الأسعار المرفوعة (File Sheets)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: M3FontSize.bodyLarge,
-                            ),
-                          ),
-                          Text(
-                            'سجل ملفات الإكسيل المرفوعة بالتاريخ مع إمكانية حذف أي شيت وإلغاء تأثيراته فوراً',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                content: SizedBox(
-                  width: 620,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (files.isEmpty)
-                        Container(
-                          padding: const EdgeInsets.all(24.0),
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerLow,
-                            borderRadius: M3Shape.radiusMd,
-                          ),
-                          child: const Center(
-                            child: Text('لا توجد شيتات مرفوعة حالياً'),
-                          ),
-                        )
-                      else
-                        Flexible(
-                          child: SingleChildScrollView(
-                            child: Wrap(
-                              spacing: 10.0,
-                              runSpacing: 10.0,
-                              children: files.asMap().entries.map((entry) {
-                                final idx = entry.key;
-                                final file = entry.value;
-                                final isLatest = idx == 0;
-                                return Container(
-                                  key: ValueKey('file_sheet_bubble_${file.id}'),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14.0,
-                                    vertical: 12.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isLatest
-                                        ? cs.primaryContainer
-                                            .withValues(alpha: 0.45)
-                                        : cs.surfaceContainerLow,
-                                    borderRadius: M3Shape.radiusLg,
-                                    border: Border.all(
-                                      color: isLatest
-                                          ? cs.primary.withValues(alpha: 0.5)
-                                          : cs.outlineVariant
-                                              .withValues(alpha: 0.6),
-                                      width: isLatest ? 1.5 : 1.0,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: isLatest
-                                            ? cs.primary
-                                            : cs.surfaceContainerHighest,
-                                        child: Icon(
-                                          Icons.table_chart_rounded,
-                                          size: 18,
-                                          color: isLatest
-                                              ? cs.onPrimary
-                                              : cs.onSurfaceVariant,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12.0),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Flexible(
-                                                  child: M3WrapText(
-                                                    file.fileName,
-                                                    maxLines: 3,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w900,
-                                                      fontSize: M3FontSize
-                                                          .labelMediumPlus,
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (isLatest) ...[
-                                                  const SizedBox(width: 8.0),
-                                                  Container(
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                      horizontal: 8.0,
-                                                      vertical: 2.0,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(
-                                                              0xFF0F766E)
-                                                          .withValues(
-                                                              alpha: 0.15),
-                                                      borderRadius:
-                                                          M3Shape.radiusFull,
-                                                    ),
-                                                    child: const Text(
-                                                      'مفعل حالياً',
-                                                      style: TextStyle(
-                                                        fontSize:
-                                                            M3FontSize.tiny,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        color: M3Palette.teal,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4.0),
-                                            Wrap(
-                                              spacing: 10.0,
-                                              runSpacing: 4.0,
-                                              children: [
-                                                Text(
-                                                  'تاريخ الرفع: ${_formatUploadDate(file.uploadedAt)}',
-                                                  style: theme
-                                                      .textTheme.labelSmall
-                                                      ?.copyWith(
-                                                    color: cs.onSurfaceVariant,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                                Text(
-                                                  '• عدد الأصناف: ${file.rowsIngested} صنف',
-                                                  style: theme
-                                                      .textTheme.labelSmall
-                                                      ?.copyWith(
-                                                    color: cs.primary,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      IconButton(
-                                        key: ValueKey(
-                                            'delete_file_sheet_btn_${file.id}'),
-                                        tooltip:
-                                            'حذف هذا الشيت وإلغاء تأثيراته من الكارتة',
-                                        icon: Icon(
-                                          Icons.delete_outline_rounded,
-                                          color: cs.error,
-                                        ),
-                                        onPressed: () async {
-                                          Navigator.of(ctx).pop();
-                                          await _handleDeleteProductMasterSheet(
-                                              file);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: const Text('إغلاق'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      _handleUploadMasterWorkbook();
-                    },
-                    icon: const Icon(Icons.upload_file_rounded, size: 18),
-                    label: const Text('رفع شيت أسعار جديد'),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 
@@ -895,8 +684,6 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     );
   }
 
-  String _formatUploadDate(String raw) =>
-      AppDateFormat.tryFormat(raw, withTime: true);
 
   void _exportFilteredCatalogToCsv() {
     final items = _filteredItems;
@@ -946,10 +733,6 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     );
   }
 
-  void _copyToClipboard(String value, String labelAr) {
-    Clipboard.setData(ClipboardData(text: value));
-    M3Feedback.showInfo(context, 'تم نسخ $labelAr: $value');
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -970,7 +753,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildPageHeader(summary: null),
+              _buildPageHeader(),
               const SizedBox(height: 16.0),
               M3ErrorBanner(
                 title: 'تعذّر تحميل كارتة الأصناف والأسعار',
@@ -1001,149 +784,75 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       backgroundColor: cs.surface,
       body: M3ToolbarButtonTheme(
         child: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding:
-                  const EdgeInsetsDirectional.fromSTEB(24.0, 20.0, 24.0, 12.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildPageHeader(summary: summary),
-                  const SizedBox(height: 12.0),
-                  _buildHeaderMetaStrip(theme, cs, summary),
-                  const SizedBox(height: 16.0),
-                  _buildKpiCardsRow(theme, cs, summary, filtered.length),
-                  const SizedBox(height: 16.0),
-                  M3ResponsiveTabBar<int>(
-                    key: const ValueKey('product_master_tabs'),
-                    textDirection: TextDirection.ltr,
-                    selectedValue: _tabController.index,
-                    items: [
-                      M3ResponsiveTabItem<int>(
-                        value: 0,
-                        icon: Icons.qr_code_2_rounded,
-                        selectedIcon: Icons.qr_code_2_rounded,
-                        label: 'كارتة الأصناف (${filtered.length})',
-                      ),
-                      const M3ResponsiveTabItem<int>(
-                        value: 1,
-                        icon: Icons.calculate_rounded,
-                        selectedIcon: Icons.calculate_rounded,
-                        label: 'حاسبة الطلبيات والخصومات والهامش',
-                      ),
-                      M3ResponsiveTabItem<int>(
-                        value: 2,
-                        icon: Icons.cloud_upload_rounded,
-                        selectedIcon: Icons.cloud_upload_rounded,
-                        label:
-                            'الشيتات المرفوعة (${_archivedMasterFiles.length})',
-                      ),
-                    ],
-                    onChanged: (next) {
-                      _tabController.animateTo(next);
-                      setState(() {});
-                    },
-                  ),
-                ],
+          headerSliverBuilder: (context, innerBoxIsScrolled) => [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                    24.0, 20.0, 24.0, 0.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildPageHeader(),
+                    const SizedBox(height: 16.0),
+                    _buildTabBar(theme, cs, filtered.length),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildCatalogTab(theme, cs, summary, filtered),
-            _buildCalculatorTab(theme, cs, summary),
-            _buildUploadAndArchiveTab(theme, cs, summary),
           ],
-        ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildCatalogTab(theme, cs, summary, filtered),
+              _buildUploadAndArchiveTab(theme, cs, summary),
+              _buildCalculatorTab(theme, cs, summary),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// Short status chip matching Sell-Out / Trade Marketing geometry.
-  /// Labels stay on one line (no mid-word split). When an icon is present and
-  /// the chip is squeezed (e.g. price col → 64dp inner), [Flexible] lets the
-  /// text fade instead of blowing the Row.
-  Widget _statusChip(String label, Color color, {Key? key, IconData? icon}) {
-    final style = TextStyle(
-      fontWeight: FontWeight.w800,
-      fontSize: M3FontSize.labelSmallPlus,
-      color: color,
-    );
-    final text = Text(
-      label,
-      maxLines: 1,
-      softWrap: false,
-      overflow: TextOverflow.fade,
-      textAlign: TextAlign.center,
-      style: style,
-    );
-    return M3ChipSurface(
-      key: key,
-      color: color.withValues(alpha: 0.14),
-      child: icon == null
-          ? text
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 14.0, color: color),
-                const SizedBox(width: M3Spacing.xxs),
-                Flexible(child: text),
-              ],
-            ),
+  /// M3 primary tabs, fixed (not scrollable), 48dp, directly under the title.
+  /// Order (RTL, first = rightmost): SKU card, uploaded sheets, order calculator.
+  Widget _buildTabBar(ThemeData theme, ColorScheme cs, int catalogCount) {
+    return TabBar(
+      key: const ValueKey('product_master_tabs'),
+      controller: _tabController,
+      isScrollable: false,
+      labelColor: cs.primary,
+      unselectedLabelColor: cs.onSurfaceVariant,
+      labelStyle: theme.textTheme.titleSmall,
+      unselectedLabelStyle: theme.textTheme.titleSmall,
+      indicatorColor: cs.primary,
+      dividerColor: cs.outlineVariant,
+      dividerHeight: 1.0,
+      tabs: [
+        Tab(
+          key: const ValueKey('pm_tab_catalog'),
+          height: 48.0,
+          text: 'كارتة الأصناف ($catalogCount)',
+        ),
+        Tab(
+          key: const ValueKey('pm_tab_sheets'),
+          height: 48.0,
+          text: 'الشيتات المرفوعة (${_archivedMasterFiles.length})',
+        ),
+        const Tab(
+          key: ValueKey('pm_tab_calculator'),
+          height: 48.0,
+          text: 'حاسبة الطلبيات',
+        ),
+      ],
     );
   }
 
-  /// Sell-Out / Errors / OOS symmetry: shared page chrome + tonal actions.
-  Widget _buildPageHeader({ProductMasterSummaryModel? summary}) {
-    final canExport = summary != null && _filteredItems.isNotEmpty;
-    return M3PageHeader(
-      key: const ValueKey('product_master_page_header'),
+  /// Title only: page actions live in each tab's toolbar.
+  Widget _buildPageHeader() {
+    return const M3PageHeader(
+      key: ValueKey('product_master_page_header'),
       titleEn: 'Product Master & Price List',
       subtitleAr: 'كارتة الأصناف والأسعار',
-      actions: M3ButtonGroup(
-        maxVisibleCompact: 2,
-        items: [
-          M3GroupItem(
-            key: const ValueKey('product_master_header_sheets_btn'),
-            label: 'File Sheets (${_archivedMasterFiles.length})',
-            icon: Icons.layers_rounded,
-            kind: M3GroupItemKind.tonal,
-            tooltip: 'الشيتات المرفوعة',
-            onPressed: _showFileSheetsModal,
-          ),
-          M3GroupItem(
-            key: const ValueKey('product_master_export_csv_btn'),
-            label: 'تصدير Excel (CSV)',
-            icon: Icons.download_rounded,
-            kind: M3GroupItemKind.tonal,
-            tooltip: 'تصدير الكتالوج',
-            onPressed: canExport ? _exportFilteredCatalogToCsv : null,
-          ),
-          M3GroupItem(
-            key: const ValueKey('product_master_add_sku_btn'),
-            label: 'إضافة صنف جديد',
-            icon: Icons.add_box_rounded,
-            kind: M3GroupItemKind.tonal,
-            tooltip: 'إضافة صنف جديد',
-            onPressed: summary == null ? null : () => _openNewSkuCard(summary),
-          ),
-          M3GroupItem(
-            key: const ValueKey('product_master_upload_btn'),
-            label: _isUploading
-                ? 'جاري تحديث الكارتة...'
-                : 'رفع تحديث شيت الأسعار',
-            icon: Icons.upload_file_rounded,
-            kind: M3GroupItemKind.tonal,
-            tooltip: 'رفع تحديث شيت الأسعار',
-            isLoading: _isUploading,
-            onPressed: _isUploading ? null : _handleUploadMasterWorkbook,
-          ),
-        ],
-      ),
     );
   }
 
@@ -1182,177 +891,6 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     );
   }
 
-  /// Meta chips under the page header (date / VAT / sheets / price-diff).
-  Widget _buildHeaderMetaStrip(
-    ThemeData theme,
-    ColorScheme cs,
-    ProductMasterSummaryModel summary,
-  ) {
-    final totalChanged = summary.priceIncreasedCount +
-        summary.priceDecreasedCount +
-        summary.newSkusCount;
-    return Wrap(
-      spacing: 8.0,
-      runSpacing: 6.0,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        _buildMetaChip(cs, Icons.verified_rounded, summary.sheetDateLabel),
-        _buildMetaChip(
-          cs,
-          Icons.discount_rounded,
-          'خصم فاتورة ${summary.defaultDiscountPct.toStringAsFixed(0)}%',
-        ),
-        _buildMetaChip(
-          cs,
-          Icons.receipt_long_rounded,
-          'ضريبة ${(summary.defaultVatRate * 100).toStringAsFixed(0)}%',
-        ),
-        InkWell(
-          key: const ValueKey('product_master_file_sheets_btn'),
-          onTap: _showFileSheetsModal,
-          borderRadius: M3Shape.radiusFull,
-          child: _statusChip(
-            'شيتات الأسعار (${_archivedMasterFiles.length})',
-            cs.primary,
-            icon: Icons.folder_special_rounded,
-          ),
-        ),
-        if (totalChanged > 0)
-          InkWell(
-            key: const ValueKey('product_master_diff_summary_chip'),
-            onTap: () => _showUploadDiffSummaryDialog(summary),
-            borderRadius: M3Shape.radiusFull,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _statusChip('فروق', M3Palette.amberDeep,
-                    icon: Icons.price_change_rounded),
-                const SizedBox(height: 2.0),
-                M3WrapText(
-                  '↑${summary.priceIncreasedCount} ↓${summary.priceDecreasedCount} +${summary.newSkusCount}',
-                  maxLines: 2,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: M3FontSize.tiny,
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildMetaChip(ColorScheme cs, IconData icon, String label) {
-    return _statusChip(label, cs.primary, icon: icon);
-  }
-
-  Widget _buildKpiCardsRow(
-    ThemeData theme,
-    ColorScheme cs,
-    ProductMasterSummaryModel summary,
-    int filteredCount,
-  ) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Even fill: 5 cards → 3+2 at the live shell (not a lonely 4+1).
-        // Incomplete last row is stretched full-width by M3EqualHeightGrid
-        // (no empty third slot). Height stays Sell-Out 138.
-        final columns = M3KpiGridColumns.forWidthAndCount(
-          constraints.maxWidth,
-          5,
-        );
-        // Empty catalog → «—» + note (never advertise fake 0% / 0.0 averages).
-        final emptyCatalog = summary.totalSkus <= 0;
-        final regularShare = !emptyCatalog
-            ? ((summary.regularSkusCount / summary.totalSkus) * 100)
-                .toStringAsFixed(1)
-            : null;
-        return M3EqualHeightGrid(
-          key: const ValueKey('product_master_kpi_grid'),
-          columns: columns,
-          spacing: M3Spacing.sm,
-          runSpacing: M3Spacing.sm,
-          children: [
-            M3SummaryKpiCard(
-              key: const ValueKey('pm_kpi_card_Total Registered'),
-              title: 'إجمالي الأصناف',
-              titleMaxLines: 1,
-              subtitleMaxLines: 1,
-              value: emptyCatalog ? '—' : countSku(summary.totalSkus),
-              subtitle: emptyCatalog
-                  ? 'لا توجد أصناف في الكارتة'
-                  : 'المعروض بالفلتر الحالي: ${countSku(filteredCount)}',
-              icon: Icons.qr_code_scanner_rounded,
-              color: cs.primary,
-              valueKey: const ValueKey('pm_kpi_value_Total Registered'),
-              textValue: emptyCatalog,
-            ),
-            M3SummaryKpiCard(
-              key: const ValueKey('pm_kpi_card_Regular Catalog'),
-              title: 'أصناف البيع العادي',
-              titleMaxLines: 1,
-              subtitleMaxLines: 1,
-              value: emptyCatalog ? '—' : countSku(summary.regularSkusCount),
-              subtitle: emptyCatalog
-                  ? 'لا توجد أصناف لحساب الحصة'
-                  : 'تمثل $regularShare% من إجمالي الكارتة',
-              icon: Icons.check_circle_outline_rounded,
-              color: M3Palette.teal,
-              textValue: emptyCatalog,
-            ),
-            M3SummaryKpiCard(
-              key: const ValueKey('pm_kpi_card_Promos'),
-              title: 'أصناف العروض',
-              titleMaxLines: 1,
-              subtitleMaxLines: 1,
-              value: emptyCatalog
-                  ? '—'
-                  : '${_intFmt.format(summary.promoSkusCount)} عرض',
-              subtitle: emptyCatalog
-                  ? 'لا توجد عروض مسجّلة'
-                  : 'عروض وشرنك وباقات ترويجية',
-              icon: Icons.local_offer_rounded,
-              color: M3Palette.warning,
-              textValue: emptyCatalog,
-            ),
-            M3SummaryKpiCard(
-              key: const ValueKey('pm_kpi_card_Unique Barcodes'),
-              title: 'الباركودات الفريدة',
-              titleMaxLines: 1,
-              subtitleMaxLines: 1,
-              value: emptyCatalog
-                  ? '—'
-                  : '${_intFmt.format(summary.uniqueBarcodesCount)} باركود',
-              subtitle: emptyCatalog
-                  ? 'لا يوجد متوسط سعة للكرتونة'
-                  : 'متوسط السعة: ${summary.avgUnitsPerCarton.toStringAsFixed(1)} وحدة/كرتونة',
-              icon: Icons.view_in_ar_rounded,
-              color: M3Palette.indigo,
-              textValue: emptyCatalog,
-            ),
-            M3SummaryKpiCard(
-              key: const ValueKey('pm_kpi_card_Chain Coverage'),
-              title: 'التغطية بالسلاسل',
-              titleMaxLines: 1,
-              subtitleMaxLines: 1,
-              value: emptyCatalog
-                  ? '—'
-                  : '${_intFmt.format(summary.activeInChainsCount)} نشط',
-              subtitle: emptyCatalog
-                  ? 'لا توجد تغطية سلاسل بعد'
-                  : 'غير مسحوب (فرصة توزيع): ${countSku(summary.unpulledSkusCount)}',
-              icon: Icons.storefront_rounded,
-              color: M3Palette.info,
-              textValue: emptyCatalog,
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   List<String> _buildEffectivePrefixChips(ProductMasterSummaryModel summary) {
     final raw = summary.availablePrefixes;
     final hasSubPr = raw.any(
@@ -1364,745 +902,201 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     return raw;
   }
 
+  bool get _hasActiveFilters =>
+      _selectedPrefix != 'all' ||
+      _selectedBrand != 'all' ||
+      _selectedItemType != 'all' ||
+      _selectedPackaging != 'all' ||
+      _selectedPullStatus != 'all' ||
+      _selectedPriceChange != 'all' ||
+      _searchController.text.isNotEmpty;
+
+  void _resetFilters() {
+    _searchController.clear();
+    setState(() {
+      _selectedPrefix = 'all';
+      _selectedBrand = 'all';
+      _selectedItemType = 'all';
+      _selectedPackaging = 'all';
+      _selectedPullStatus = 'all';
+      _selectedPriceChange = 'all';
+      _currentPage = 0;
+    });
+  }
+
+  Future<void> _openItemCard(ProductMasterItemModel item) async {
+    await ProductMasterScreen.showProductIdCardModal(
+      context,
+      apiClient: widget.apiClient,
+      item: item,
+      onUpdated: (updatedSummary) {
+        _repo.prime(updatedSummary);
+        if (mounted) setState(() => _summary = updatedSummary);
+      },
+    );
+  }
+
   Widget _buildCatalogTab(
     ThemeData theme,
     ColorScheme cs,
     ProductMasterSummaryModel summary,
     List<ProductMasterItemModel> filtered,
   ) {
-    final totalPages = (filtered.length / _pageSize).ceil();
+    final pageCount = (filtered.length / _pageSize).ceil();
     final safePage =
-        totalPages == 0 ? 0 : _currentPage.clamp(0, totalPages - 1);
+        pageCount == 0 ? 0 : _currentPage.clamp(0, pageCount - 1);
     final startIdx = safePage * _pageSize;
-    final endIdx = (startIdx + _pageSize) > filtered.length
-        ? filtered.length
-        : (startIdx + _pageSize);
+    final endIdx = math.min(startIdx + _pageSize, filtered.length);
     final pageItems = filtered.isEmpty
         ? const <ProductMasterItemModel>[]
         : filtered.sublist(startIdx, endIdx);
 
-    return ListView(
-      padding: const EdgeInsetsDirectional.fromSTEB(24.0, 8.0, 24.0, 32.0),
-      children: [
-        // Search & Filter Bar
-        Container(
-          padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLow,
-            borderRadius: M3Shape.radiusLg,
-            border:
-                Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: M3SearchFieldWidth(
-                      hintText: 'بحث بكود الصنف أو الباركود أو الاسم',
-                      child: TextField(
-                      key: const ValueKey('product_master_search_input'),
-                      controller: _searchController,
-                      onChanged: (_) => setState(() => _currentPage = 0),
-                      decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.search_rounded),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(Icons.clear_rounded),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _currentPage = 0);
-                                },
-                              )
-                            : null,
-                        hintText: 'بحث بكود الصنف أو الباركود أو الاسم',
-                        filled: true,
-                        fillColor: cs.surface,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16.0,
-                          vertical: 12.0,
-                        ),
-                        border: const OutlineInputBorder(
-                          borderRadius: M3Shape.radiusMd,
-                        ),
-                      ),
-                    ),
-                    ),
-                  ),
-                  const SizedBox(width: 12.0),
-                  if (_selectedPrefix != 'all' ||
-                      _selectedBrand != 'all' ||
-                      _selectedItemType != 'all' ||
-                      _selectedPackaging != 'all' ||
-                      _selectedPullStatus != 'all' ||
-                      _selectedPriceChange != 'all' ||
-                      _searchController.text.isNotEmpty)
-                    TextButton.icon(
-                      key: const ValueKey('product_master_reset_filters_btn'),
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() {
-                          _selectedPrefix = 'all';
-                          _selectedBrand = 'all';
-                          _selectedItemType = 'all';
-                          _selectedPackaging = 'all';
-                          _selectedPullStatus = 'all';
-                          _selectedPriceChange = 'all';
-                          _currentPage = 0;
-                        });
-                      },
-                      icon:
-                          const Icon(Icons.filter_alt_off_rounded, size: 18.0),
-                      label: const Text('إعادة ضبط الفلاتر'),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12.0),
-              // Quick Price-Change Filter Bar (فلتر سريع لتغيرات الأسعار)
-              _buildQuickPriceChangeFilterBar(theme, cs, summary),
-              const SizedBox(height: 12.0),
-              Wrap(
-                spacing: 12.0,
-                runSpacing: 10.0,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  // Item Code Prefix dropdown filter
-                  _buildDropdownFilter(
-                    labelAr: 'البادئة',
-                    value: _selectedPrefix,
-                    items: {
-                      'all': 'الكل (All)',
-                      for (final pfx in _buildEffectivePrefixChips(summary))
-                        pfx: '$pfx (${_prefixDescriptionAr(pfx)})',
-                    },
-                    onChanged: (v) => setState(() {
-                      _selectedPrefix = v ?? 'all';
-                      _currentPage = 0;
-                    }),
-                  ),
-                  // Brand filter
-                  _buildDropdownFilter(
-                    labelAr: 'العلامة',
-                    value: _selectedBrand,
-                    items: {
-                      'all':
-                          'كل العلامات التجارية (${summary.availableBrands.length})',
-                      for (final b in summary.availableBrands) b: b,
-                    },
-                    onChanged: (v) => setState(() {
-                      _selectedBrand = v ?? 'all';
-                      _currentPage = 0;
-                    }),
-                  ),
-                  // Item Type filter
-                  _buildDropdownFilter(
-                    labelAr: 'النوع',
-                    value: _selectedItemType,
-                    items: {
-                      'all': 'الكل (عادي + عرض)',
-                      'عادي': 'عادي (Regular - ${summary.regularSkusCount})',
-                      'عرض': 'عرض ترويجي (Promo - ${summary.promoSkusCount})',
-                    },
-                    onChanged: (v) => setState(() {
-                      _selectedItemType = v ?? 'all';
-                      _currentPage = 0;
-                    }),
-                  ),
-                  // Packaging filter
-                  _buildDropdownFilter(
-                    labelAr: 'التعبئة',
-                    value: _selectedPackaging,
-                    items: {
-                      'all': 'كل أنواع التعبئة',
-                      for (final p in summary.availablePackaging) p: p,
-                    },
-                    onChanged: (v) => setState(() {
-                      _selectedPackaging = v ?? 'all';
-                      _currentPage = 0;
-                    }),
-                  ),
-                  // Chain Pull Status filter
-                  _buildDropdownFilter(
-                    labelAr: 'السحب',
-                    value: _selectedPullStatus,
-                    items: {
-                      'all': 'الكل (${summary.totalSkus})',
-                      'active':
-                          'مسحوب ونشط بالسلاسل (${summary.activeInChainsCount})',
-                      'unpulled':
-                          'غير مسحوب - فرصة توزيع (${summary.unpulledSkusCount})',
-                    },
-                    onChanged: (v) => setState(() {
-                      _selectedPullStatus = v ?? 'all';
-                      _currentPage = 0;
-                    }),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16.0),
-
-        // Sell-Out / Errors / TM symmetry: catalog sits on M3TableSurface so
-        // rows stay tonal (not bare white) at ~1920 device / 1280 logical.
-        Container(
-          key: const ValueKey('pm_catalog_tonal_surface'),
-          decoration: BoxDecoration(
-            color: M3TableSurface.color(cs),
-            borderRadius: M3Shape.radiusLg,
-            border:
-                Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 12.0,
+    return LayoutBuilder(builder: (context, constraints) {
+      final tableWidth = constraints.maxWidth - 48.0;
+      final visible =
+          PmCatalogTableStyle.visibleColumns(tableWidth, _columnOverrides);
+      const radius = M3Shape.radiusLg;
+      return CustomScrollView(
+        key: const PageStorageKey('pm_catalog_scroll'),
+        slivers: [
+          SliverPadding(
+            padding:
+                const EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 32.0),
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _buildCatalogToolbar(
+                      theme, cs, summary, filtered, tableWidth, visible),
                 ),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12.0,
-                  runSpacing: 8.0,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'جدول كارتة الأصناف والأسعار الرسمية (${_intFmt.format(filtered.length)} صنف)',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          'Official SKU Master Table • اضغط على أي صنف لفتح بطاقة تعريف الصنف أو تعديل السعر والباركود',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                const SliverToBoxAdapter(child: SizedBox(height: 16.0)),
+                DecoratedSliver(
+                  key: const ValueKey('pm_catalog_tonal_surface'),
+                  decoration: BoxDecoration(
+                    color: M3TableSurface.color(cs),
+                    borderRadius: radius,
+                  ),
+                  sliver: DecoratedSliver(
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(
+                      borderRadius: radius,
+                      border: Border.all(color: cs.outlineVariant),
                     ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          filtered.isEmpty
-                              ? '0 من 0'
-                              : 'عرض ${startIdx + 1} - $endIdx من ${filtered.length}',
-                          style: theme.textTheme.labelMedium,
-                        ),
-                        const SizedBox(width: 8.0),
-                        IconButton(
-                          icon: const Icon(Icons.chevron_right_rounded),
-                          tooltip: 'الصفحة السابقة',
-                          onPressed: safePage > 0
-                              ? () =>
-                                  setState(() => _currentPage = safePage - 1)
-                              : null,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.chevron_left_rounded),
-                          tooltip: 'الصفحة التالية',
-                          onPressed: safePage < totalPages - 1
-                              ? () =>
-                                  setState(() => _currentPage = safePage + 1)
-                              : null,
-                        ),
-                      ],
+                    sliver: SliverMainAxisGroup(
+                      key: const ValueKey('pm_catalog_table'),
+                      slivers: PmCatalogTable.slivers(
+                        context: context,
+                        tableWidth: tableWidth,
+                        visible: visible,
+                        pageItems: pageItems,
+                        totalCount: filtered.length,
+                        startIndex: startIdx,
+                        page: safePage,
+                        pageCount: pageCount,
+                        defaultDiscountPct: summary.defaultDiscountPct,
+                        onPageChanged: (p) => setState(() => _currentPage = p),
+                        onOpenItem: _openItemCard,
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const Divider(height: 1.0),
-              if (pageItems.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(40.0),
-                  child: Center(
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.search_off_rounded,
-                          size: 48,
-                          color: cs.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'لا توجد أصناف مطابقة لمعايير البحث الحالية',
-                          style: theme.textTheme.titleMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              else
-                LayoutBuilder(builder: (context, tableConstraints) {
-                final w = _catalogColumnWidths(tableConstraints.maxWidth);
-                Widget box(int i, Widget child) =>
-                    SizedBox(width: w[i], child: child);
-                return TableScrollContainer(
-                  showSwipeHint: false,
-                  showControls: false,
-                  child: DataTable(
-                    key: const ValueKey('pm_catalog_table'),
-                    headingRowColor: WidgetStateProperty.all(
-                      cs.surfaceContainerHighest.withValues(alpha: 0.45),
-                    ),
-                    // Chip (32) + gap + ≤3-line description + vertical pad
-                    // (Errors / Pricing status-column budget).
-                    dataRowMinHeight: 72.0,
-                    dataRowMaxHeight: 120.0,
-                    headingRowHeight: 48.0,
-                    columnSpacing: 6.0,
-                    horizontalMargin: 8.0,
-                    showCheckboxColumn: false,
-                    columns: [
-                      DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(0, _buildColHeader('م', '#')),
-                      ),
-                      DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(1, _buildColHeader('كود الصنف', 'Item Code')),
-                      ),
-                      DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(2, _buildColHeader('اسم الصنف', 'Official SKU Name')),
-                      ),
-                      DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(3, _buildColHeader('الباركود', 'Barcode')),
-                      ),
-                      DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(4, _buildColHeader('التعبئة', 'Pack')),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(5, _buildColHeader('سعر الوحدة', 'Excl. VAT')),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(6, _buildColHeader('السعر ش.ض', 'Incl. VAT')),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(7, _buildColHeader('سعر الكرتونة', 'Carton')),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(
-                          8,
-                          _buildColHeader(
-                            'الصافي',
-                            'Net (-${summary.defaultDiscountPct.toStringAsFixed(0)}%)',
-                          ),
-                        ),
-                      ),
-                      DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(9, _buildColHeader('النوع', 'Type')),
-                      ),
-                      DataColumn(
-                        headingRowAlignment: MainAxisAlignment.center,
-                        label: box(10, _buildColHeader('إجراءات', 'Actions')),
-                      ),
-                    ],
-                    rows: pageItems.map((item) {
-                      final isPromo = item.itemType == 'عرض';
-                      final raw = DataRow(
-                        onSelectChanged: (_) async {
-                          await ProductMasterScreen.showProductIdCardModal(
-                            context,
-                            apiClient: widget.apiClient,
-                            item: item,
-                            onUpdated: (updatedSummary) {
-                              _repo.prime(updatedSummary);
-                              if (mounted) {
-                                setState(() => _summary = updatedSummary);
-                              }
-                            },
-                          );
-                        },
-                        cells: [
-                          DataCell(
-                            Text(
-                              item.serialNo.toString(),
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          // Item Code pill
-                          DataCell(
-                            SizedBox(
-                              width: w[1],
-                              child: InkWell(
-                              onTap: () =>
-                                  _copyToClipboard(item.itemCode, 'كود الصنف'),
-                              borderRadius: M3Shape.radiusSm,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.0,
-                                  vertical: 2.0,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: cs.primaryContainer
-                                      .withValues(alpha: 0.55),
-                                  borderRadius: M3Shape.radiusSm,
-                                  border: Border.all(
-                                    color: cs.primary.withValues(alpha: 0.35),
-                                  ),
-                                ),
-                                child: HyphenatedCodeText(
-                                  item.itemCode,
-                                  maxLines: 2,
-                                  maxWidth: w[1] - 10,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: M3FontSize.bodySmall,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            ),
-                          ),
-                          // Official Name & Brand (centered, wrap ≤3)
-                          DataCell(
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                M3WrapText(
-                                  item.officialName,
-                                  maxLines: 3,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 2.0),
-                                M3WrapText(
-                                  '${item.brand} • ${item.category}',
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                    fontSize: M3FontSize.tinyPlus,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Barcode
-                          DataCell(
-                            SizedBox(
-                              width: w[3],
-                              child: InkWell(
-                              onTap: () =>
-                                  _copyToClipboard(item.barcode, 'الباركود'),
-                              borderRadius: M3Shape.radiusSm,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4.0,
-                                  vertical: 2.0,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: cs.surfaceContainerHighest
-                                      .withValues(alpha: 0.6),
-                                  borderRadius: M3Shape.radiusSm,
-                                ),
-                                child: HyphenatedCodeText(
-                                  item.barcode,
-                                  maxLines: 2,
-                                  maxWidth: w[3] - 10,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: M3FontSize.bodySmall,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            ),
-                          ),
-                          // Pack & Units/Carton
-                          DataCell(
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                M3WrapText(
-                                  '${item.unitsPerCarton} / كرتونة',
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                M3WrapText(
-                                  item.packagingType,
-                                  maxLines: 1,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Unit Price Excl VAT
-                          DataCell(
-                            M3WrapText(
-                              '${_currFmt.format(item.unitPriceExclVat)} ج.م',
-                              maxLines: 2,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          // Unit Price Incl VAT + Price Change Indicator Badge
-                          DataCell(
-                            _buildPriceWithChangeIndicator(theme, cs, item),
-                          ),
-                          // Carton Price Incl VAT
-                          DataCell(
-                            M3WrapText(
-                              '${_currFmt.format(item.cartonPriceInclVat)} ج.م',
-                              maxLines: 2,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          // Net Unit Cost — centered like every other numeric col.
-                          DataCell(
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                M3WrapText(
-                                  '${_currFmt.format(item.netUnitInvoiceCost)} ج.م',
-                                  maxLines: 2,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: M3Palette.teal,
-                                  ),
-                                ),
-                                M3WrapText(
-                                  'كرتونة: ${_currFmt.format(item.netCartonInvoiceCost)}',
-                                  maxLines: 1,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontSize: M3FontSize.tiny,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Item Type & Pull Status: short chip + description.
-                          // 4dp start-edge tonal strip (Errors symmetry) so the
-                          // type accent stays visible at wide shells (~1920).
-                          // box(9) locks the live 96 / compact 88 type floor so
-                          // «مسحوب» / «غير مسحوب» stay one line in-test and live.
-                          DataCell(
-                            box(
-                              9,
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: M3Spacing.xxs,
-                                  vertical: M3Spacing.xs,
-                                ),
-                                child: DecoratedBox(
-                                  key: ValueKey(
-                                      'pm_row_type_strip_${item.itemCode}'),
-                                  decoration: BoxDecoration(
-                                    border: BorderDirectional(
-                                      start: BorderSide(
-                                        color: (isPromo
-                                                ? M3Palette.amberDeep
-                                                : M3Palette.teal)
-                                            .withValues(alpha: 0.55),
-                                        width: 4.0,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      _statusChip(
-                                        isPromo ? 'عرض' : 'عادي',
-                                        isPromo
-                                            ? M3Palette.amberDeep
-                                            : M3Palette.teal,
-                                        key: ValueKey(
-                                            'pm_row_type_chip_${item.itemCode}'),
-                                      ),
-                                      const SizedBox(height: 4.0),
-                                      _statusChip(
-                                        item.isActiveInChains
-                                            ? 'مسحوب'
-                                            : 'غير مسحوب',
-                                        item.isActiveInChains
-                                            ? M3Palette.info
-                                            : cs.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(height: 2.0),
-                                      M3WrapText(
-                                        item.isActiveInChains
-                                            ? (item.totalPosUnitsSold > 0
-                                                ? '${_intFmt.format(item.totalPosUnitsSold)} وحدة'
-                                                : 'نشط بالسلاسل')
-                                            : 'فرصة توزيع',
-                                        maxLines: 2,
-                                        textAlign: TextAlign.center,
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                          fontSize: M3FontSize.tiny,
-                                          color: cs.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Actions
-                          DataCell(
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 28.0,
-                                    minHeight: 28.0,
-                                  ),
-                                  style: IconButton.styleFrom(
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    minimumSize: const Size(28.0, 28.0),
-                                  ),
-                                  icon: const Icon(
-                                    Icons.badge_rounded,
-                                    size: 18.0,
-                                  ),
-                                  tooltip: 'بطاقة تعريف الصنف وتعديل السعر',
-                                  onPressed: () async {
-                                    await ProductMasterScreen
-                                        .showProductIdCardModal(
-                                      context,
-                                      apiClient: widget.apiClient,
-                                      item: item,
-                                      onUpdated: (updatedSummary) {
-                                        _repo.prime(updatedSummary);
-                                        if (mounted) {
-                                          setState(
-                                              () => _summary = updatedSummary);
-                                        }
-                                      },
-                                    );
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                      return DataRow(
-                        onSelectChanged: raw.onSelectChanged,
-                        cells: [
-                          for (var i = 0; i < raw.cells.length; i++)
-                            DataCell(box(i, raw.cells[i].child)),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                );
-                }),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
+    });
   }
 
-  /// Mins at the live 1030 content shell: item code / barcode stay on
-  /// one monospace line (e.g. FGCL-0550-0001, 13-digit barcodes), and
-  /// the price headers «سعر الوحدة / السعر ش.ض / سعر الكرتونة» are
-  /// not cut. Leftover width still goes to the name column.
-  // Type col (index 9) must fit one-line chips «مسحوب» / «غير مسحوب»
-  // (M3ChipSurface padding + Cairo) without wrapping mid-word.
-  static const _catalogColMinsLive = <double>[
-    24, 130, 140, 120, 64, 80, 80, 88, 64, 96, 52,
-  ];
+  static const String _searchHint = 'بحث بالكود أو الباركود أو الاسم';
 
-  /// Narrower shell (1024+sidebar ≈ 774dp): codes wrap at dashes, no
-  /// horizontal scroll.
-  static const _catalogColMinsCompact = <double>[
-    24, 92, 120, 92, 60, 52, 52, 52, 60, 88, 52,
-  ];
-
-  /// Column content widths that fill [available] (table chrome included)
-  /// so the 11-column catalog fits the live 1030 content shell.
-  List<double> _catalogColumnWidths(double available) {
-    const spacing = 6.0;
-    const margin = 8.0;
-    // Live 1280+sidebar content is 1030, but the catalog tab has 24dp
-    // horizontal padding, so the table LayoutBuilder sees ~982dp — still
-    // the live profile. Compact is for the 1024+sidebar shell (~726–774).
-    final useLive = available >= 900;
-    final mins = useLive ? _catalogColMinsLive : _catalogColMinsCompact;
-    final slack = useLive ? 24.0 : 16.0;
-    final chrome = margin * 2 + spacing * (mins.length - 1) + slack;
-    var leftover = available - chrome - mins.fold<double>(0, (a, b) => a + b);
-    final widths = List<double>.from(mins);
-    if (leftover > 0) {
-      widths[2] += leftover;
-    } else if (leftover < 0) {
-      // Never shrink type (9): live 96 / compact 88 hold «مسحوب» / «غير مسحوب».
-      // Other columns: first to 85% of min, then harder (70%) so the table
-      // still fits the 1024+sidebar shell without horizontal scroll.
-      for (final floorFactor in [0.85, 0.70]) {
-        if (leftover >= 0) break;
-        for (final i in [2, 4, 8, 1, 3, 10, 5, 6, 7, 0]) {
-          if (leftover >= 0) break;
-          final reducible = widths[i] - mins[i] * floorFactor;
-          if (reducible <= 0) continue;
-          final cut = reducible < -leftover ? reducible : -leftover;
-          widths[i] -= cut;
-          leftover += cut;
-        }
-      }
-    }
-    return widths;
-  }
-
-  Widget _buildQuickPriceChangeFilterBar(
+  /// One 40dp row: search (start) · filter chips · actions (end).
+  Widget _buildCatalogToolbar(
     ThemeData theme,
     ColorScheme cs,
     ProductMasterSummaryModel summary,
+    List<ProductMasterItemModel> filtered,
+    double tableWidth,
+    List<PmCatalogColumn> visible,
   ) {
+    final chips = _buildFilterChips(summary);
+    return SizedBox(
+      key: const ValueKey('pm_catalog_toolbar'),
+      height: 40.0,
+      child: Row(
+        children: [
+          M3SearchFieldWidth(
+            hintText: _searchHint,
+            width: 240.0,
+            chrome: 48.0 + 16.0 + 16.0,
+            child: TextField(
+              key: const ValueKey('product_master_search_input'),
+              controller: _searchController,
+              onChanged: (_) => setState(() => _currentPage = 0),
+              textAlignVertical: TextAlignVertical.center,
+              decoration: InputDecoration(
+                constraints: const BoxConstraints.tightFor(height: 40.0),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                prefixIcon: const Icon(Icons.search_rounded, size: 20.0),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18.0),
+                        tooltip: 'مسح البحث',
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _currentPage = 0);
+                        },
+                      )
+                    : null,
+                hintText: _searchHint,
+                filled: true,
+                fillColor: cs.surfaceContainerHighest,
+                border: const OutlineInputBorder(
+                  borderRadius: M3Shape.radiusFull,
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8.0),
+          Expanded(
+            child: SingleChildScrollView(
+              key: const ValueKey('pm_catalog_filter_chips'),
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (var i = 0; i < chips.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 8.0),
+                    chips[i],
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8.0),
+          _buildColumnsMenu(tableWidth, visible),
+          const SizedBox(width: 8.0),
+          IconButton(
+            key: const ValueKey('product_master_export_csv_btn'),
+            icon: const Icon(Icons.download_rounded),
+            tooltip: 'تصدير CSV',
+            onPressed: filtered.isEmpty ? null : _exportFilteredCatalogToCsv,
+          ),
+          const SizedBox(width: 8.0),
+          _buildCatalogOverflowMenu(summary),
+          const SizedBox(width: 8.0),
+          FilledButton.icon(
+            key: const ValueKey('product_master_add_sku_btn'),
+            onPressed: () => _openNewSkuCard(summary),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('إضافة صنف'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildFilterChips(ProductMasterSummaryModel summary) {
     final allItems = summary.items;
     final upCount = summary.priceIncreasedCount > 0
         ? summary.priceIncreasedCount
@@ -2115,252 +1109,169 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         : allItems.where((e) => e.priceChangeDirection == 'new').length;
     final changedCount = upCount + downCount + newCount;
 
-    Widget buildChip({
-      required String keyId,
-      required String value,
-      required String label,
-      required IconData icon,
-      required Color color,
-    }) {
-      final isSelected = _selectedPriceChange == value;
-      return FilterChip(
-        key: ValueKey(keyId),
-        selected: isSelected,
-        showCheckmark: false,
-        avatar: Icon(
-          icon,
-          size: 15.0,
-          color: isSelected ? Colors.white : color,
-        ),
-        label: Text(
-          label,
-          style: TextStyle(
-            fontSize: M3FontSize.labelSmallPlus,
-            fontWeight: FontWeight.w800,
-            color: isSelected ? Colors.white : cs.onSurface,
-          ),
-        ),
-        selectedColor: color,
-        backgroundColor: cs.surface,
-        side: BorderSide(
-          color: isSelected ? color : color.withValues(alpha: 0.35),
-        ),
-        onSelected: (_) {
-          setState(() {
-            _selectedPriceChange =
-                (_selectedPriceChange == value && value != 'all')
-                    ? 'all'
-                    : value;
-            _currentPage = 0;
-          });
+    return [
+      _PmFilterMenuChip(
+        key: const ValueKey('pm_filter_price_change'),
+        label: 'تغير السعر',
+        value: _selectedPriceChange,
+        selectedLabel: const {
+          'changed': 'تغير',
+          'up': 'زاد ↑',
+          'down': 'انخفض ↓',
+          'new': 'جديد',
+        }[_selectedPriceChange],
+        itemKeyPrefix: 'price_filter',
+        options: {
+          'all': 'الكل (${summary.totalSkus})',
+          'changed': 'تغير السعر ($changedCount)',
+          'up': 'زاد ↑ ($upCount)',
+          'down': 'انخفض ↓ ($downCount)',
+          'new': 'جديد ($newCount)',
         },
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: M3Shape.radiusMd,
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        onSelected: (v) => setState(() {
+          _selectedPriceChange = v;
+          _currentPage = 0;
+        }),
       ),
-      child: Wrap(
-        spacing: 8.0,
-        runSpacing: 8.0,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.price_change_rounded, size: 17.0, color: cs.primary),
-              const SizedBox(width: 6.0),
-              const Text(
-                'فلتر سريع لتغيرات الأسعار:',
-                style: TextStyle(
-                    fontSize: M3FontSize.bodySmall,
-                    fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-          buildChip(
-            keyId: 'price_filter_all',
-            value: 'all',
-            label: 'الكل (${summary.totalSkus})',
-            icon: Icons.apps_rounded,
-            color: cs.primary,
-          ),
-          buildChip(
-            keyId: 'price_filter_changed',
-            value: 'changed',
-            label: 'تغير السعر ($changedCount)',
-            icon: Icons.published_with_changes_rounded,
-            color: M3Palette.warning,
-          ),
-          buildChip(
-            keyId: 'price_filter_up',
-            value: 'up',
-            label: 'زاد ↑ ($upCount)',
-            icon: Icons.trending_up_rounded,
-            color: M3Palette.danger,
-          ),
-          buildChip(
-            keyId: 'price_filter_down',
-            value: 'down',
-            label: 'انخفض ↓ ($downCount)',
-            icon: Icons.trending_down_rounded,
-            color: M3Palette.teal,
-          ),
-          buildChip(
-            keyId: 'price_filter_new',
-            value: 'new',
-            label: 'جديد ($newCount)',
-            icon: Icons.fiber_new_rounded,
-            color: M3Palette.info,
-          ),
-          if (summary.diffSummary != null)
-            ActionChip(
-              key: const ValueKey('product_master_open_diff_summary_btn'),
-              avatar: Icon(
-                Icons.summarize_rounded,
-                size: 15.0,
-                color: cs.primary,
-              ),
-              label: const Text(
-                'تقرير مقارنة الشيت الجديد',
-                style: TextStyle(
-                    fontSize: M3FontSize.labelSmallPlus,
-                    fontWeight: FontWeight.w800),
-              ),
-              onPressed: () => _showUploadDiffSummaryDialog(
-                summary,
-                uploadedFilename: summary.sourceFilename,
-              ),
-            ),
-        ],
+      _PmFilterMenuChip(
+        key: const ValueKey('pm_filter_brand'),
+        label: 'العلامة',
+        value: _selectedBrand,
+        itemKeyPrefix: 'pm_filter_brand',
+        options: {
+          'all': 'كل العلامات (${summary.availableBrands.length})',
+          for (final b in summary.availableBrands) b: b,
+        },
+        onSelected: (v) => setState(() {
+          _selectedBrand = v;
+          _currentPage = 0;
+        }),
       ),
-    );
+      _PmFilterMenuChip(
+        key: const ValueKey('pm_filter_item_type'),
+        label: 'النوع',
+        value: _selectedItemType,
+        itemKeyPrefix: 'pm_filter_item_type',
+        options: {
+          'all': 'الكل (عادي + عرض)',
+          'عادي': 'عادي (${summary.regularSkusCount})',
+          'عرض': 'عرض ترويجي (${summary.promoSkusCount})',
+        },
+        onSelected: (v) => setState(() {
+          _selectedItemType = v;
+          _currentPage = 0;
+        }),
+      ),
+      _PmFilterMenuChip(
+        key: const ValueKey('pm_filter_pull_status'),
+        label: 'السحب',
+        value: _selectedPullStatus,
+        selectedLabel: const {
+          'active': 'مسحوب',
+          'unpulled': 'غير مسحوب',
+        }[_selectedPullStatus],
+        itemKeyPrefix: 'pm_filter_pull_status',
+        options: {
+          'all': 'الكل (${summary.totalSkus})',
+          'active': 'مسحوب ونشط بالسلاسل (${summary.activeInChainsCount})',
+          'unpulled': 'غير مسحوب - فرصة توزيع (${summary.unpulledSkusCount})',
+        },
+        onSelected: (v) => setState(() {
+          _selectedPullStatus = v;
+          _currentPage = 0;
+        }),
+      ),
+      _PmFilterMenuChip(
+        key: const ValueKey('pm_filter_prefix'),
+        label: 'البادئة',
+        value: _selectedPrefix,
+        itemKeyPrefix: 'pm_filter_prefix',
+        options: {
+          'all': 'الكل',
+          for (final pfx in _buildEffectivePrefixChips(summary))
+            pfx: '$pfx (${_prefixDescriptionAr(pfx)})',
+        },
+        onSelected: (v) => setState(() {
+          _selectedPrefix = v;
+          _currentPage = 0;
+        }),
+      ),
+      _PmFilterMenuChip(
+        key: const ValueKey('pm_filter_packaging'),
+        label: 'التعبئة',
+        value: _selectedPackaging,
+        itemKeyPrefix: 'pm_filter_packaging',
+        options: {
+          'all': 'كل أنواع التعبئة',
+          for (final p in summary.availablePackaging) p: p,
+        },
+        onSelected: (v) => setState(() {
+          _selectedPackaging = v;
+          _currentPage = 0;
+        }),
+      ),
+    ];
   }
 
-  Widget _buildPriceWithChangeIndicator(
-    ThemeData theme,
-    ColorScheme cs,
-    ProductMasterItemModel item,
-  ) {
-    final dir = item.priceChangeDirection.toLowerCase();
-    final isUp = dir == 'up';
-    final isDown = dir == 'down';
-    final isNew = dir == 'new';
-    final hasPrev = item.prevUnitPriceInclVat > 0;
-    final changeColor = isUp
-        ? M3Palette.danger
-        : isDown
-            ? M3Palette.teal
-            : M3Palette.info;
-    // Missing prior price / pct → «—», never advertise a fake +0.0%.
-    final changeLabel = isNew
-        ? 'جديد'
-        : (!hasPrev || item.priceChangePct == 0)
-            ? '—'
-            : CurrencyFormatter.formatSignedPct(item.priceChangePct);
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        M3WrapText(
-          '${_currFmt.format(item.unitPriceInclVat)} ج.م',
-          maxLines: 2,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: cs.primary,
+  /// Column visibility: columns that don't fit are hidden instead of cut off.
+  Widget _buildColumnsMenu(double tableWidth, List<PmCatalogColumn> visible) {
+    return MenuAnchor(
+      menuChildren: [
+        for (final c in PmCatalogTableStyle.columns.where((c) => c.hideable))
+          CheckboxMenuButton(
+            key: ValueKey('pm_column_toggle_${c.id.name}'),
+            value: visible.contains(c.id),
+            closeOnActivate: false,
+            onChanged: (v) =>
+                setState(() => _columnOverrides[c.id] = v ?? false),
+            child: Text(c.label),
           ),
-        ),
-        if (isUp || isDown || isNew) ...[
-          const SizedBox(height: 2.0),
-          _statusChip(
-            changeLabel,
-            changeColor,
-            key: ValueKey('price_indicator_${item.itemCode}_$dir'),
-            icon: isUp
-                ? Icons.trending_up_rounded
-                : isDown
-                    ? Icons.trending_down_rounded
-                    : Icons.fiber_new_rounded,
-          ),
-          if ((isUp || isDown) && hasPrev)
-            M3WrapText(
-              'كان: ${_currFmt.format(item.prevUnitPriceInclVat)} ج.م',
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontSize: M3FontSize.microPlus,
-                color: cs.onSurfaceVariant,
-                decoration: TextDecoration.lineThrough,
-              ),
-            )
-          else if ((isUp || isDown) && !hasPrev)
-            M3WrapText(
-              'لا يوجد سعر سابق للمقارنة',
-              maxLines: 2,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontSize: M3FontSize.microPlus,
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildColHeader(String ar, String en) {
-    return Tooltip(
-      message: en,
-      child: Text(
-        ar,
-        textAlign: TextAlign.center,
-        maxLines: 2,
-        overflow: TextOverflow.visible,
-        style: const TextStyle(
-            fontWeight: FontWeight.w800, fontSize: M3FontSize.bodySmall),
-      ),
-    );
-  }
-
-  Widget _buildDropdownFilter({
-    required String labelAr,
-    required String value,
-    required Map<String, String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    final safeValue = items.containsKey(value) ? value : 'all';
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          '$labelAr:',
-          style: const TextStyle(
-              fontSize: M3FontSize.bodySmall, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(width: 6.0),
-        DropdownButtonHideUnderline(
-          child: M3Dropdown<String>(
-            value: safeValue,
-            fitOptions: true,
-            options: m3OptionsFromMenuItems<String>(items.entries
-                .map((e) => DropdownMenuItem<String>(
-                      value: e.key,
-                      child: Text(
-                        e.value,
-                        style: const TextStyle(fontSize: M3FontSize.bodySmall),
-                      ),
-                    ))
-                .toList()),
-            onChanged: m3Legacy<String>(onChanged),
-          ),
+        const Divider(height: 1.0),
+        MenuItemButton(
+          key: const ValueKey('pm_column_reset'),
+          onPressed: _columnOverrides.isEmpty
+              ? null
+              : () => setState(_columnOverrides.clear),
+          child: const Text('الأعمدة الافتراضية'),
         ),
       ],
+      builder: (context, controller, _) => IconButton(
+        key: const ValueKey('pm_columns_menu_btn'),
+        icon: const Icon(Icons.view_column_rounded),
+        tooltip: 'الأعمدة',
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+      ),
+    );
+  }
+
+  Widget _buildCatalogOverflowMenu(ProductMasterSummaryModel summary) {
+    return MenuAnchor(
+      menuChildren: [
+        MenuItemButton(
+          key: const ValueKey('product_master_reset_filters_btn'),
+          leadingIcon: const Icon(Icons.filter_alt_off_rounded),
+          onPressed: _hasActiveFilters ? _resetFilters : null,
+          child: const Text('إعادة ضبط الفلاتر'),
+        ),
+        if (summary.diffSummary != null)
+          MenuItemButton(
+            key: const ValueKey('product_master_open_diff_summary_btn'),
+            leadingIcon: const Icon(Icons.summarize_rounded),
+            onPressed: () => _showUploadDiffSummaryDialog(
+              summary,
+              uploadedFilename: summary.sourceFilename,
+            ),
+            child: const Text('تقرير مقارنة الشيت الجديد'),
+          ),
+      ],
+      builder: (context, controller, _) => IconButton(
+        key: const ValueKey('pm_catalog_more_btn'),
+        icon: const Icon(Icons.more_vert_rounded),
+        tooltip: 'المزيد',
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+      ),
     );
   }
 
@@ -2389,7 +1300,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     }
   }
 
-  /// «حاسبة الطلبيات والخصومات والهامش»: per-chain VAT / invoice / extra discount settings.
+  /// «حاسبة الطلبيات»: per-chain VAT / invoice / extra discount settings.
   /// They are the single source of truth for that chain's Sell-In everywhere.
   Widget _buildCalculatorTab(
     ThemeData theme,
@@ -2397,13 +1308,17 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     ProductMasterSummaryModel summary,
   ) {
     return ListView(
-      padding: const EdgeInsetsDirectional.fromSTEB(24.0, 12.0, 24.0, 32.0),
+      padding: const EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 32.0),
       children: [
         ChainDiscountProfilesCard(
           profiles: _chainProfiles,
           loading: _chainProfilesLoading,
           saving: _chainProfilesSaving,
           error: _chainProfilesError,
+          errorTitle: _chainProfilesErrorOnLoad
+              ? 'تعذّر تحميل إعدادات السلاسل'
+              : 'تعذّر حفظ إعدادات السلاسل',
+          onRetry: _chainProfilesErrorOnLoad ? _loadChainProfiles : null,
           canEdit:
               widget.apiClient.currentUser?.canEditChainTerms ?? true,
           onSave: _saveChainProfiles,
@@ -2418,54 +1333,45 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     ProductMasterSummaryModel summary,
   ) {
     return ListView(
-      padding: const EdgeInsetsDirectional.fromSTEB(24.0, 12.0, 24.0, 32.0),
+      padding: const EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 32.0),
       children: [
-        Container(
-          padding: const EdgeInsets.all(24.0),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLow,
-            borderRadius: M3Shape.radiusLg,
-            border: Border.all(color: cs.primary.withValues(alpha: 0.35)),
-          ),
-          child: Column(
+        SizedBox(
+          key: const ValueKey('pm_sheets_toolbar'),
+          height: 40.0,
+          child: Row(
             children: [
-              Icon(
-                Icons.cloud_upload_rounded,
-                size: 48.0,
-                color: cs.primary,
-              ),
-              const SizedBox(height: 12.0),
-              Text(
-                'رفع وتحديث شيت كارتة الأصناف والأسعار (Excel .xlsx / .csv)',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
+              Expanded(
+                child: Text(
+                  'أرشيف شيتات كارتة الأصناف والأسعار (${_archivedMasterFiles.length})',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium,
                 ),
               ),
-              const SizedBox(height: 4.0),
-              Text(
-                'يقوم النظام تلقائياً بقراءة أكواد الأصناف (FGCL, FGDW, PR...) والباركودات وسعة الكرتونة والأسعار وتحديث جميع شاشات المبيعات والنواقص والتسعير فوراً',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 16.0),
+              const SizedBox(width: 8.0),
               FilledButton.icon(
+                key: const ValueKey('product_master_upload_btn'),
                 onPressed: _isUploading ? null : _handleUploadMasterWorkbook,
-                icon: const Icon(Icons.upload_file_rounded),
-                label: const Text('اختيار شيت كارتة الأصناف من الجهاز'),
+                icon: _isUploading
+                    ? const SizedBox.square(
+                        dimension: 18.0,
+                        child: CircularProgressIndicator(strokeWidth: 2.0),
+                      )
+                    : const Icon(Icons.upload_file_rounded),
+                label: Text(
+                    _isUploading ? 'جاري تحديث الكارتة...' : 'رفع شيت أسعار'),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 20.0),
+        const SizedBox(height: 8.0),
         Text(
-          'أرشيف شيتات كارتة الأصناف والأسعار المرفوعة (${_archivedMasterFiles.length})',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
+          'ارفع شيت Excel (.xlsx / .csv): يقرأ النظام أكواد الأصناف والباركودات وسعة الكرتونة والأسعار ويحدّث كل الشاشات فوراً. حذف شيت يلغي تحديثاته ويسترجع الأسعار السابقة.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 10.0),
+        const SizedBox(height: 16.0),
         if (_archivedMasterFiles.isEmpty)
           Container(
             padding: const EdgeInsets.all(24.0),
@@ -2863,6 +1769,71 @@ class _ProductIdCardDialogState extends State<_ProductIdCardDialog> {
             label: Text(_isSaving ? 'جاري الحفظ...' : 'حفظ وتحديث الكارتة'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// M3 filter chip (8dp corners) that opens a menu of [options]. Selected
+/// (tonal) whenever [value] is not `all`.
+class _PmFilterMenuChip extends StatelessWidget {
+  const _PmFilterMenuChip({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.onSelected,
+    required this.itemKeyPrefix,
+    this.selectedLabel,
+  });
+
+  final String label;
+  final String value;
+  final Map<String, String> options;
+  final ValueChanged<String> onSelected;
+  final String itemKeyPrefix;
+
+  /// Short text shown after «label:» when filtered (defaults to [value]).
+  final String? selectedLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = value != 'all' && options.containsKey(value);
+    return MenuAnchor(
+      menuChildren: [
+        for (final e in options.entries)
+          MenuItemButton(
+            key: ValueKey('${itemKeyPrefix}_${e.key}'),
+            leadingIcon: Icon(
+              Icons.check_rounded,
+              color: e.key == value ? null : Colors.transparent,
+            ),
+            onPressed: () => onSelected(e.key),
+            child: Text(e.value),
+          ),
+      ],
+      builder: (context, controller, _) => FilterChip(
+        selected: active,
+        showCheckmark: false,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: const RoundedRectangleBorder(borderRadius: M3ChipStyle.radius),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160.0),
+              child: Text(
+                active ? '$label: ${selectedLabel ?? value}' : label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4.0),
+            const Icon(Icons.arrow_drop_down_rounded, size: 18.0),
+          ],
+        ),
+        onSelected: (_) =>
+            controller.isOpen ? controller.close() : controller.open(),
       ),
     );
   }

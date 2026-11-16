@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/storage/session_storage.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
 
@@ -263,11 +264,13 @@ Future<List<FlutterErrorDetails>> pumpProductMaster(
   bool withSidebar = false,
   ApiClient? apiClient,
   Widget? page,
+  bool resetTabQuery = true,
 }) async {
   tester.view.physicalSize = Size(width, height);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  if (resetTabQuery) SessionStorage.replaceBrowserQueryParam('tab', null);
 
   final errors = <FlutterErrorDetails>[];
   final old = FlutterError.onError;

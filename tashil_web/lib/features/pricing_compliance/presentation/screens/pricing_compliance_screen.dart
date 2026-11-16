@@ -244,6 +244,7 @@ class _PricingComplianceScreenState extends State<PricingComplianceScreen>
             body: ProductMasterScreen(
               apiClient: widget.apiClient,
               initialSearchQuery: initialQuery,
+              persistTabInUrl: false,
             ),
           ),
         ),
