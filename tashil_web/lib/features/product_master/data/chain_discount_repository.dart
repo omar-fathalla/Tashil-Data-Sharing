@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:tashil_web/core/network/backend_http.dart';
@@ -65,6 +66,18 @@ class ChainDiscountException implements Exception {
   String toString() => message;
 }
 
+const String kChainDiscountTimeoutMessage =
+    'انتهت مهلة تحميل إعدادات السلاسل. تحقّق من الاتصال ثم أعد المحاولة.';
+const String kChainDiscountConnectionMessage =
+    'تعذّر الاتصال بالخادم لتحميل إعدادات السلاسل. أعد المحاولة بعد قليل.';
+
+/// User-facing Arabic text for a chain-terms load/save failure (never a raw exception).
+String friendlyChainDiscountError(Object error) {
+  if (error is ChainDiscountException) return error.message;
+  if (error is TimeoutException) return kChainDiscountTimeoutMessage;
+  return kChainDiscountConnectionMessage;
+}
+
 /// GET / PUT `/api/v1/product-master/chain-discounts` (per tenant, stored in Firestore).
 class ChainDiscountRepository {
   final ApiClient api;
@@ -73,20 +86,27 @@ class ChainDiscountRepository {
   // Offline-only fallback: holds what the user entered in this session, never invented values.
   static final Map<String, List<ChainDiscountProfileModel>> _offline = {};
 
+  /// Client budget for GET; the backend bounds its own read well below this.
+  static Duration loadTimeout = const Duration(seconds: 20);
+
   Future<List<ChainDiscountProfileModel>> load() async {
     try {
       final res = await BackendHttp.get(
         Uri.parse(ApiEndpoints.productMasterChainDiscounts),
         headers: api.requestHeaders,
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(loadTimeout);
       if (res.statusCode == 200) {
         return _parse(res.bodyBytes);
       }
       if (!api.allowMockFallback) {
-        throw ChainDiscountException('تعذر تحميل خصومات السلاسل (HTTP ${res.statusCode})');
+        throw ChainDiscountException(res.statusCode == 504
+            ? kChainDiscountTimeoutMessage
+            : 'تعذّر تحميل إعدادات السلاسل (HTTP ${res.statusCode}). أعد المحاولة.');
       }
     } catch (e) {
-      if (!api.allowMockFallback) rethrow;
+      if (!api.allowMockFallback) {
+        throw ChainDiscountException(friendlyChainDiscountError(e));
+      }
     }
     return List.of(_offline[api.tenantId] ?? const []);
   }
@@ -113,7 +133,11 @@ class ChainDiscountRepository {
     } on ChainDiscountException {
       rethrow;
     } catch (e) {
-      if (!api.allowMockFallback) rethrow;
+      if (!api.allowMockFallback) {
+        throw ChainDiscountException(e is TimeoutException
+            ? 'انتهت مهلة حفظ إعدادات السلاسل. أعد المحاولة.'
+            : 'تعذّر الاتصال بالخادم لحفظ إعدادات السلاسل. أعد المحاولة.');
+      }
     }
     _offline[api.tenantId] = List.of(profiles);
     return profiles;
