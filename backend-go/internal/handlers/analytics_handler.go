@@ -22,6 +22,7 @@ type AnalyticsHandler struct {
 	records            bqsink.RecordsQuerier
 	sellIn             SellInTotalsQuerier
 	competitiveMonthly bqsink.CompetitiveMonthlyQuerier
+	targetBreakdown    bqsink.TargetBreakdownQuerier
 	monthlySummaryOpts monthlysummary.Options
 }
 

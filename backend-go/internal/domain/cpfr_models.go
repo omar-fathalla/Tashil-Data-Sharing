@@ -506,7 +506,10 @@ type TargetComparisonItem struct {
 	CCTargetRevenueEGP      float64                 `json:"cc_target_revenue_egp"`
 	BranchesCount           int                     `json:"branches_count"`
 	ActiveSKUsCount         int                     `json:"active_skus_count"`
-	Status                  string                  `json:"status"`    // "exceeded" | "on_track" | "at_risk"
+	// HasActuals is false when the target period has no actual rows in scope (e.g. a future year).
+	// Such a target is not comparable: achieved / achievement / gap must read "—", never 0.
+	HasActuals              bool                    `json:"has_actuals"`
+	Status                  string                  `json:"status"`    // "exceeded" | "on_track" | "at_risk" | "no_data"
 	StatusAr                string                  `json:"status_ar"` // "تجاوز المستهدف" | "قيد التحقيق" | "أقل من المستهدف"
 	Notes                   string                  `json:"notes"`
 	UpdatedAt               string                  `json:"updated_at"`
@@ -536,6 +539,15 @@ type TargetsSummaryResponse struct {
 	AvgCasePriceEGP           float64                `json:"avg_case_price_egp"`
 	TotalBranchesCovered      int                    `json:"total_branches_covered"`
 	TotalSKUsCovered          int                    `json:"total_skus_covered"`
+	// Comparable* cover only targets whose period has actual data. Total*Revenue/Units above keep every
+	// target (a future-year target counts in TotalTarget*), while achievement and variance are computed
+	// on the comparable subset so a future year cannot drag them down.
+	ComparableTargetRevenueEGP float64 `json:"comparable_target_revenue_egp"`
+	ComparableActualRevenueEGP float64 `json:"comparable_actual_revenue_egp"`
+	ComparableTargetsCount     int     `json:"comparable_targets_count"`
+	NoDataTargetsCount         int     `json:"no_data_targets_count"`
+	NoDataTargetRevenueEGP     float64 `json:"no_data_target_revenue_egp"`
+	NoDataTargetUnits          float64 `json:"no_data_target_units"`
 	Items                     []TargetComparisonItem `json:"items"`
 }
 

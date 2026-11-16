@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/targetalloc"
 )
 
 // TenantWorkbookAnalytics stores multi-sheet market share, competitor, pricing, and trend analytics extracted from an Excel workbook.
@@ -53,6 +54,8 @@ type Repository interface {
 	GetTargetsSummary(ctx context.Context, tenantID, targetType, chain string, year int) (*domain.TargetsSummaryResponse, error)
 	UpsertTarget(ctx context.Context, tenantID string, target domain.TargetRecord) (*domain.TargetRecord, error)
 	DeleteTarget(ctx context.Context, tenantID, targetID string) error
+	GetTarget(ctx context.Context, tenantID, targetID string) (*domain.TargetRecord, bool)
+	TargetBreakdownSource(tenantID, chain string) targetalloc.Source
 	GetProductMaster(ctx context.Context, tenantID string, filter ProductMasterFilter) (*domain.ProductMasterSummaryResponse, error)
 	SetProductMaster(ctx context.Context, tenantID string, summary *domain.ProductMasterSummaryResponse) (*domain.ProductMasterSummaryResponse, error)
 	ClearProductMaster(ctx context.Context, tenantID string) error

@@ -9822,6 +9822,18 @@ class ApiClient {
     throw Exception('تعذر حفظ المستهدف (HTTP ${response.statusCode})');
   }
 
+  /// Raw JSON of `GET /api/v1/sellout/targets/{id}/breakdown` (parsed by the
+  /// Targets repository). Throws on any non-200 answer.
+  Future<Map<String, dynamic>> getTargetBreakdownJson(String id) async {
+    final response = await BackendHttp
+        .get(Uri.parse(ApiEndpoints.targetBreakdown(id)), headers: _headers)
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw Exception('تعذر تحميل توزيع المستهدف (HTTP ${response.statusCode})');
+  }
+
   /// Deletes a Target by ID and returns the updated summary.
   Future<TargetsSummaryModel> deleteTarget({
     required String id,
@@ -14020,6 +14032,12 @@ class TargetComparisonModel {
   final double ccTargetRevenueEgp;
   final int branchesCount;
   final int activeSkusCount;
+
+  /// False when the target period has no actual sales in scope (e.g. a future
+  /// year): achieved / achievement / gap are not comparable and read «—».
+  /// Older backends omit the flag; then a period with no actual value or units
+  /// counts as having no sales yet.
+  final bool hasActuals;
   final String status;
   final String statusAr;
   final String notes;
@@ -14065,6 +14083,7 @@ class TargetComparisonModel {
     this.ccTargetRevenueEgp = 0.0,
     this.branchesCount = 0,
     this.activeSkusCount = 0,
+    bool? hasActuals,
     required this.status,
     required this.statusAr,
     required this.notes,
@@ -14074,7 +14093,7 @@ class TargetComparisonModel {
     this.brands = const [],
     this.salesRepQuotas = const [],
     this.monthlyPhasing = const [],
-  });
+  }) : hasActuals = hasActuals ?? (actualRevenueEgp > 0 || actualUnits > 0);
 
   factory TargetComparisonModel.fromJson(Map<String, dynamic> json) {
     final branchesList = (json['branches'] as List<dynamic>? ?? const [])
@@ -14133,6 +14152,7 @@ class TargetComparisonModel {
       ccTargetRevenueEgp: (json['cc_target_revenue_egp'] as num?)?.toDouble() ?? 0.0,
       branchesCount: (json['branches_count'] as num?)?.toInt() ?? branchesList.length,
       activeSkusCount: (json['active_skus_count'] as num?)?.toInt() ?? chainSkusList.length,
+      hasActuals: json['has_actuals'] as bool?,
       status: json['status'] as String? ?? 'at_risk',
       statusAr: json['status_ar'] as String? ?? 'أقل من المستهدف',
       notes: json['notes'] as String? ?? '',
