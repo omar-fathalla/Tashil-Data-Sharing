@@ -2,6 +2,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/widgets/m3_toolbar_button.dart';
 import 'package:tashil_web/core/network/api_client.dart';
@@ -154,7 +155,7 @@ void main() {
     expect(find.textContaining('لا توجد مستهدفات بعد'), findsWidgets);
   });
 
-  testWidgets('4. text KPI values: 2 lines + tooltip, equal card heights',
+  testWidgets('4. text KPI values: top SKU is one line + tooltip, equal card heights',
       (tester) async {
     await _pump(tester, width: 1280);
     await _openTab(tester, 1);
@@ -162,16 +163,37 @@ void main() {
     expect(values, findsWidgets);
     for (final e in values.evaluate()) {
       final t = e.widget as Text;
-      expect(t.maxLines, 2);
-      expect(
-          find.ancestor(of: find.byWidget(t), matching: find.byType(Tooltip)),
-          findsWidgets);
+      final isTopSku =
+          t.key == const ValueKey('kpi_value_Top SKU');
+      // The top item name is one line (ellipsis). The top store stays on the
+      // shared 2-line value role; its short name still paints as one line.
+      expect(t.maxLines, isTopSku ? 1 : 2);
+      expect(t.overflow, TextOverflow.ellipsis);
+      final tip =
+          find.ancestor(of: find.byWidget(t), matching: find.byType(Tooltip));
+      expect(tip, findsWidgets);
+      expect(tester.widget<Tooltip>(tip.first).message, t.data);
+      if (isTopSku) {
+        // One line box, not the wrapped two-line height (~56).
+        expect(tester.getSize(find.byWidget(t)).height, lessThan(40));
+        expect(t.softWrap, isFalse);
+      }
     }
     final hs = _keyPrefix('kpi_card_')
         .evaluate()
         .map((e) => tester.getSize(find.byWidget(e.widget)).height)
         .toSet();
     expect(hs.length, 1, reason: '$hs');
+    expect(find.text('تصدير'), findsOneWidget);
+    expect(find.text('تصدير CSV'), findsNothing);
+    final hint = tester.widget<TextField>(
+        find.byKey(const ValueKey('perf_search_field')));
+    final hintColor = hint.decoration?.hintStyle?.color;
+    final scheme = _cs(tester);
+    expect(hint.decoration?.hintText, 'ابحث بالفرع أو المنطقة أو الصنف');
+    expect(hintColor, isNotNull);
+    expect(hintColor, isNot(scheme.onSurface));
+    expect(hintColor!.a, lessThan(scheme.onSurfaceVariant.a));
   });
 
   testWidgets('5. Targets year = سنة البيانات, filter bars share one style',
@@ -246,4 +268,75 @@ void main() {
       expect(c.borderWidth, greaterThanOrEqualTo(0.0));
     }
   });
+
+  testWidgets('9. branch table: every column centred, table fills the width',
+      (tester) async {
+    await _pump(tester, width: 1280);
+    await _openTab(tester, 1);
+    final section = find.byKey(const ValueKey('branch_velocity_section'));
+    final table =
+        find.descendant(of: section, matching: find.byType(DataTable));
+    expect(table, findsOneWidget);
+    final dt = tester.widget<DataTable>(table);
+    expect(dt.rows, isNotEmpty);
+    String? colLabel(DataColumn c) {
+      Widget w = c.label;
+      while (true) {
+        if (w is Text) return w.data;
+        if (w is ConstrainedBox && w.child != null) {
+          w = w.child!;
+          continue;
+        }
+        if (w is Align && w.child != null) {
+          w = w.child!;
+          continue;
+        }
+        return null;
+      }
+    }
+
+    for (final (i, c) in dt.columns.indexed) {
+      expect(c.headingRowAlignment, MainAxisAlignment.center,
+          reason: colLabel(c));
+      final label = colLabel(c)!;
+      final head = find.descendant(of: table, matching: find.text(label));
+      expect(head, findsOneWidget, reason: label);
+      final cellScope = find.byWidget(dt.rows.first.cells[i].child);
+      if (label.contains('حصة')) {
+        final row =
+            find.descendant(of: cellScope, matching: find.byType(Row));
+        expect(row, findsOneWidget, reason: label);
+        expect(_centerX(tester, row),
+            closeTo(_centerX(tester, head), 2.0),
+            reason: label);
+      } else {
+        final cellText =
+            find.descendant(of: cellScope, matching: find.byType(Text));
+        expect(cellText, findsWidgets, reason: label);
+        expect(_glyphCenterX(tester, cellText.first),
+            closeTo(_glyphCenterX(tester, head.first), 2.0),
+            reason: label);
+      }
+    }
+    final scroller = find.descendant(
+        of: section, matching: find.byType(SingleChildScrollView));
+    expect(scroller, findsOneWidget);
+    expect(tester.getSize(table).width,
+        greaterThanOrEqualTo(tester.getSize(scroller).width - 1));
+  });
+}
+
+double _centerX(WidgetTester tester, Finder finder) {
+  final box = tester.getRect(finder);
+  return (box.left + box.right) / 2;
+}
+
+double _glyphCenterX(WidgetTester tester, Finder finder) {
+  final p = tester.renderObject<RenderParagraph>(finder);
+  final len = p.text.toPlainText().length;
+  final boxes =
+      p.getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: len));
+  final l = boxes.map((b) => b.left).reduce((a, b) => a < b ? a : b);
+  final r = boxes.map((b) => b.right).reduce((a, b) => a > b ? a : b);
+  return p.localToGlobal(Offset((l + r) / 2, 0)).dx;
 }
