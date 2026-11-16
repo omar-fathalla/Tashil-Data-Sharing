@@ -290,6 +290,91 @@ void main() {
   });
 
   group('breakdown dialog', () {
+    testWidgets('is RTL under an LTR app, and the title uses titleMedium', (tester) async {
+      await _bigScreen(tester);
+      final repo = _FakeRepo(const [], {'t26': _breakdownJson()});
+      // Default MaterialApp locale is English (LTR), matching the app shell.
+      // The dialog must impose RTL itself.
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: TargetBreakdownView(
+            repository: repo,
+            target: TargetComparisonModel.fromJson(_item('t26', 2026,
+                target: 150000000,
+                actual: 127135120,
+                hasActuals: true,
+                units: 250000,
+                actualUnits: 1532854)),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final dialog = find.byKey(const ValueKey('target_breakdown_dialog'));
+      expect(
+        tester
+            .widget<Directionality>(find.byKey(const ValueKey('target_breakdown_direction')))
+            .textDirection,
+        TextDirection.rtl,
+      );
+      expect(Directionality.of(tester.element(dialog)), TextDirection.rtl);
+
+      double centerX(Finder f) => tester.getCenter(f).dx;
+      expect(
+        centerX(find.text('الفرع / الصنف')),
+        greaterThan(centerX(find.text('الفرق (ج.م)'))),
+        reason: 'branch column sits on the right, gap column on the left',
+      );
+      expect(
+        centerX(find.byKey(const ValueKey('target_breakdown_kpi_target'))),
+        greaterThan(centerX(find.byKey(const ValueKey('target_breakdown_kpi_actual')))),
+      );
+      expect(
+        centerX(find.byKey(const ValueKey('target_breakdown_kpi_actual'))),
+        greaterThan(centerX(find.byKey(const ValueKey('target_breakdown_kpi_achievement')))),
+      );
+      expect(
+        centerX(find.byKey(const ValueKey('target_breakdown_kpi_achievement'))),
+        greaterThan(centerX(find.byKey(const ValueKey('target_breakdown_kpi_gap')))),
+      );
+      expect(
+        centerX(find.byKey(const ValueKey('target_breakdown_back'))),
+        greaterThan(centerX(find.byKey(const ValueKey('target_breakdown_export')))),
+        reason: 'back arrow on the right, export on the left',
+      );
+
+      final caption = find.byKey(const ValueKey('target_breakdown_caption'));
+      expect(
+        centerX(find.descendant(of: caption, matching: find.byIcon(Icons.info_outline_rounded))),
+        greaterThan(centerX(find.descendant(of: caption, matching: find.byType(Text)))),
+        reason: 'info icon leads the banner from the right',
+      );
+
+      final row = find.byKey(const ValueKey('target_breakdown_row_A'));
+      expect(
+        centerX(find.descendant(of: row, matching: find.byIcon(Icons.expand_more_rounded))),
+        greaterThan(centerX(find.descendant(of: row, matching: find.text('فرع المعادي')))),
+        reason: 'expand chevron sits at the start of the name cell',
+      );
+
+      final pct = tester.widget<Text>(find.descendant(
+        of: find.byKey(const ValueKey('target_breakdown_total_row')),
+        matching: find.text('100.0%'),
+      ));
+      expect(pct.textDirection, TextDirection.ltr);
+
+      final titleFinder = find.byKey(const ValueKey('target_breakdown_title'));
+      final title = tester.widget<Text>(titleFinder);
+      final theme = Theme.of(tester.element(titleFinder));
+      expect(title.maxLines, 1);
+      expect(title.overflow, TextOverflow.ellipsis);
+      expect(title.data, contains('توزيع المستهدف'));
+      expect(title.style?.fontSize, theme.textTheme.titleMedium?.fontSize);
+      expect(title.style?.fontSize, 16);
+      expect(title.style!.fontSize!, lessThan(theme.textTheme.titleLarge!.fontSize!));
+    });
+
     testWidgets('shows caption, exact totals, expandable SKUs and zero-baseline list',
         (tester) async {
       await _bigScreen(tester);
