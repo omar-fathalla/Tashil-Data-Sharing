@@ -144,7 +144,9 @@ func TestChainDiscountGetDoesNotWaitOnApplier(t *testing.T) {
 	}
 }
 
-type slowChainRepo struct{ firestore.ChainDiscountRepository }
+type slowChainRepo struct {
+	firestore.ChainDiscountRepository
+}
 
 func (slowChainRepo) GetChainDiscountProfiles(ctx context.Context, _ string) (*domain.ChainDiscountProfiles, error) {
 	<-ctx.Done()
