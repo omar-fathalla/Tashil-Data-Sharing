@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
@@ -102,6 +103,68 @@ func TestChainDiscountProfilesCRUDAuditAndTenantIsolation(t *testing.T) {
 	}
 	if !strings.Contains(joined, "added Kazyon") || !strings.Contains(joined, "deleted fathalla") || !strings.Contains(joined, "updated kazyon invoice 12.00%→15.00%") {
 		t.Fatalf("audit details missing changes:\n%s", joined)
+	}
+}
+
+// blockingApplier stands in for the analytics client while a long request holds its write lock.
+type blockingApplier struct{ release chan struct{} }
+
+func (a *blockingApplier) SetChainDiscountProfiles(string, []domain.ChainDiscountProfile) {
+	<-a.release
+}
+
+func TestChainDiscountGetDoesNotWaitOnApplier(t *testing.T) {
+	fs := firestore.NewClient("", true)
+	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
+	if err := fs.SaveChainDiscountProfiles(context.Background(), &domain.ChainDiscountProfiles{
+		TenantID: "tenant-adeco",
+		Profiles: []domain.ChainDiscountProfile{{Chain: "kazyon", InvoiceDiscountPct: 12}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	app := &blockingApplier{release: make(chan struct{})}
+	defer close(app.release)
+	mux := cdMux(NewChainDiscountHandler(fs, fs, app))
+
+	done := make(chan map[string]interface{}, 1)
+	go func() {
+		rec, out := tmDo(t, mux, admin, "GET", "/api/v1/product-master/chain-discounts", nil)
+		if rec.Code != 200 {
+			t.Errorf("GET: %d %v", rec.Code, out)
+		}
+		done <- out
+	}()
+	select {
+	case out := <-done:
+		if ps, _ := out["profiles"].([]interface{}); len(ps) != 1 {
+			t.Fatalf("GET profiles: %v", out)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("GET blocked on the applier (analytics write lock)")
+	}
+}
+
+type slowChainRepo struct{ firestore.ChainDiscountRepository }
+
+func (slowChainRepo) GetChainDiscountProfiles(ctx context.Context, _ string) (*domain.ChainDiscountProfiles, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestChainDiscountGetTimesOutWithGatewayTimeout(t *testing.T) {
+	prev := chainDiscountGetTimeout
+	chainDiscountGetTimeout = 50 * time.Millisecond
+	defer func() { chainDiscountGetTimeout = prev }()
+
+	mux := cdMux(NewChainDiscountHandler(slowChainRepo{}, nil, nil))
+	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
+	start := time.Now()
+	rec, _ := tmDo(t, mux, admin, "GET", "/api/v1/product-master/chain-discounts", nil)
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("slow store must yield 504, got %d", rec.Code)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatalf("GET took %v; must be bounded by chainDiscountGetTimeout", time.Since(start))
 	}
 }
 

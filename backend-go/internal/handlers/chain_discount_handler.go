@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -49,19 +51,31 @@ func wrapChainDiscounts(d *domain.ChainDiscountProfiles) chainDiscountResponse {
 	}
 }
 
+// chainDiscountGetTimeout bounds the Firestore read so the page gets an answer well inside the
+// client's 10s budget.
+var chainDiscountGetTimeout = 5 * time.Second
+
 // HandleGet serves GET /api/v1/product-master/chain-discounts.
+//
+// It is a pure read: it must not call the applier. Applying re-enriches every Sell-In row under the
+// analytics client's global write lock and invalidates all cached analytics, so a read would queue
+// behind any long-running analytics request. Instances converge through the TTL sync instead
+// (bigquery.WithChainDiscountSource), and PUT applies synchronously.
 func (h *ChainDiscountHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	c, ok := tmClaims(w, r)
 	if !ok {
 		return
 	}
-	d, err := h.repo.GetChainDiscountProfiles(r.Context(), c.TenantID)
+	ctx, cancel := context.WithTimeout(r.Context(), chainDiscountGetTimeout)
+	defer cancel()
+	d, err := h.repo.GetChainDiscountProfiles(ctx, c.TenantID)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			writeErr(w, http.StatusGatewayTimeout, "chain discounts store timed out")
+			return
+		}
 		writeErr(w, http.StatusInternalServerError, "failed to load chain discounts")
 		return
-	}
-	if h.applier != nil {
-		h.applier.SetChainDiscountProfiles(c.TenantID, d.Profiles)
 	}
 	writeJSON(w, http.StatusOK, wrapChainDiscounts(d))
 }
