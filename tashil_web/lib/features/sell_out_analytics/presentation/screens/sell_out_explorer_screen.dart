@@ -73,24 +73,27 @@ class SellOutExplorerScreen extends StatefulWidget {
 }
 
 class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with DataRefreshMixin<SellOutExplorerScreen> {
-  // Headers and cells centred; the item name stays start-aligned.
-  /// Two-line wrapped heading so the 12-column price table fits the live
-  /// 1280+sidebar shell without horizontal scrolling.
+  // Headers and cells centred; the item name (+ nested code) stays start-aligned.
+  /// One-line short headings capped so the 11-column price table fits the
+  /// live 1280+sidebar shell; full original wording lives in [tooltip].
   static DataColumn _priceHeading(
     String label, {
     bool numeric = true,
     bool center = true,
     double maxWidth = 88,
+    String? tooltip,
   }) {
     return DataColumn(
       numeric: numeric,
+      tooltip: tooltip,
       headingRowAlignment: center ? MainAxisAlignment.center : null,
       label: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Text(
           label,
-          maxLines: 3,
-          softWrap: true,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
           textAlign: center ? TextAlign.center : TextAlign.start,
         ),
       ),
@@ -98,21 +101,23 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   }
 
 
-  /// Per-column caps measured from the live longest bodyMedium values
+  /// Per-column caps: numeric floors from live bodyMedium values
   /// (e.g. 11259.7, 1082.66, 87,233, −44.0%) so a number never wraps
-  /// internally. Currency («ج.م») may go to the next line.
-  static const double _priceColCode = 116;
-  static const double _priceColName = 220;
-  static const double _priceColUnitsPer = 36;
+  /// internally; header caps sized so the shortened one-line labels fit
+  /// (Cairo labelMedium). Currency («ج.م») may go to the next line.
+  /// Name column absorbs the former standalone code column so the official
+  /// name (≤2 lines) + nested item code (1 line) stay ≤3 lines total.
+  static const double _priceColName = 196;
+  static const double _priceColUnitsPer = 72;
   static const double _priceColUnits = 54;
   static const double _priceColCartons = 58;
-  static const double _priceColList = 52;
-  static const double _priceColSell = 52;
-  static const double _priceColDelta = 54;
-  static const double _priceColFactory = 52;
-  static const double _priceColNetCarton = 60;
-  static const double _priceColNetSales = 52;
-  static const double _priceColMargin = 90;
+  static const double _priceColList = 64;
+  static const double _priceColSell = 56;
+  static const double _priceColDelta = 56;
+  static const double _priceColFactory = 88;
+  static const double _priceColNetCarton = 96;
+  static const double _priceColNetSales = 76;
+  static const double _priceColMargin = 80;
 
   static Widget _priceCell(
     String text, {
@@ -134,24 +139,46 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   }
 
   static List<DataColumn> get _priceMatrixColumns => [
-        _priceHeading('كود الصنف', numeric: false, maxWidth: _priceColCode),
         _priceHeading('الصنف الرسمي', numeric: false, center: false, maxWidth: _priceColName),
         _priceHeading('وحدات/كرتونة', maxWidth: _priceColUnitsPer),
         _priceHeading('الوحدات', maxWidth: _priceColUnits),
         _priceHeading('الكراتين', maxWidth: _priceColCartons),
-        _priceHeading('سعر القائمة (شامل الضريبة)', maxWidth: _priceColList),
-        _priceHeading('سعر البيع الفعلي', maxWidth: _priceColSell),
-        _priceHeading('فرق السعر %', maxWidth: _priceColDelta),
-        _priceHeading('تكلفة المصنع للقطعة', maxWidth: _priceColFactory),
-        _priceHeading('صافي سعر الكرتونة (فاتورة)', maxWidth: _priceColNetCarton),
+        _priceHeading(
+          'سعر القائمة',
+          maxWidth: _priceColList,
+          tooltip: 'سعر القائمة (شامل الضريبة)',
+        ),
+        _priceHeading(
+          'سعر البيع',
+          maxWidth: _priceColSell,
+          tooltip: 'سعر البيع الفعلي',
+        ),
+        _priceHeading(
+          'فرق السعر',
+          maxWidth: _priceColDelta,
+          tooltip: 'فرق السعر %',
+        ),
+        _priceHeading(
+          'تكلفة المصنع/ق',
+          maxWidth: _priceColFactory,
+          tooltip: 'تكلفة المصنع للقطعة',
+        ),
+        _priceHeading(
+          'صافي سعر الكرتونة',
+          maxWidth: _priceColNetCarton,
+          tooltip: 'صافي سعر الكرتونة (فاتورة)',
+        ),
         _priceHeading('صافي المبيعات', maxWidth: _priceColNetSales),
-        _priceHeading('هامش السلسلة', maxWidth: _priceColMargin),
+        _priceHeading(
+          'الهامش',
+          maxWidth: _priceColMargin,
+          tooltip: 'هامش السلسلة',
+        ),
       ];
 
   /// Flex shares for the price matrix at the live 1280+sidebar width.
   /// Gutters are xxs so the measured numeric caps fit without h-scroll.
   static const List<double> _priceMatrixFlex = [
-    _priceColCode,
     _priceColName,
     _priceColUnitsPer,
     _priceColUnits,
@@ -1409,9 +1436,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               showSwipeHint: false,
               columnFlex: _priceMatrixFlex,
               child: DataTable(
-                headingRowHeight: 64.0,
+                headingRowHeight: 48.0,
                 dataRowMinHeight: 52.0,
-                // Room for a 3-line item name (owner table rule).
+                // Name ≤2 lines + nested item code = ≤3 lines total.
                 dataRowMaxHeight: 80.0,
                 columnSpacing: M3Spacing.xxs,
                 horizontalMargin: M3Spacing.xxs,
@@ -1421,40 +1448,43 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 rows: centerCellsUnderCenteredHeadings(_priceMatrixColumns, filteredItems.map((s) {
                   final isNegMargin = s.retailerMarginPct < 0;
                   final marginColor = isNegMargin ? colorScheme.error : colorScheme.secondary;
+                  final code = s.itemCode.isNotEmpty ? s.itemCode : s.barcode;
                   return DataRow(
                     cells: [
                       DataCell(
                         InkWell(
                           onTap: () => _openProductIdCardForSummary(s),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 116.0),
-                            child: HyphenatedCodeText(
-                              s.itemCode.isNotEmpty ? s.itemCode : s.barcode,
-                              maxLines: 3,
-                              maxWidth: 116,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.primary,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      DataCell(
-                        InkWell(
-                          onTap: () => _openProductIdCardForSummary(s),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 220.0),
-                            child: Tooltip(
-                              message: s.skuName,
-                              child: Text(
-                                s.skuName,
-                                key: const ValueKey('price_matrix_sku_name'),
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                softWrap: true,
-                                style: cellStrong,
-                              ),
+                            constraints: const BoxConstraints(maxWidth: _priceColName),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Tooltip(
+                                  message: s.skuName,
+                                  child: Text(
+                                    s.skuName,
+                                    key: const ValueKey('price_matrix_sku_name'),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    softWrap: true,
+                                    style: cellStrong,
+                                  ),
+                                ),
+                                if (code.isNotEmpty)
+                                  HyphenatedCodeText(
+                                    code,
+                                    key: const ValueKey('price_matrix_item_code'),
+                                    maxLines: 1,
+                                    maxWidth: _priceColName,
+                                    textAlign: TextAlign.start,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.primary,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -1479,7 +1509,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       DataCell(_priceCell(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: cellStrong?.copyWith(color: colorScheme.primary), maxWidth: _priceColNetSales)),
                       DataCell(
                         ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 90.0),
+                          constraints: const BoxConstraints(maxWidth: _priceColMargin),
                           child: M3WrapText(
                             s.retailerMarginPct != 0
                                 ? CurrencyFormatter.formatMarginSummary(s.retailerGrossProfit, s.retailerMarginPct)
@@ -2284,6 +2314,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               titleEn: 'Top SKU',
               value: topSku != null ? topSku.skuName : '—',
               textValue: true,
+              // Long item names stay one line (ellipsis + hover tooltip) so
+              // this card matches the height of the other three KPIs.
+              singleLineValue: true,
               subtitle: topSku != null
                   ? '${CurrencyFormatter.formatCompactEGP(topSku.revenue)} (${CurrencyFormatter.formatNumber(topSku.units)} وحدة) • $perfPeriodBadgeAr'
                   : 'لا توجد مبيعات • $perfPeriodBadgeAr',
@@ -2457,12 +2490,18 @@ onChanged: m3Legacy<String>((v) {
 ),
                   M3SearchFieldWidth(
                     hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
+                    hintStyle: _perfSearchHintStyle(theme, colorScheme),
                     width: 220.0,
                     child: TextField(
                       key: const ValueKey('perf_search_field'),
                       controller: _perfSearchController,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
+                        hintStyle: _perfSearchHintStyle(theme, colorScheme),
                         isDense: true,
                         prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
                         suffixIcon: _perfSearch.isNotEmpty
@@ -2509,7 +2548,7 @@ onChanged: m3Legacy<String>((v) {
                       M3Feedback.showSuccess(context, 'تم تصدير التقرير.');
                     },
                     icon: const Icon(Icons.download_rounded, size: 18.0),
-                    label: const Text('تصدير CSV'),
+                    label: const Text('تصدير'),
                   ),
                   FilledButton.tonalIcon(
                     onPressed: () {
@@ -2578,13 +2617,13 @@ onChanged: m3Legacy<String>((v) {
                   headingRowColor: WidgetStatePropertyAll(
                     colorScheme.surfaceContainerHigh.withOpacity(0.5),
                   ),
-                  columns: const [
-                    DataColumn(label: Text('الترتيب')),
-                    DataColumn(label: Text('الفرع')),
-                    DataColumn(label: Text('السلسلة')),
-                    DataColumn(label: Text('الكمية المباعة'), numeric: true),
-                    DataColumn(label: Text('صافي المبيعات (ج.م)'), numeric: true),
-                    DataColumn(label: Text('حصة المبيعات %'), numeric: true),
+                  columns: [
+                    _centeredColumn('الترتيب'),
+                    _centeredColumn('الفرع'),
+                    _centeredColumn('السلسلة'),
+                    _centeredColumn('الكمية المباعة', numeric: true),
+                    _centeredColumn('صافي المبيعات (ج.م)', numeric: true),
+                    _centeredColumn('حصة المبيعات %', numeric: true),
                   ],
                   rows: branchList.asMap().entries.map((entry) {
                     final idx = entry.key + 1;
@@ -3057,10 +3096,6 @@ onChanged: m3Legacy<String>((v) {
             ],
           ),
         ),
-        if (_recordsSummary.skuSummaries.isNotEmpty) ...[
-          M3Spacing.gapMD,
-          _buildAdecoPriceAndMarginMatrixSection(context, theme, colorScheme),
-        ],
       ],
     );
   }
@@ -3528,6 +3563,7 @@ onChanged: m3Legacy<int>((v) {
     required IconData icon,
     required Color color,
     bool textValue = false,
+    bool singleLineValue = false,
     Key? subtitleKey,
   }) {
     // Shared reference KPI card (Sell-Out is the reference; Compare mirrors it).
@@ -3542,6 +3578,28 @@ onChanged: m3Legacy<int>((v) {
       icon: icon,
       color: color,
       textValue: textValue,
+      valueMaxLines: singleLineValue ? 1 : 2,
+      shrinkOverflowingValue: singleLineValue,
     );
   }
+}
+
+/// Placeholder for the branch-performance search. Lighter than entered text
+/// (onSurfaceVariant at 70%, same treatment as the Sell-In search hint).
+TextStyle? _perfSearchHintStyle(ThemeData theme, ColorScheme colorScheme) {
+  return theme.textTheme.bodyLarge?.copyWith(
+    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+    fontWeight: FontWeight.w400,
+  );
+}
+
+/// Header and cell share one centre axis. [TableScrollContainer] centres the
+/// cells of every column whose heading uses [MainAxisAlignment.center] and
+/// stretches the table to the full width.
+DataColumn _centeredColumn(String label, {bool numeric = false}) {
+  return DataColumn(
+    numeric: numeric,
+    headingRowAlignment: MainAxisAlignment.center,
+    label: Text(label, textAlign: TextAlign.center),
+  );
 }
