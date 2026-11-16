@@ -190,37 +190,52 @@ void main() {
         );
 
         for (final label in [
-          'كود الصنف',
           'الصنف الرسمي',
           'وحدات/كرتونة',
           'الوحدات',
           'الكراتين',
-          'سعر القائمة (شامل الضريبة)',
-          'سعر البيع الفعلي',
-          'فرق السعر %',
-          'تكلفة المصنع للقطعة',
-          'صافي سعر الكرتونة (فاتورة)',
+          'سعر القائمة',
+          'سعر البيع',
+          'فرق السعر',
+          'تكلفة المصنع/ق',
+          'صافي سعر الكرتونة',
           'صافي المبيعات',
-          'هامش السلسلة',
+          'الهامش',
         ]) {
           final head = find.descendant(of: table, matching: find.text(label));
           expect(head, findsWidgets, reason: 'missing header $label');
           expect(_onScreen(tester, head.first), isTrue,
               reason: 'header "$label" is clipped or off-screen');
+          final para = tester.renderObject<RenderParagraph>(head.first);
+          expect(para.size.height, lessThanOrEqualTo(24.0),
+              reason: 'header "$label" must stay on one line');
         }
+
+        expect(find.descendant(of: table, matching: find.text('كود الصنف')),
+            findsNothing);
 
         final names = find.byKey(const ValueKey('price_matrix_sku_name'));
         expect(names, findsNWidgets(3));
         for (final t in tester.widgetList<Text>(names)) {
-          expect(t.maxLines, 3);
+          expect(t.maxLines, 2);
           expect(t.overflow, TextOverflow.ellipsis);
+          // Full name stays in the tooltip when the 2-line cap ellipsizes.
+          final tip = find.ancestor(
+              of: find.byWidget(t), matching: find.byType(Tooltip));
+          expect(tester.widget<Tooltip>(tip.first).message, t.data);
         }
-        for (final e in names.evaluate()) {
-          final p = tester.renderObject<RenderParagraph>(
-              find.byElementPredicate((x) => x == e));
-          expect(p.didExceedMaxLines, isFalse,
-              reason: 'name "${(e.widget as Text).data}" clipped before 3 lines');
-        }
+        // Shorter live name still fits in 2 lines; the longest may ellipsize
+        // (owner rule: name ≤2 lines + nested code = ≤3 lines total).
+        final shortName = find.descendant(
+            of: table, matching: find.text(kLiveLongName2));
+        expect(shortName, findsOneWidget);
+        expect(
+          tester
+              .renderObject<RenderParagraph>(shortName)
+              .didExceedMaxLines,
+          isFalse,
+          reason: 'medium-length name should fit in 2 lines',
+        );
 
         // Live negative deltas keep the minus on the left.
         final delta = find.byKey(const ValueKey('price_matrix_delta_pct'));
@@ -261,6 +276,21 @@ void main() {
           );
         }
 
+        // Short headers keep full original wording in DataColumn.tooltip.
+        final byLabel = {
+          for (final c in dt.columns) colLabel(c): c.tooltip,
+        };
+        expect(byLabel['سعر القائمة'], 'سعر القائمة (شامل الضريبة)');
+        expect(byLabel['سعر البيع'], 'سعر البيع الفعلي');
+        expect(byLabel['فرق السعر'], 'فرق السعر %');
+        expect(byLabel['تكلفة المصنع/ق'], 'تكلفة المصنع للقطعة');
+        expect(byLabel['صافي سعر الكرتونة'], 'صافي سعر الكرتونة (فاتورة)');
+        expect(byLabel['الهامش'], 'هامش السلسلة');
+        expect(byLabel['صافي المبيعات'], isNull);
+
+        // Item code nests under the official name (no standalone column).
+        expect(find.byKey(const ValueKey('price_matrix_item_code')),
+            findsNWidgets(3));
         expect(find.byType(HyphenatedCodeText), findsWidgets);
         for (final code in ['PRHC-0003-0009', 'PRHC-0001-0001', 'FGDG-0004-0001']) {
           final f = find.descendant(of: table, matching: find.text(code));
@@ -273,6 +303,16 @@ void main() {
             lessThanOrEqualTo(22.0),
             reason: 'code $code wrapped to more than one line (h=${para.size.height})',
           );
+          // Nested under the same name cell (Column with sku name).
+          final nameColumn = find.ancestor(of: f, matching: find.byType(Column));
+          expect(
+            find.descendant(
+              of: nameColumn.first,
+              matching: find.byKey(const ValueKey('price_matrix_sku_name')),
+            ),
+            findsOneWidget,
+            reason: 'code $code not under official name',
+          );
         }
 
         final marginText = CurrencyFormatter.formatMarginSummary(-4600000, -60.3);
@@ -284,7 +324,7 @@ void main() {
         expect(
           marginPara.didExceedMaxLines,
           isFalse,
-          reason: 'هامش السلسلة ellipsized: $marginText',
+          reason: 'الهامش ellipsized: $marginText',
         );
 
         // Numbers must never wrap internally (11259.7, 17446.6, 1082.66).

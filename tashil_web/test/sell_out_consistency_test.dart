@@ -455,12 +455,17 @@ void main() {
         expect(names, findsNWidgets(2));
         for (final e in names.evaluate()) {
           final t = e.widget as Text;
-          expect(t.maxLines, 3);
+          expect(t.maxLines, 2);
           expect(t.style?.fontSize, 14.0);
           final tip = find.ancestor(
               of: find.byWidget(t), matching: find.byType(Tooltip));
           expect(tester.widget<Tooltip>(tip.first).message, t.data);
         }
+        // Item code nests under the official name.
+        expect(find.byKey(const ValueKey('price_matrix_item_code')),
+            findsNWidgets(2));
+        expect(find.text('RH-1'), findsOneWidget);
+        expect(find.text('RH-2'), findsOneWidget);
         // The long name really wraps onto a second line.
         final para = tester.renderObject<RenderParagraph>(find.descendant(
             of: find.byWidgetPredicate((w) => w is Text && w.data == longName),
