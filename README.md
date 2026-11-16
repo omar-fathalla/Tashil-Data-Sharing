@@ -62,3 +62,7 @@ cd tashil_web
 flutter run -d chrome
 # Launches web portal with Arabic RTL and M3 design
 ```
+
+## Cursor cloud agents
+
+Cloud agents use [`.cursor/environment.json`](.cursor/environment.json). The image pins Flutter 3.41.2 (web precached, analytics off) and Go 1.26.0; [`.cursor/install.sh`](.cursor/install.sh) only syncs pub, Go modules, and the Playwright npm cache. Versions, verification commands, and the dashboard step for the saved `Tashil-Data-Sharing` environment are in [`.cursor/README.md`](.cursor/README.md).

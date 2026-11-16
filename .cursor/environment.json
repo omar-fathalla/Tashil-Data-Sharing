@@ -1,0 +1,8 @@
+{
+  "name": "Tashil Data Sharing",
+  "user": "ubuntu",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "install": "if [ -f .cursor/install.sh ]; then exec bash .cursor/install.sh; elif [ -f /agent/repos/Tashil-Data-Sharing/.cursor/install.sh ]; then exec bash /agent/repos/Tashil-Data-Sharing/.cursor/install.sh; else echo 'cursor install: .cursor/install.sh not found' >&2; exit 1; fi"
+}
