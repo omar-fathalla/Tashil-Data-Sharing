@@ -232,4 +232,12 @@ class SessionStorage {
 
   /// Current browser path on web; '' elsewhere.
   static String currentBrowserPath() => platformCurrentPath();
+
+  /// A query parameter of the current URL (in-memory outside the browser).
+  static String? browserQueryParam(String name) => platformQueryParam(name);
+
+  /// Sets (or removes, when [value] is null/empty) one query parameter in
+  /// place, keeping the path, the other parameters and the hash.
+  static void replaceBrowserQueryParam(String name, String? value) =>
+      platformReplaceQueryParam(name, value);
 }

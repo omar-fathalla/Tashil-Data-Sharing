@@ -40,6 +40,30 @@ void platformReplaceUrl(String path) {
   } catch (_) {}
 }
 
+String? platformQueryParam(String name) {
+  try {
+    return Uri.parse(html.window.location.href).queryParameters[name];
+  } catch (_) {
+    return null;
+  }
+}
+
+void platformReplaceQueryParam(String name, String? value) {
+  try {
+    final loc = html.window.location;
+    final params =
+        Map<String, String>.of(Uri.parse(loc.href).queryParameters);
+    if (value == null || value.isEmpty) {
+      params.remove(name);
+    } else {
+      params[name] = value;
+    }
+    final query = params.isEmpty ? '' : '?${Uri(queryParameters: params).query}';
+    html.window.history
+        .replaceState(null, '', '${loc.pathname ?? ''}$query${loc.hash}');
+  } catch (_) {}
+}
+
 String platformCurrentPath() {
   try {
     return html.window.location.pathname ?? '';
