@@ -5,6 +5,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/theme/m3_status_colors.dart';
+import '../../../../core/utils/bidi_text.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
@@ -24,12 +25,15 @@ Future<void> showTargetBreakdownDialog(
 }) {
   return showDialog<void>(
     context: context,
-    builder: (_) => Dialog(
-      insetPadding: const EdgeInsets.all(16.0),
-      clipBehavior: Clip.antiAlias,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1280.0, maxHeight: 820.0),
-        child: TargetBreakdownView(repository: repository, target: target),
+    builder: (_) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: Dialog(
+        insetPadding: const EdgeInsets.all(16.0),
+        clipBehavior: Clip.antiAlias,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1280.0, maxHeight: 820.0),
+          child: TargetBreakdownView(repository: repository, target: target),
+        ),
       ),
     ),
   );
@@ -115,44 +119,53 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
     final cs = theme.colorScheme;
     final t = widget.target;
     final title = 'توزيع المستهدف • ${t.chainDisplayName} • ${t.monthLabel}';
-    return Column(
-      key: const ValueKey('target_breakdown_dialog'),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(8, 12, 16, 8),
-          child: Row(
-            children: [
-              IconButton(
-                key: const ValueKey('target_breakdown_back'),
-                tooltip: 'رجوع',
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => Navigator.of(context).maybePop(),
-              ),
-              const SizedBox(width: 4.0),
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+    // The app locale is English, so a route opened with showDialog inherits
+    // LTR. This dialog is Arabic: force RTL for the header, banner, KPI row
+    // and table. Numeric strings keep an LTR paragraph so signs and «%» stay
+    // on the correct side of the digits.
+    return Directionality(
+      key: const ValueKey('target_breakdown_direction'),
+      textDirection: TextDirection.rtl,
+      child: Column(
+        key: const ValueKey('target_breakdown_dialog'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(8, 12, 16, 8),
+            child: Row(
+              children: [
+                IconButton(
+                  key: const ValueKey('target_breakdown_back'),
+                  tooltip: 'رجوع',
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                ),
+                const SizedBox(width: 4.0),
+                Expanded(
+                  child: Text(
+                    title,
+                    key: const ValueKey('target_breakdown_title'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-              FilledButton.tonalIcon(
-                key: const ValueKey('target_breakdown_export'),
-                onPressed: _data == null ? null : _export,
-                icon: const Icon(Icons.download_rounded, size: 18.0),
-                label: const Text('تصدير'),
-              ),
-            ],
+                FilledButton.tonalIcon(
+                  key: const ValueKey('target_breakdown_export'),
+                  onPressed: _data == null ? null : _export,
+                  icon: const Icon(Icons.download_rounded, size: 18.0),
+                  label: const Text('تصدير'),
+                ),
+              ],
+            ),
           ),
-        ),
-        Divider(height: 1, color: cs.outlineVariant),
-        Flexible(child: _buildBody(context)),
-      ],
+          Divider(height: 1, color: cs.outlineVariant),
+          Flexible(child: _buildBody(context)),
+        ],
+      ),
     );
   }
 
@@ -205,7 +218,7 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
             M3Spacing.gapSM,
             _note(
               context,
-              'مبيعات فعلية بقيمة ${_egp(m.unattributedActualEgp, m)} غير منسوبة '
+              'مبيعات فعلية بقيمة ${ltrIsolate(_egp(m.unattributedActualEgp, m))} غير منسوبة '
               'لفرع محدد، لذلك لا تظهر في صفوف الفروع.',
             ),
           ],
@@ -285,8 +298,8 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
           M3SummaryKpiCard(
             key: const ValueKey('target_breakdown_kpi_target'),
             title: 'المستهدف',
-            value: CurrencyFormatter.formatCompactEGP(m.targetRevenueEgp),
-            subtitle: _egp(m.targetRevenueEgp, m),
+            value: ltrIsolate(CurrencyFormatter.formatCompactEGP(m.targetRevenueEgp)),
+            subtitle: ltrIsolate(_egp(m.targetRevenueEgp, m)),
             icon: Icons.flag_circle_rounded,
             color: cs.primary,
           ),
@@ -295,15 +308,15 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
             title: 'المحقق',
             value: noSales
                 ? '—'
-                : CurrencyFormatter.formatCompactEGP(m.actualRevenueEgp),
-            subtitle: noSales ? _noSalesYet : _egp(m.actualRevenueEgp, m),
+                : ltrIsolate(CurrencyFormatter.formatCompactEGP(m.actualRevenueEgp)),
+            subtitle: noSales ? _noSalesYet : ltrIsolate(_egp(m.actualRevenueEgp, m)),
             icon: Icons.insights_rounded,
             color: colors.accents.teal,
           ),
           M3SummaryKpiCard(
             key: const ValueKey('target_breakdown_kpi_achievement'),
             title: 'نسبة التحقيق',
-            value: noSales || ach == null ? '—' : '${ach.toStringAsFixed(1)}%',
+            value: noSales || ach == null ? '—' : ltrIsolate('${ach.toStringAsFixed(1)}%'),
             subtitle: noSales ? _noSalesYet : 'من المستهدف',
             icon: Icons.pie_chart_rounded,
             color: achColor,
@@ -313,7 +326,7 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
             title: 'الفرق',
             value: noSales
                 ? '—'
-                : CurrencyFormatter.formatCompactEGP(m.gapEgp),
+                : ltrIsolate(CurrencyFormatter.formatCompactEGP(m.gapEgp)),
             subtitle: noSales
                 ? _noSalesYet
                 : (m.gapEgp >= 0 ? 'فوق المستهدف' : 'المتبقي للمستهدف'),
@@ -414,10 +427,12 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
     FontWeight? weight,
     Color? color,
     bool dim = false,
+    TextDirection? textDirection,
   }) {
     final theme = Theme.of(context);
     return Text(
       text,
+      textDirection: textDirection,
       textAlign: TextAlign.center,
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
@@ -427,6 +442,24 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
       ),
     );
   }
+
+  /// A figure (money, qty, %, gap). LTR so a leading sign and a trailing
+  /// «%» / «ج.م» stay beside the digits inside the RTL table.
+  Widget _figure(
+    BuildContext context,
+    String text, {
+    FontWeight? weight,
+    Color? color,
+    bool dim = false,
+  }) =>
+      _text(
+        context,
+        text,
+        weight: weight,
+        color: color,
+        dim: dim,
+        textDirection: TextDirection.ltr,
+      );
 
   Widget _headerRow(BuildContext context) {
     final theme = Theme.of(context);
@@ -493,14 +526,14 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
   }) {
     final noSales = !m.hasActuals;
     return [
-      _cell(context, 1, _text(context, _pct(share), weight: weight)),
-      _cell(context, 2, _text(context, _egp(target, m), weight: FontWeight.w800)),
-      _cell(context, 3, _text(context, _units(units), weight: weight, dim: units == null)),
-      _cell(context, 4, _text(context, _cartons(cartons), weight: weight, dim: cartons == null)),
+      _cell(context, 1, _figure(context, _pct(share), weight: weight)),
+      _cell(context, 2, _figure(context, _egp(target, m), weight: FontWeight.w800)),
+      _cell(context, 3, _figure(context, _units(units), weight: weight, dim: units == null)),
+      _cell(context, 4, _figure(context, _cartons(cartons), weight: weight, dim: cartons == null)),
       _cell(
         context,
         5,
-        _text(
+        _figure(
           context,
           noSales ? '—' : _egp(actual, m),
           weight: weight,
@@ -510,7 +543,7 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
       _cell(
         context,
         6,
-        _text(
+        _figure(
           context,
           noSales ? '—' : CurrencyFormatter.formatNumber(actualUnits),
           weight: weight,
@@ -520,7 +553,7 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
       _cell(
         context,
         7,
-        _text(
+        _figure(
           context,
           noSales || ach == null ? '—' : _pct(ach),
           weight: FontWeight.w800,
@@ -531,7 +564,7 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
       _cell(
         context,
         8,
-        _text(
+        _figure(
           context,
           noSales ? '—' : _signedEgp(gap, m),
           weight: weight,
@@ -722,7 +755,8 @@ class _TargetBreakdownViewState extends State<TargetBreakdownView> {
                 trailing: Text(
                   !m.hasActuals
                       ? '—'
-                      : '${_egp(n.actualRevenueEgp, m)} • ${CurrencyFormatter.formatNumber(n.actualUnits)} وحدة',
+                      : '${ltrIsolate(_egp(n.actualRevenueEgp, m))} • '
+                          '${ltrIsolate(CurrencyFormatter.formatNumber(n.actualUnits))} وحدة',
                   style: theme.textTheme.bodyMedium,
                 ),
               ),
