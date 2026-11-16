@@ -265,10 +265,13 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                     ),
                   ],
                 ),
+                // Chip-axis alignment: captions hang below and must not
+                // stagger the three metric chips + suppliers FilterChip.
                 Wrap(
+                  key: const ValueKey('pareto_market_share_header_chips'),
                   spacing: 8.0,
                   runSpacing: 6.0,
-                  crossAxisAlignment: WrapCrossAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.start,
                   children: [
                     // Short chip + description (TM / Compare pattern).
                     _ShortChipWithDesc(
@@ -294,6 +297,7 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                     ],
                     if (widget.supplierShares.length > 8)
                       FilterChip(
+                        key: const ValueKey('pareto_suppliers_filter_chip'),
                         label: Text(_showAll
                             ? 'أهم 8 موردين'
                             : 'كل الموردين (${widget.supplierShares.length})'),
@@ -304,6 +308,11 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
                             size: 18.0),
                         showCheckmark: false,
                         selected: _showAll,
+                        // Match M3ChipSurface ~32dp height so the chip body
+                        // shares the same top axis as the metric chips.
+                        visualDensity: VisualDensity.standard,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
                         onSelected: (_) => setState(() => _showAll = !_showAll),
                       ),
                   ],
@@ -1496,6 +1505,9 @@ class _ParetoPowerSkusCard extends StatelessWidget {
 /// Short [M3ChipSurface] label with an optional description underneath
 /// (Trade Marketing / Compare pattern). Keeps long explanatory copy out of
 /// the chip so geometry stays 32dp and text is never ellipsized inside it.
+///
+/// Always reserves one caption strut under the chip so siblings without a
+/// description keep the same chip-axis height in a header [Wrap].
 class _ShortChipWithDesc extends StatelessWidget {
   const _ShortChipWithDesc({
     super.key,
@@ -1515,6 +1527,15 @@ class _ShortChipWithDesc extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final labelColor = shortColor ?? cs.onSurfaceVariant;
+    final hasDescription =
+        description != null && description!.trim().isNotEmpty;
+    final labelStyle = theme.textTheme.labelMedium?.copyWith(
+      color: labelColor,
+      fontWeight: FontWeight.w600,
+    );
+    final captionStyle = theme.textTheme.labelSmall?.copyWith(
+      color: cs.onSurfaceVariant,
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1528,10 +1549,7 @@ class _ShortChipWithDesc extends StatelessWidget {
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.clip,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: labelColor,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: labelStyle,
                 )
               : Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1544,26 +1562,30 @@ class _ShortChipWithDesc extends StatelessWidget {
                         maxLines: 1,
                         softWrap: false,
                         overflow: TextOverflow.clip,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: labelColor,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: labelStyle,
                       ),
                     ),
                   ],
                 ),
         ),
-        if (description != null && description!.isNotEmpty) ...[
-          const SizedBox(height: 2.0),
-          Text(
-            description!,
+        // Reserve one caption line so missing descriptions do not shrink the
+        // column and stagger chip tops against captioned siblings.
+        const SizedBox(height: 2.0),
+        ExcludeSemantics(
+          excluding: !hasDescription,
+          child: Text(
+            hasDescription ? description! : '',
             maxLines: 2,
             overflow: TextOverflow.clip,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
+            style: captionStyle,
+            strutStyle: captionStyle == null
+                ? null
+                : StrutStyle.fromTextStyle(
+                    captionStyle,
+                    forceStrutHeight: true,
+                  ),
           ),
-        ],
+        ),
       ],
     );
   }

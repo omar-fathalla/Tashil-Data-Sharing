@@ -45,6 +45,8 @@ class ApiEndpoints {
   static String targetBreakdown(String id) =>
       '$baseUrl/api/v1/sellout/targets/${Uri.encodeComponent(id)}/breakdown';
   static String get storeMatrix => '$baseUrl/api/v1/analytics/store-matrix';
+  static String get storeMatrixMatchedMonths =>
+      '$baseUrl/api/v1/analytics/store-matrix/matched-months';
   static String get pricingCompliance => '$baseUrl/api/v1/analytics/pricing-compliance';
   static String get cpfrDashboard => '$baseUrl/api/v1/analytics/cpfr';
   static String get oosMonitor => '$baseUrl/api/v1/analytics/oos-monitor';

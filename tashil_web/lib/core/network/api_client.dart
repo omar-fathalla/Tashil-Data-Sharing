@@ -3673,6 +3673,42 @@ class ApiClient {
     return _buildMockOOSResponse(alerts);
   }
 
+  /// Calendar months (1..12) present in BOTH [year] and [compYear] for [chain] —
+  /// the exact window the like-for-like store matrix compares when no month is
+  /// picked. Throws on transport/HTTP failure so callers can decide to hide the label.
+  Future<List<int>> getYoyMatchedMonths({
+    String? chain,
+    required int year,
+    required int compYear,
+  }) async {
+    final effectiveChain = (currentUser?.role == 'chain_kam' &&
+            currentUser?.assignedChain != null &&
+            currentUser!.assignedChain!.isNotEmpty)
+        ? currentUser!.assignedChain
+        : chain;
+    final params = <String, String>{
+      'year': year.toString(),
+      'comp_year': compYear.toString(),
+      if (effectiveChain != null &&
+          effectiveChain.isNotEmpty &&
+          effectiveChain != 'الكل' &&
+          effectiveChain != 'all')
+        'chain': effectiveChain,
+    };
+    final uri = Uri.parse(ApiEndpoints.storeMatrixMatchedMonths).replace(queryParameters: params);
+    final resp = await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 30));
+    if (resp.statusCode != 200) {
+      throw ServerConnectionException(
+        'تعذّر تحميل البيانات من الخادم. حاول مرة أخرى بعد قليل.',
+        'HTTP ${resp.statusCode}',
+      );
+    }
+    final decoded = jsonDecode(resp.body);
+    final raw = decoded is Map ? decoded['months'] : null;
+    if (raw is! List) return const <int>[];
+    return raw.whereType<num>().map((e) => e.toInt()).where((m) => m >= 1 && m <= 12).toList()..sort();
+  }
+
   /// Analytics: Get store benchmark matrix
   Future<List<StoreBenchmarkItem>> getStoreBenchmarkMatrix({
     String? region,

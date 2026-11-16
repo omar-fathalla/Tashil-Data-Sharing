@@ -374,6 +374,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/analytics/targets/upload", analyticsHandler.HandleUploadTargetsFile)
 	mux.HandleFunc("GET /api/v1/sellout/targets/{id}/breakdown", analyticsHandler.HandleTargetBreakdown)
 	mux.HandleFunc("GET /api/v1/analytics/store-matrix", analyticsHandler.HandleStoreMatrix)
+	mux.HandleFunc("GET /api/v1/analytics/store-matrix/matched-months", analyticsHandler.HandleStoreMatrixMatchedMonths)
 	mux.HandleFunc("GET /api/v1/analytics/pricing-compliance", analyticsHandler.HandlePricingCompliance)
 	mux.HandleFunc("GET /api/v1/analytics/cpfr", analyticsHandler.HandleCPFRDashboard)
 	mux.HandleFunc("GET /api/v1/analytics/aggregates", analyticsHandler.HandleGetAnalyticsAggregates)

@@ -23,6 +23,10 @@ class SellOutExplorerData {
   /// [currentBranchMatrix] / the records summary.
   final List<StoreBenchmarkItem> yoyCurrentBranchMatrix;
 
+  /// Calendar months present in both the selected and the previous year. Empty
+  /// when a month/date range pins the period, or when the lookup failed.
+  final List<int> matchedMonths;
+
   const SellOutExplorerData({
     required this.records,
     required this.summary,
@@ -30,6 +34,7 @@ class SellOutExplorerData {
     required this.currentBranchMatrix,
     required this.prevBranchMatrix,
     required this.yoyCurrentBranchMatrix,
+    this.matchedMonths = const [],
     this.sideError,
   });
 
@@ -187,6 +192,16 @@ class SellOutExplorerRepository {
                   : Future<List<StoreBenchmarkItem>>.value(const <StoreBenchmarkItem>[]),
               const <StoreBenchmarkItem>[],
             ),
+            // Label only: a failure (or an older backend without the route) must
+            // not flag sideError, the table works without the month caption.
+            (intersect && q.matrixYear != null && q.matrixYear! > 0
+                    ? api.getYoyMatchedMonths(
+                        chain: q.matrixChain,
+                        year: q.matrixYear!,
+                        compYear: q.compYear,
+                      )
+                    : Future<List<int>>.value(const <int>[]))
+                .catchError((Object _) => const <int>[]),
           ]);
           final current = results[1] as List<StoreBenchmarkItem>;
           final yoyCurrentRaw = results[3] as List<StoreBenchmarkItem>;
@@ -197,6 +212,7 @@ class SellOutExplorerRepository {
             currentBranchMatrix: current,
             prevBranchMatrix: results[2] as List<StoreBenchmarkItem>,
             yoyCurrentBranchMatrix: intersect ? yoyCurrentRaw : current,
+            matchedMonths: results[4] as List<int>,
             sideError: sideError,
           );
         }));

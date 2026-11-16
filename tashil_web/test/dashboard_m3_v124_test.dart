@@ -77,21 +77,25 @@ double _glyphCenterX(WidgetTester tester, Finder finder) {
   return p.localToGlobal(Offset((l + r) / 2, 0)).dx;
 }
 
-List<SupplierShareModel> _suppliers() => [
-      for (var i = 0; i < 4; i++)
+List<SupplierShareModel> _suppliers({int count = 4}) => [
+      for (var i = 0; i < count; i++)
         SupplierShareModel(
           supplierName: 'مورد تجريبي ${i + 1} (Test Supplier ${i + 1})',
-          totalRevenue: 400000.0 - i * 50000,
-          totalUnits: 3000 - i * 200,
-          marketSharePct: 20.0 - i * 3,
+          totalRevenue: 400000.0 - i * 5000,
+          totalUnits: 3000 - i * 20,
+          marketSharePct: 20.0 - i * 0.5,
           skuCount: 10 + i,
           isTenant: i == 1,
           rank: i + 1,
         ),
     ];
 
-Future<void> _pumpPareto(WidgetTester tester) async {
-  tester.view.physicalSize = const Size(1440, 3000);
+Future<void> _pumpPareto(
+  WidgetTester tester, {
+  int supplierCount = 4,
+  Size size = const Size(1440, 3000),
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -104,9 +108,9 @@ Future<void> _pumpPareto(WidgetTester tester) async {
           child: ParetoCategorySection(
             categories: const [],
             paretoSkus: const [],
-            supplierShares: _suppliers(),
+            supplierShares: _suppliers(count: supplierCount),
             totalMarketRevenue: 2000000,
-            tenantMarketSharePct: 17.0,
+            tenantMarketSharePct: 17.58,
             competitorsCount: 105,
           ),
         ),
@@ -181,6 +185,102 @@ void main() {
       findsOneWidget,
     );
     handle.dispose();
+  });
+
+  testWidgets(
+      'market-share header chips share one chip-axis row at desktop width',
+      (tester) async {
+    // 15 suppliers so «كل الموردين (15)» FilterChip is present (live pattern).
+    await _pumpPareto(tester, supplierCount: 15, size: const Size(1440, 3000));
+    expect(tester.takeException(), isNull);
+
+    final row = find.byKey(const ValueKey('pareto_market_share_header_chips'));
+    expect(row, findsOneWidget);
+    expect(
+      tester.widget<Wrap>(row).crossAxisAlignment,
+      WrapCrossAlignment.start,
+      reason: 'captions hang below; chips align on the chip axis',
+    );
+
+    final share = find.byKey(const ValueKey('pareto_share_chip'));
+    final total = find.byKey(const ValueKey('pareto_market_total_chip'));
+    final competitors = find.byKey(const ValueKey('pareto_competitors_chip'));
+    final suppliers =
+        find.byKey(const ValueKey('pareto_suppliers_filter_chip'));
+    expect(share, findsOneWidget);
+    expect(total, findsOneWidget);
+    expect(competitors, findsOneWidget);
+    expect(suppliers, findsOneWidget);
+    expect(find.text('كل الموردين (15)'), findsOneWidget);
+    expect(find.textContaining('حصتنا السوقية · المركز'), findsOneWidget);
+    expect(find.text('إجمالي السوق'), findsOneWidget);
+    expect(find.text('105 منافسين'), findsOneWidget);
+
+    // Captioned copy stays under the chip surface, not inside it.
+    expect(
+      find.descendant(
+        of: find.descendant(of: share, matching: find.byType(M3ChipSurface)),
+        matching: find.textContaining('حصتنا السوقية'),
+      ),
+      findsNothing,
+    );
+
+    final shareChipTop = tester
+        .getTopLeft(
+            find.descendant(of: share, matching: find.byType(M3ChipSurface)))
+        .dy;
+    final totalChipTop = tester
+        .getTopLeft(
+            find.descendant(of: total, matching: find.byType(M3ChipSurface)))
+        .dy;
+    final competitorsChipTop = tester
+        .getTopLeft(
+            find.descendant(
+                of: competitors, matching: find.byType(M3ChipSurface)))
+        .dy;
+    final suppliersTop = tester.getTopLeft(suppliers).dy;
+
+    // Chip surfaces (+ FilterChip) share one horizontal axis (±2dp).
+    expect(totalChipTop, closeTo(shareChipTop, 2.0));
+    expect(competitorsChipTop, closeTo(shareChipTop, 2.0));
+    expect(suppliersTop, closeTo(shareChipTop, 2.0));
+
+    // Desktop: all four stay on one wrap run (same top band).
+    final shareLeft = tester.getTopLeft(share).dx;
+    final totalLeft = tester.getTopLeft(total).dx;
+    final competitorsLeft = tester.getTopLeft(competitors).dx;
+    final suppliersLeft = tester.getTopLeft(suppliers).dx;
+    final xs = [shareLeft, totalLeft, competitorsLeft, suppliersLeft]..sort();
+    for (var i = 1; i < xs.length; i++) {
+      expect(xs[i] - xs[i - 1], greaterThan(4.0),
+          reason: 'chips must sit side-by-side on one desktop row');
+    }
+  });
+
+  testWidgets(
+      'market-share header chips may wrap on a narrow width',
+      (tester) async {
+    await _pumpPareto(tester, supplierCount: 15, size: const Size(520, 3000));
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('pareto_share_chip')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pareto_suppliers_filter_chip')),
+        findsOneWidget);
+    // At least one child drops to a lower run when the strip is narrow.
+    final tops = [
+      tester.getTopLeft(find.byKey(const ValueKey('pareto_share_chip'))).dy,
+      tester
+          .getTopLeft(find.byKey(const ValueKey('pareto_market_total_chip')))
+          .dy,
+      tester
+          .getTopLeft(find.byKey(const ValueKey('pareto_competitors_chip')))
+          .dy,
+      tester
+          .getTopLeft(find.byKey(const ValueKey('pareto_suppliers_filter_chip')))
+          .dy,
+    ];
+    expect(tops.reduce((a, b) => a > b ? a : b) - tops.reduce((a, b) => a < b ? a : b),
+        greaterThan(8.0),
+        reason: 'narrow width may wrap the header chip strip');
   });
 
   testWidgets('F4/F3: one active chain reads "سلسلة نشطة واحدة"',

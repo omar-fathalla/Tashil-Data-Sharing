@@ -46,6 +46,7 @@ type Repository interface {
 	GetChainShares(ctx context.Context, tenantID, period string, dateRange ...string) ([]domain.ChainShareSummary, error)
 	GetDailyTrends(ctx context.Context, tenantID, period string, dateRange ...string) ([]domain.DailyTrendPoint, error)
 	GetStoreBenchmarkMatrix(ctx context.Context, tenantID string, filter StoreMatrixFilter) ([]domain.StoreBenchmarkItem, error)
+	MatchedYoYMonths(ctx context.Context, tenantID, chain string, year, compYear int) ([]int, error)
 	GetPricingCompliance(ctx context.Context, tenantID string, filter PricingComplianceFilter) ([]domain.PricingComplianceItem, error)
 	GetMonthlyPriceElasticity(ctx context.Context, tenantID string, filter PricingComplianceFilter) ([]domain.MonthlyPriceElasticityPoint, domain.PriceElasticitySummary, error)
 	GetCPFRDashboard(ctx context.Context, tenantID string, filter CPFRFilter) (*domain.CPFRDashboardPayload, error)
@@ -2659,6 +2660,56 @@ func getStoreRegion(storeID, storeName string) string {
 	return "القاهرة الكبرى"
 }
 
+// ownMonthSetLocked returns the "-MM" calendar months that have own-brand
+// Sell-Out records in year (same tenant/chain scope as the store matrix).
+// Caller must hold c.mu.
+func (c *Client) ownMonthSetLocked(tenantID string, year int, chainOK func(string) bool) map[string]bool {
+	months := make(map[string]bool)
+	prefix := fmt.Sprintf("%04d-", year)
+	for _, r := range c.records {
+		if !matchTenant(r.TenantID, tenantID) || !isOwnRecord(r) || !chainOK(r.RetailerChain) {
+			continue
+		}
+		if len(r.TransactionDate) >= 7 && strings.HasPrefix(r.TransactionDate, prefix) {
+			months[r.TransactionDate[4:7]] = true
+		}
+	}
+	return months
+}
+
+// MatchedYoYMonths returns the calendar months (1..12, ascending) present in
+// BOTH year and compYear for the chain scope. This is exactly the month window
+// GetStoreBenchmarkMatrix applies when SameMonthsAsYear is set (with Month == 0),
+// so the UI can state which months a like-for-like YoY comparison covers.
+func (c *Client) MatchedYoYMonths(ctx context.Context, tenantID, chain string, year, compYear int) ([]int, error) {
+	c.ensureTenantSeeded(tenantID)
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	chainOK := func(rc string) bool {
+		if chain == "" || chain == "all" || chain == "الكل" {
+			return true
+		}
+		return strings.EqualFold(rc, chain)
+	}
+	cur := c.ownMonthSetLocked(tenantID, year, chainOK)
+	prev := c.ownMonthSetLocked(tenantID, compYear, chainOK)
+	return intersectMonthSets(cur, prev), nil
+}
+
+// intersectMonthSets converts two "-MM" sets into the ascending month numbers present in both.
+func intersectMonthSets(a, b map[string]bool) []int {
+	out := make([]int, 0, 12)
+	for m := 1; m <= 12; m++ {
+		key := fmt.Sprintf("-%02d", m)
+		if a[key] && b[key] {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
 // GetStoreBenchmarkMatrix aggregates store-level metrics, computes rank and tier, and applies query filters.
 func (c *Client) GetStoreBenchmarkMatrix(ctx context.Context, tenantID string, filter StoreMatrixFilter) ([]domain.StoreBenchmarkItem, error) {
 	c.ensureTenantSeeded(tenantID)
@@ -2688,16 +2739,7 @@ func (c *Client) GetStoreBenchmarkMatrix(ctx context.Context, tenantID string, f
 	// reference year (same tenant/chain scope) once, before aggregating.
 	var sameMonths map[string]bool
 	if filter.SameMonthsAsYear > 0 && filter.Month == 0 {
-		sameMonths = make(map[string]bool)
-		refPrefix := fmt.Sprintf("%04d-", filter.SameMonthsAsYear)
-		for _, r := range c.records {
-			if !matchTenant(r.TenantID, tenantID) || !isOwnRecord(r) || !chainOK(r.RetailerChain) {
-				continue
-			}
-			if len(r.TransactionDate) >= 7 && strings.HasPrefix(r.TransactionDate, refPrefix) {
-				sameMonths[r.TransactionDate[4:7]] = true
-			}
-		}
+		sameMonths = c.ownMonthSetLocked(tenantID, filter.SameMonthsAsYear, chainOK)
 	}
 
 	for _, r := range c.records {

@@ -20,6 +20,7 @@ import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/testing/test_semantics.dart';
 import '../../data/sell_out_explorer_repository.dart';
+import '../../domain/branch_growth.dart';
 import '../../domain/sell_out_upload_flow.dart';
 import '../../domain/archive_delete_copy.dart';
 import '../../../../core/network/backend_http.dart';
@@ -72,24 +73,27 @@ class SellOutExplorerScreen extends StatefulWidget {
 }
 
 class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with DataRefreshMixin<SellOutExplorerScreen> {
-  // Headers and cells centred; the item name stays start-aligned.
-  /// Two-line wrapped heading so the 12-column price table fits the live
-  /// 1280+sidebar shell without horizontal scrolling.
+  // Headers and cells centred; the item name (+ nested code) stays start-aligned.
+  /// One-line short headings capped so the 11-column price table fits the
+  /// live 1280+sidebar shell; full original wording lives in [tooltip].
   static DataColumn _priceHeading(
     String label, {
     bool numeric = true,
     bool center = true,
     double maxWidth = 88,
+    String? tooltip,
   }) {
     return DataColumn(
       numeric: numeric,
+      tooltip: tooltip,
       headingRowAlignment: center ? MainAxisAlignment.center : null,
       label: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Text(
           label,
-          maxLines: 3,
-          softWrap: true,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
           textAlign: center ? TextAlign.center : TextAlign.start,
         ),
       ),
@@ -97,21 +101,23 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   }
 
 
-  /// Per-column caps measured from the live longest bodyMedium values
+  /// Per-column caps: numeric floors from live bodyMedium values
   /// (e.g. 11259.7, 1082.66, 87,233, −44.0%) so a number never wraps
-  /// internally. Currency («ج.م») may go to the next line.
-  static const double _priceColCode = 116;
-  static const double _priceColName = 220;
-  static const double _priceColUnitsPer = 36;
+  /// internally; header caps sized so the shortened one-line labels fit
+  /// (Cairo labelMedium). Currency («ج.م») may go to the next line.
+  /// Name column absorbs the former standalone code column so the official
+  /// name (≤2 lines) + nested item code (1 line) stay ≤3 lines total.
+  static const double _priceColName = 196;
+  static const double _priceColUnitsPer = 72;
   static const double _priceColUnits = 54;
   static const double _priceColCartons = 58;
-  static const double _priceColList = 52;
-  static const double _priceColSell = 52;
-  static const double _priceColDelta = 54;
-  static const double _priceColFactory = 52;
-  static const double _priceColNetCarton = 60;
-  static const double _priceColNetSales = 52;
-  static const double _priceColMargin = 90;
+  static const double _priceColList = 64;
+  static const double _priceColSell = 56;
+  static const double _priceColDelta = 56;
+  static const double _priceColFactory = 88;
+  static const double _priceColNetCarton = 96;
+  static const double _priceColNetSales = 76;
+  static const double _priceColMargin = 80;
 
   static Widget _priceCell(
     String text, {
@@ -133,24 +139,46 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   }
 
   static List<DataColumn> get _priceMatrixColumns => [
-        _priceHeading('كود الصنف', numeric: false, maxWidth: _priceColCode),
         _priceHeading('الصنف الرسمي', numeric: false, center: false, maxWidth: _priceColName),
         _priceHeading('وحدات/كرتونة', maxWidth: _priceColUnitsPer),
         _priceHeading('الوحدات', maxWidth: _priceColUnits),
         _priceHeading('الكراتين', maxWidth: _priceColCartons),
-        _priceHeading('سعر القائمة (شامل الضريبة)', maxWidth: _priceColList),
-        _priceHeading('سعر البيع الفعلي', maxWidth: _priceColSell),
-        _priceHeading('فرق السعر %', maxWidth: _priceColDelta),
-        _priceHeading('تكلفة المصنع للقطعة', maxWidth: _priceColFactory),
-        _priceHeading('صافي سعر الكرتونة (فاتورة)', maxWidth: _priceColNetCarton),
+        _priceHeading(
+          'سعر القائمة',
+          maxWidth: _priceColList,
+          tooltip: 'سعر القائمة (شامل الضريبة)',
+        ),
+        _priceHeading(
+          'سعر البيع',
+          maxWidth: _priceColSell,
+          tooltip: 'سعر البيع الفعلي',
+        ),
+        _priceHeading(
+          'فرق السعر',
+          maxWidth: _priceColDelta,
+          tooltip: 'فرق السعر %',
+        ),
+        _priceHeading(
+          'تكلفة المصنع/ق',
+          maxWidth: _priceColFactory,
+          tooltip: 'تكلفة المصنع للقطعة',
+        ),
+        _priceHeading(
+          'صافي سعر الكرتونة',
+          maxWidth: _priceColNetCarton,
+          tooltip: 'صافي سعر الكرتونة (فاتورة)',
+        ),
         _priceHeading('صافي المبيعات', maxWidth: _priceColNetSales),
-        _priceHeading('هامش السلسلة', maxWidth: _priceColMargin),
+        _priceHeading(
+          'الهامش',
+          maxWidth: _priceColMargin,
+          tooltip: 'هامش السلسلة',
+        ),
       ];
 
   /// Flex shares for the price matrix at the live 1280+sidebar width.
   /// Gutters are xxs so the measured numeric caps fit without h-scroll.
   static const List<double> _priceMatrixFlex = [
-    _priceColCode,
     _priceColName,
     _priceColUnitsPer,
     _priceColUnits,
@@ -163,6 +191,12 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     _priceColNetSales,
     _priceColMargin,
   ];
+
+  static const double _branchRankWidth = 28.0;
+
+  /// Branch-growth table column shares: grouped rank+branch, 2026, 2025, diff,
+  /// YoY %, monthly average, status.
+  static const List<double> _branchGrowthFlex = [2.6, 1.3, 1.3, 1.0, 1.1, 1.1, 1.1];
 
   @override
   void onBackendDataChanged() {
@@ -208,6 +242,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   /// Selected-year totals restricted to months present last year — YoY only.
   Map<String, StoreBenchmarkItem> _yoyCurrentBranchMap = const {};
   double _yoyCurrentTotalChainRevenue = 0.0;
+  /// Calendar months compared like-for-like (present in both years); empty when unknown.
+  List<int> _matchedYoyMonths = const [];
 
   // Tab 1: Performance & Branch Analytics State
   String _perfChain = 'all';
@@ -321,6 +357,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         _prevYearTotalChainRevenue = 0.0;
         _yoyCurrentBranchMap = const {};
         _yoyCurrentTotalChainRevenue = 0.0;
+        _matchedYoyMonths = const [];
       });
       // clearSnackBars after the first frame — initState's first load cannot depend on
       // ScaffoldMessenger yet.
@@ -405,6 +442,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         _prevYearTotalChainRevenue = prevTotalRev;
         _yoyCurrentBranchMap = yoyCurMap;
         _yoyCurrentTotalChainRevenue = yoyCurRev;
+        _matchedYoyMonths = data.matchedMonths;
         if (_availableCategories.isEmpty || _chainStores.isEmpty) {
           final cats = <String>{};
           final storesByChain = <String, List<Map<String, String>>>{};
@@ -1398,9 +1436,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               showSwipeHint: false,
               columnFlex: _priceMatrixFlex,
               child: DataTable(
-                headingRowHeight: 64.0,
+                headingRowHeight: 48.0,
                 dataRowMinHeight: 52.0,
-                // Room for a 3-line item name (owner table rule).
+                // Name ≤2 lines + nested item code = ≤3 lines total.
                 dataRowMaxHeight: 80.0,
                 columnSpacing: M3Spacing.xxs,
                 horizontalMargin: M3Spacing.xxs,
@@ -1410,40 +1448,43 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                 rows: centerCellsUnderCenteredHeadings(_priceMatrixColumns, filteredItems.map((s) {
                   final isNegMargin = s.retailerMarginPct < 0;
                   final marginColor = isNegMargin ? colorScheme.error : colorScheme.secondary;
+                  final code = s.itemCode.isNotEmpty ? s.itemCode : s.barcode;
                   return DataRow(
                     cells: [
                       DataCell(
                         InkWell(
                           onTap: () => _openProductIdCardForSummary(s),
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 116.0),
-                            child: HyphenatedCodeText(
-                              s.itemCode.isNotEmpty ? s.itemCode : s.barcode,
-                              maxLines: 3,
-                              maxWidth: 116,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.primary,
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      DataCell(
-                        InkWell(
-                          onTap: () => _openProductIdCardForSummary(s),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 220.0),
-                            child: Tooltip(
-                              message: s.skuName,
-                              child: Text(
-                                s.skuName,
-                                key: const ValueKey('price_matrix_sku_name'),
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                softWrap: true,
-                                style: cellStrong,
-                              ),
+                            constraints: const BoxConstraints(maxWidth: _priceColName),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Tooltip(
+                                  message: s.skuName,
+                                  child: Text(
+                                    s.skuName,
+                                    key: const ValueKey('price_matrix_sku_name'),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    softWrap: true,
+                                    style: cellStrong,
+                                  ),
+                                ),
+                                if (code.isNotEmpty)
+                                  HyphenatedCodeText(
+                                    code,
+                                    key: const ValueKey('price_matrix_item_code'),
+                                    maxLines: 1,
+                                    maxWidth: _priceColName,
+                                    textAlign: TextAlign.start,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.primary,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -1468,7 +1509,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                       DataCell(_priceCell(CurrencyFormatter.formatCompactEGP(s.totalNetRevenue), style: cellStrong?.copyWith(color: colorScheme.primary), maxWidth: _priceColNetSales)),
                       DataCell(
                         ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 90.0),
+                          constraints: const BoxConstraints(maxWidth: _priceColMargin),
                           child: M3WrapText(
                             s.retailerMarginPct != 0
                                 ? CurrencyFormatter.formatMarginSummary(s.retailerGrossProfit, s.retailerMarginPct)
@@ -1777,16 +1818,19 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(child: cards[0]),
-                          M3Spacing.hGapSM,
-                          Expanded(child: cards[1]),
-                          M3Spacing.hGapSM,
-                          Expanded(child: cards[2]),
-                          M3Spacing.hGapSM,
-                          Expanded(child: cards[3]),
-                        ],
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: cards[0]),
+                            M3Spacing.hGapSM,
+                            Expanded(child: cards[1]),
+                            M3Spacing.hGapSM,
+                            Expanded(child: cards[2]),
+                            M3Spacing.hGapSM,
+                            Expanded(child: cards[3]),
+                          ],
+                        ),
                       ),
                       if (selectedStoreId != null) ...[
                         const SizedBox(height: 8.0),
@@ -1989,7 +2033,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     // card is one step higher on the same surface scale.
     return Container(
       key: ValueKey('insight_badge_$label'),
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+      constraints: const BoxConstraints(minHeight: 72.0),
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
       decoration: BoxDecoration(
         color: isHighlighted
             ? colorScheme.surfaceContainerHigh
@@ -1997,36 +2042,49 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
         borderRadius: M3Shape.radiusMd,
         border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(6.0),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: M3Shape.radiusSm,
-            ),
-            child: Icon(icon, size: 18.0, color: color),
-          ),
-          const SizedBox(width: 8.0),
-          Expanded(
-            child: Text(
-              '$label: $branchName',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.onSurface),
-            ),
-          ),
-          const SizedBox(width: 6.0),
-          Flexible(
-            child: M3ChipSurface(
-              color: colorScheme.surfaceContainerHighest,
-              child: Text(
-                valueText,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6.0),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: M3Shape.radiusSm,
+                ),
+                child: Icon(icon, size: 18.0, color: color),
               ),
-            ),
+              const SizedBox(width: 8.0),
+              Expanded(
+                child: Text(
+                  label,
+                  style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6.0),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  branchName,
+                  style: M3TextVariants.denseLabelHeavy.copyWith(color: colorScheme.onSurface),
+                ),
+              ),
+              const SizedBox(width: 8.0),
+              M3ChipSurface(
+                color: colorScheme.surfaceContainerHighest,
+                child: Text(
+                  valueText,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -2108,51 +2166,26 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final int compYear = (_selectedYear > 0 ? _selectedYear : _currentYear) - 1;
     final int currYearLabel = _selectedYear > 0 ? _selectedYear : _currentYear;
 
-    // Build Branch YoY & MoM Growth Matrix
-    // Displayed current revenue stays full-period; YoY % uses like-for-like months.
-    final branchGrowthMatrix = branchList.map((b) {
-      StoreBenchmarkItem? prevItem = _prevYearBranchMap[b.storeId];
-      if (prevItem == null) {
-        for (final entry in _prevYearBranchMap.values) {
-          if (entry.storeName == b.storeName) {
-            prevItem = entry;
-            break;
-          }
-        }
-      }
-      StoreBenchmarkItem? yoyCurItem = _yoyCurrentBranchMap[b.storeId];
-      if (yoyCurItem == null) {
-        for (final entry in _yoyCurrentBranchMap.values) {
-          if (entry.storeName == b.storeName) {
-            yoyCurItem = entry;
-            break;
-          }
-        }
-      }
-      final prevRev = prevItem?.totalRevenue ?? 0.0;
-      final prevUnits = prevItem?.totalUnits ?? 0;
-      final yoyCurRev = yoyCurItem?.totalRevenue ?? 0.0;
-      final varianceEgp = yoyCurRev - prevRev;
-      final double? yoyGrowthPct = likeForLikeYoyPct(yoyCurRev, prevRev);
-      final String status = prevRev <= 0
-          ? (b.revenue > 0 ? 'new_branch' : 'declining')
-          : ((yoyGrowthPct ?? 0.0) >= 0 ? 'growing' : 'declining');
-      final double monthlyRunRate = _selectedMonth > 0 ? b.revenue : (b.revenue / 12.0);
-      return (
-        storeId: b.storeId,
-        storeName: b.storeName,
-        chain: b.chain,
-        region: b.region != '—' ? b.region : (prevItem?.region ?? '—'),
-        currentRevenue: b.revenue,
-        prevRevenue: prevRev,
-        varianceEgp: varianceEgp,
-        yoyGrowthPct: yoyGrowthPct,
-        monthlyRunRate: monthlyRunRate,
-        currentUnits: b.units,
-        prevUnits: prevUnits,
-        status: status,
-      );
-    }).toList();
+    // Branch growth table: the 2026 / 2025 sales columns, the difference and the
+    // YoY % all use the SAME matched-month window (see buildBranchGrowthRows).
+    final branchGrowthMatrix = buildBranchGrowthRows(
+      branches: [
+        for (final b in branchList)
+          BranchGrowthBase(
+            storeId: b.storeId,
+            storeName: b.storeName,
+            chain: b.chain,
+            region: b.region,
+            units: b.units,
+            revenue: b.revenue,
+          ),
+      ],
+      prevByStore: _prevYearBranchMap,
+      currentLikeForLikeByStore: _yoyCurrentBranchMap,
+    );
+    final bool compareMatchedMonths = _selectedMonth == 0 &&
+        selectedDateRange == null &&
+        _matchedYoyMonths.isNotEmpty;
 
     final filteredGrowthBranches = branchGrowthMatrix.where((item) {
       if (_perfGrowthStatusFilter != 'all' && item.status != _perfGrowthStatusFilter) {
@@ -2172,8 +2205,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final growingBranchesCount = branchGrowthMatrix.where((b) => b.status == 'growing').length;
     final decliningBranchesCount = branchGrowthMatrix.where((b) => b.status == 'declining').length;
     final newBranchesCount = branchGrowthMatrix.where((b) => b.status == 'new_branch').length;
-    // Full-period current total for the strip value; YoY % is like-for-like.
-    final totalCurrMatrixRev = branchGrowthMatrix.fold<double>(0.0, (s, b) => s + b.currentRevenue);
+    final totalCurrMatrixRev = _yoyCurrentTotalChainRevenue;
     final totalPrevMatrixRev = _prevYearTotalChainRevenue;
     final totalMatrixVarianceEgp = _yoyCurrentTotalChainRevenue - totalPrevMatrixRev;
     final double? totalMatrixYoYPct =
@@ -2282,6 +2314,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               titleEn: 'Top SKU',
               value: topSku != null ? topSku.skuName : '—',
               textValue: true,
+              // Long item names stay one line (ellipsis + hover tooltip) so
+              // this card matches the height of the other three KPIs.
+              singleLineValue: true,
               subtitle: topSku != null
                   ? '${CurrencyFormatter.formatCompactEGP(topSku.revenue)} (${CurrencyFormatter.formatNumber(topSku.units)} وحدة) • $perfPeriodBadgeAr'
                   : 'لا توجد مبيعات • $perfPeriodBadgeAr',
@@ -2455,12 +2490,18 @@ onChanged: m3Legacy<String>((v) {
 ),
                   M3SearchFieldWidth(
                     hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
+                    hintStyle: _perfSearchHintStyle(theme, colorScheme),
                     width: 220.0,
                     child: TextField(
                       key: const ValueKey('perf_search_field'),
                       controller: _perfSearchController,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
+                        hintStyle: _perfSearchHintStyle(theme, colorScheme),
                         isDense: true,
                         prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
                         suffixIcon: _perfSearch.isNotEmpty
@@ -2507,7 +2548,7 @@ onChanged: m3Legacy<String>((v) {
                       M3Feedback.showSuccess(context, 'تم تصدير التقرير.');
                     },
                     icon: const Icon(Icons.download_rounded, size: 18.0),
-                    label: const Text('تصدير CSV'),
+                    label: const Text('تصدير'),
                   ),
                   FilledButton.tonalIcon(
                     onPressed: () {
@@ -2576,13 +2617,13 @@ onChanged: m3Legacy<String>((v) {
                   headingRowColor: WidgetStatePropertyAll(
                     colorScheme.surfaceContainerHigh.withOpacity(0.5),
                   ),
-                  columns: const [
-                    DataColumn(label: Text('الترتيب')),
-                    DataColumn(label: Text('الفرع')),
-                    DataColumn(label: Text('السلسلة')),
-                    DataColumn(label: Text('الكمية المباعة'), numeric: true),
-                    DataColumn(label: Text('صافي المبيعات (ج.م)'), numeric: true),
-                    DataColumn(label: Text('حصة المبيعات %'), numeric: true),
+                  columns: [
+                    _centeredColumn('الترتيب'),
+                    _centeredColumn('الفرع'),
+                    _centeredColumn('السلسلة'),
+                    _centeredColumn('الكمية المباعة', numeric: true),
+                    _centeredColumn('صافي المبيعات (ج.م)', numeric: true),
+                    _centeredColumn('حصة المبيعات %', numeric: true),
                   ],
                   rows: branchList.asMap().entries.map((entry) {
                     final idx = entry.key + 1;
@@ -2711,9 +2752,11 @@ onChanged: m3Legacy<String>((v) {
                               ),
                               const SizedBox(height: 2.0),
                               Text(
-                                'نمو الفروع (سنوي وشهري) • $perfPeriodBadgeAr',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                compareMatchedMonths
+                                    ? 'مقارنة نفس الشهور: ${matchedMonthsLabelAr(_matchedYoyMonths)} • سنة $currYearLabel مقابل $compYear'
+                                    : 'نمو الفروع (سنوي وشهري) • $perfPeriodBadgeAr',
+                                key: const ValueKey('branch_growth_subtitle'),
+                                maxLines: 2,
                                 style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                               ),
                             ],
@@ -2810,7 +2853,9 @@ onChanged: m3Legacy<String>((v) {
                     ];
 
                     if (box.maxWidth >= 900) {
-                      return Row(
+                      return IntrinsicHeight(
+                        child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(child: stripCards[0]),
                           const SizedBox(width: 8.0),
@@ -2820,6 +2865,7 @@ onChanged: m3Legacy<String>((v) {
                           const SizedBox(width: 8.0),
                           Expanded(child: stripCards[3]),
                         ],
+                        ),
                       );
                     }
                     return Wrap(
@@ -2833,45 +2879,74 @@ onChanged: m3Legacy<String>((v) {
                 ),
               ),
 
-              // Matrix DataTable
+              // Matrix DataTable: centred headings + flex shares fill the full width;
+              // rank and branch/region live in ONE grouped first column.
               TableScrollContainer(
+                key: const ValueKey('branch_growth_table'),
                 controller: _skuPerfTableScrollController,
-                showSwipeHint: true,
+                showSwipeHint: false,
                 padding: const EdgeInsets.all(12.0),
+                columnFlex: _branchGrowthFlex,
                 child: DataTable(
                   headingRowColor: WidgetStatePropertyAll(
                     colorScheme.surfaceContainerHigh.withOpacity(0.5),
                   ),
+                  headingTextStyle: theme.textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  columnSpacing: M3Spacing.xs,
+                  horizontalMargin: M3Spacing.xs,
                   columns: [
-                    const DataColumn(label: Text('#')),
-                    const DataColumn(label: Text('الفرع والمنطقة')),
-                    DataColumn(
-                      label: Text('مبيعات $currYearLabel (ج.م)'),
-                      numeric: true,
+                    const DataColumn(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: _branchRankWidth,
+                            child: Text('#', textAlign: TextAlign.center),
+                          ),
+                          SizedBox(width: M3Spacing.xs),
+                          Text('الفرع والمنطقة'),
+                        ],
+                      ),
                     ),
                     DataColumn(
-                      label: Text('مبيعات $compYear (ج.م)'),
-                      numeric: true,
+                      label: Text('مبيعات $currYearLabel (ج.م)', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
+                    ),
+                    DataColumn(
+                      label: Text('مبيعات $compYear (ج.م)', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
                     ),
                     const DataColumn(
-                      label: Text('الفرق'),
-                      numeric: true,
+                      label: Text('الفرق', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
                     ),
                     const DataColumn(
-                      label: Text('النمو السنوي %'),
-                      numeric: true,
+                      label: Text('النمو السنوي %', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
                     ),
                     DataColumn(
-                      label: Text(_selectedMonth > 0 ? 'مبيعات الشهر الحالي' : 'المتوسط الشهري'),
-                      numeric: true,
+                      label: Text(
+                        _selectedMonth > 0 ? 'مبيعات الشهر الحالي' : 'المتوسط الشهري',
+                        textAlign: TextAlign.center,
+                      ),
+                      headingRowAlignment: MainAxisAlignment.center,
                     ),
-                    const DataColumn(label: Text('الحالة')),
+                    const DataColumn(
+                      label: Text('الحالة', textAlign: TextAlign.center),
+                      headingRowAlignment: MainAxisAlignment.center,
+                    ),
                   ],
                   rows: filteredGrowthBranches.asMap().entries.map((entry) {
                     final rank = entry.key + 1;
                     final item = entry.value;
                     final isPositive = item.varianceEgp >= 0;
                     final yoyPct = item.yoyGrowthPct;
+                    final monthlyRunRate = _selectedMonth > 0
+                        ? item.fullPeriodRevenue
+                        : item.fullPeriodRevenue / 12.0;
 
                     Color statusBg;
                     Color statusFg;
@@ -2898,33 +2973,46 @@ onChanged: m3Legacy<String>((v) {
                     return DataRow(
                       cells: [
                         DataCell(
-                          Text(
-                            '$rank',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                _displayStore(item.storeName),
-                                style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyMedium)),
+                              SizedBox(
+                                key: ValueKey('branch_growth_rank_${item.storeId}'),
+                                width: _branchRankWidth,
+                                child: Text(
+                                  '$rank',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
                               ),
-                              Text(
-                                '${item.chain.toUpperCase()} • ${item.region}',
-                                style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                                   fontSize: M3FontSize.labelSmall,                                   color: colorScheme.onSurfaceVariant,                                 )),
+                              const SizedBox(width: M3Spacing.xs),
+                              Flexible(
+                                child: Column(
+                                  key: ValueKey('branch_growth_name_${item.storeId}'),
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _displayStore(item.storeName),
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(const TextStyle(fontWeight: FontWeight.w800, fontSize: M3FontSize.bodyMedium)),
+                                    ),
+                                    Text(
+                                      '${item.chain.toUpperCase()} • ${item.region}',
+                                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(fontSize: M3FontSize.labelSmall, color: colorScheme.onSurfaceVariant)),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
                         ),
                         DataCell(
                           Text(
-                            CurrencyFormatter.formatEGP(item.currentRevenue),
+                            item.currentRevenue > 0 ? CurrencyFormatter.formatEGP(item.currentRevenue) : '—',
+                            key: ValueKey('branch_growth_cur_${item.storeId}'),
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: colorScheme.primary,
@@ -2933,9 +3021,8 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         DataCell(
                           Text(
-                            item.prevRevenue > 0
-                                ? CurrencyFormatter.formatEGP(item.prevRevenue)
-                                : '—',
+                            item.hasPrevYear ? CurrencyFormatter.formatEGP(item.prevRevenue) : '—',
+                            key: ValueKey('branch_growth_prev_${item.storeId}'),
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: colorScheme.onSurfaceVariant,
@@ -2945,6 +3032,7 @@ onChanged: m3Legacy<String>((v) {
                         DataCell(
                           Text(
                             '${isPositive ? "+" : ""}${CurrencyFormatter.formatCompactEGP(item.varianceEgp)}',
+                            key: ValueKey('branch_growth_diff_${item.storeId}'),
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: isPositive ? colorScheme.primary : colorScheme.error,
@@ -2980,14 +3068,14 @@ onChanged: m3Legacy<String>((v) {
                         ),
                         DataCell(
                           Text(
-                            CurrencyFormatter.formatCompactEGP(item.monthlyRunRate),
+                            CurrencyFormatter.formatCompactEGP(monthlyRunRate),
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                         DataCell(
                           M3ChipSurface(
-                              color: statusBg,
-                              child: Row(
+                            color: statusBg,
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(statusIcon, size: 18.0, color: statusFg),
@@ -3008,10 +3096,6 @@ onChanged: m3Legacy<String>((v) {
             ],
           ),
         ),
-        if (_recordsSummary.skuSummaries.isNotEmpty) ...[
-          M3Spacing.gapMD,
-          _buildAdecoPriceAndMarginMatrixSection(context, theme, colorScheme),
-        ],
       ],
     );
   }
@@ -3479,6 +3563,7 @@ onChanged: m3Legacy<int>((v) {
     required IconData icon,
     required Color color,
     bool textValue = false,
+    bool singleLineValue = false,
     Key? subtitleKey,
   }) {
     // Shared reference KPI card (Sell-Out is the reference; Compare mirrors it).
@@ -3493,6 +3578,28 @@ onChanged: m3Legacy<int>((v) {
       icon: icon,
       color: color,
       textValue: textValue,
+      valueMaxLines: singleLineValue ? 1 : 2,
+      shrinkOverflowingValue: singleLineValue,
     );
   }
+}
+
+/// Placeholder for the branch-performance search. Lighter than entered text
+/// (onSurfaceVariant at 70%, same treatment as the Sell-In search hint).
+TextStyle? _perfSearchHintStyle(ThemeData theme, ColorScheme colorScheme) {
+  return theme.textTheme.bodyLarge?.copyWith(
+    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+    fontWeight: FontWeight.w400,
+  );
+}
+
+/// Header and cell share one centre axis. [TableScrollContainer] centres the
+/// cells of every column whose heading uses [MainAxisAlignment.center] and
+/// stretches the table to the full width.
+DataColumn _centeredColumn(String label, {bool numeric = false}) {
+  return DataColumn(
+    numeric: numeric,
+    headingRowAlignment: MainAxisAlignment.center,
+    label: Text(label, textAlign: TextAlign.center),
+  );
 }

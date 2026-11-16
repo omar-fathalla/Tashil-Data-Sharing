@@ -409,6 +409,42 @@ func (h *AnalyticsHandler) HandleStoreMatrix(w http.ResponseWriter, r *http.Requ
 	_ = json.NewEncoder(w).Encode(stores)
 }
 
+// HandleStoreMatrixMatchedMonths serves GET /api/v1/analytics/store-matrix/matched-months.
+// It lists the calendar months present in both year and comp_year (chain-scoped) — the exact
+// window store-matrix applies for like-for-like YoY when no month is picked.
+func (h *AnalyticsHandler) HandleStoreMatrixMatchedMonths(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := middleware.EnforceTenantRLS(r)
+	if err != nil {
+		http.Error(w, `{"error":"unauthorized tenant context"}`, http.StatusUnauthorized)
+		return
+	}
+	q := r.URL.Query()
+	year, _ := strconv.Atoi(q.Get("year"))
+	compYear, _ := strconv.Atoi(q.Get("comp_year"))
+	if year <= 0 || compYear <= 0 {
+		http.Error(w, `{"error":"year and comp_year are required"}`, http.StatusBadRequest)
+		return
+	}
+	chain := q.Get("chain")
+	if claims, ok := middleware.GetUserClaims(r.Context()); ok && claims != nil {
+		if claims.Role == domain.RoleChainKAM && strings.TrimSpace(claims.AssignedChain) != "" {
+			chain = strings.TrimSpace(claims.AssignedChain)
+		}
+	}
+	months, err := h.bqRepo.MatchedYoYMonths(r.Context(), tenantID, chain, year, compYear)
+	if err != nil {
+		http.Error(w, `{"error":"failed to compute matched months"}`, http.StatusInternalServerError)
+		return
+	}
+	if months == nil {
+		months = []int{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"year": year, "comp_year": compYear, "months": months,
+	})
+}
+
 // PaginatedPricingComplianceResponse formats paginated pricing compliance items with summary KPIs, available categories, and monthly price elasticity points.
 type PaginatedPricingComplianceResponse struct {
 	Items               []domain.PricingComplianceItem       `json:"items"`
