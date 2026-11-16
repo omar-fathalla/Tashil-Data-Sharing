@@ -2312,6 +2312,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               titleEn: 'Top SKU',
               value: topSku != null ? topSku.skuName : '—',
               textValue: true,
+              // Long item names stay one line (ellipsis + hover tooltip) so
+              // this card matches the height of the other three KPIs.
+              singleLineValue: true,
               subtitle: topSku != null
                   ? '${CurrencyFormatter.formatCompactEGP(topSku.revenue)} (${CurrencyFormatter.formatNumber(topSku.units)} وحدة) • $perfPeriodBadgeAr'
                   : 'لا توجد مبيعات • $perfPeriodBadgeAr',
@@ -2485,12 +2488,18 @@ onChanged: m3Legacy<String>((v) {
 ),
                   M3SearchFieldWidth(
                     hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
+                    hintStyle: _perfSearchHintStyle(theme, colorScheme),
                     width: 220.0,
                     child: TextField(
                       key: const ValueKey('perf_search_field'),
                       controller: _perfSearchController,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'ابحث بالفرع أو المنطقة أو الصنف',
+                        hintStyle: _perfSearchHintStyle(theme, colorScheme),
                         isDense: true,
                         prefixIcon: const Icon(Icons.search_rounded, size: 18.0),
                         suffixIcon: _perfSearch.isNotEmpty
@@ -2537,7 +2546,7 @@ onChanged: m3Legacy<String>((v) {
                       M3Feedback.showSuccess(context, 'تم تصدير التقرير.');
                     },
                     icon: const Icon(Icons.download_rounded, size: 18.0),
-                    label: const Text('تصدير CSV'),
+                    label: const Text('تصدير'),
                   ),
                   FilledButton.tonalIcon(
                     onPressed: () {
@@ -2606,13 +2615,13 @@ onChanged: m3Legacy<String>((v) {
                   headingRowColor: WidgetStatePropertyAll(
                     colorScheme.surfaceContainerHigh.withOpacity(0.5),
                   ),
-                  columns: const [
-                    DataColumn(label: Text('الترتيب')),
-                    DataColumn(label: Text('الفرع')),
-                    DataColumn(label: Text('السلسلة')),
-                    DataColumn(label: Text('الكمية المباعة'), numeric: true),
-                    DataColumn(label: Text('صافي المبيعات (ج.م)'), numeric: true),
-                    DataColumn(label: Text('حصة المبيعات %'), numeric: true),
+                  columns: [
+                    _centeredColumn('الترتيب'),
+                    _centeredColumn('الفرع'),
+                    _centeredColumn('السلسلة'),
+                    _centeredColumn('الكمية المباعة', numeric: true),
+                    _centeredColumn('صافي المبيعات (ج.م)', numeric: true),
+                    _centeredColumn('حصة المبيعات %', numeric: true),
                   ],
                   rows: branchList.asMap().entries.map((entry) {
                     final idx = entry.key + 1;
@@ -3505,6 +3514,7 @@ onChanged: m3Legacy<int>((v) {
     required IconData icon,
     required Color color,
     bool textValue = false,
+    bool singleLineValue = false,
     Key? subtitleKey,
   }) {
     // Shared reference KPI card (Sell-Out is the reference; Compare mirrors it).
@@ -3519,6 +3529,28 @@ onChanged: m3Legacy<int>((v) {
       icon: icon,
       color: color,
       textValue: textValue,
+      valueMaxLines: singleLineValue ? 1 : 2,
+      shrinkOverflowingValue: singleLineValue,
     );
   }
+}
+
+/// Placeholder for the branch-performance search. Lighter than entered text
+/// (onSurfaceVariant at 70%, same treatment as the Sell-In search hint).
+TextStyle? _perfSearchHintStyle(ThemeData theme, ColorScheme colorScheme) {
+  return theme.textTheme.bodyLarge?.copyWith(
+    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+    fontWeight: FontWeight.w400,
+  );
+}
+
+/// Header and cell share one centre axis. [TableScrollContainer] centres the
+/// cells of every column whose heading uses [MainAxisAlignment.center] and
+/// stretches the table to the full width.
+DataColumn _centeredColumn(String label, {bool numeric = false}) {
+  return DataColumn(
+    numeric: numeric,
+    headingRowAlignment: MainAxisAlignment.center,
+    label: Text(label, textAlign: TextAlign.center),
+  );
 }

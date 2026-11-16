@@ -59,6 +59,8 @@ class M3SummaryKpiCard extends StatelessWidget {
     this.textValue = false,
     this.titleMaxLines = 1,
     this.subtitleMaxLines = 1,
+    this.valueMaxLines = 2,
+    this.shrinkOverflowingValue = false,
     this.titleTooltip,
     this.subtitleTooltip,
     this.cardTooltip,
@@ -79,6 +81,15 @@ class M3SummaryKpiCard extends StatelessWidget {
   /// null = wrap freely (never ellipsized).
   final int? titleMaxLines;
   final int subtitleMaxLines;
+
+  /// Value line count. The shared default is 2. A card that must stay one
+  /// line (a long product name beside numeric KPIs) passes 1.
+  final int valueMaxLines;
+
+  /// When the value is one line and does not fit at the role size, step the
+  /// font down slightly. The line box stays the role's strut, so the card
+  /// height matches the other cards in the row.
+  final bool shrinkOverflowingValue;
   /// Optional tooltip with the full wording when the visible title is shortened.
   final String? titleTooltip;
   /// Optional tooltip with the full wording when the visible subtitle is shortened.
@@ -154,28 +165,17 @@ class M3SummaryKpiCard extends StatelessWidget {
             const SizedBox(height: M3SummaryKpiStyle.valueGap),
             const M3SkeletonBox(width: 180.0, height: 12.0),
           ] else ...[
-            // Up to 2 lines; the full value is in the tooltip unless a
-            // card-level tooltip (e.g. ROMI method) covers the whole card.
-            useCardTooltip
-                ? Text(
-                    value,
-                    key: valueKey,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: valueStyle,
-                    strutStyle: M3SummaryKpiStyle.strut(valueStyle),
-                  )
-                : Tooltip(
-                    message: value,
-                    child: Text(
-                      value,
-                      key: valueKey,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: valueStyle,
-                      strutStyle: M3SummaryKpiStyle.strut(valueStyle),
-                    ),
-                  ),
+            // Up to [valueMaxLines] (shared default 2). The full value is in
+            // the tooltip unless a card-level tooltip (e.g. ROMI method)
+            // covers the whole card.
+            _kpiValue(
+              value: value,
+              valueKey: valueKey,
+              style: valueStyle,
+              maxLines: valueMaxLines,
+              shrinkToFit: shrinkOverflowingValue && valueMaxLines == 1,
+              showTooltip: !useCardTooltip,
+            ),
             const SizedBox(height: M3SummaryKpiStyle.valueGap),
             useCardTooltip || subtitleTooltip == null
                 ? Text(
@@ -210,5 +210,94 @@ class M3SummaryKpiCard extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 360),
       child: card,
     );
+  }
+}
+
+/// Next on-scale step under a text value (titleLarge 22 → titleMedium 16).
+/// The original strut keeps the line box, so the card height does not change.
+const double _kShrunkValueFontSize = 16.0;
+
+Widget _kpiValue({
+  required String value,
+  required Key? valueKey,
+  required TextStyle? style,
+  required int maxLines,
+  required bool shrinkToFit,
+  required bool showTooltip,
+}) {
+  final Widget text = shrinkToFit
+      ? _OneLineKpiValue(value: value, style: style, valueKey: valueKey)
+      : Text(
+          value,
+          key: valueKey,
+          maxLines: maxLines,
+          overflow: TextOverflow.ellipsis,
+          style: style,
+          strutStyle: M3SummaryKpiStyle.strut(style),
+        );
+  if (!showTooltip) return text;
+  return Tooltip(message: value, child: text);
+}
+
+/// Single-line value. When [style] does not fit the card, the font steps
+/// down to [_kShrunkValueFontSize] and the rest is an ellipsis. Hover shows
+/// the full string via the surrounding tooltip. The strut stays the role's,
+/// so the card is the same height as a one-line sibling.
+class _OneLineKpiValue extends StatelessWidget {
+  const _OneLineKpiValue({
+    required this.value,
+    required this.style,
+    required this.valueKey,
+  });
+
+  final String value;
+  final TextStyle? style;
+  final Key? valueKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final role = style;
+        var fitted = role;
+        final size = role?.fontSize;
+        final maxW = constraints.maxWidth;
+        if (role != null &&
+            size != null &&
+            size > _kShrunkValueFontSize &&
+            maxW.isFinite &&
+            maxW > 0 &&
+            _overflows(context, value, role, maxW)) {
+          fitted = role.copyWith(fontSize: _kShrunkValueFontSize);
+        }
+        return Text(
+          value,
+          key: valueKey,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          style: fitted,
+          strutStyle: M3SummaryKpiStyle.strut(role),
+        );
+      },
+    );
+  }
+
+  static bool _overflows(
+    BuildContext context,
+    String text,
+    TextStyle style,
+    double maxWidth,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+      locale: Localizations.maybeLocaleOf(context),
+    )..layout(maxWidth: maxWidth);
+    final overflows = painter.didExceedMaxLines;
+    painter.dispose();
+    return overflows;
   }
 }
