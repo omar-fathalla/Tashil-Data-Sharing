@@ -348,6 +348,15 @@ class TenantUserModel {
   // Mirrors chainWriteRoles in backend-go (legacy 'admin' dropped).
   bool get canManageChains => isSuperAdmin || role == 'vendor_admin';
 
+  /// Edit per-chain VAT / discount terms. Mirrors chainDiscountWriteRoles in backend-go
+  /// (the server re-checks the verified JWT role).
+  bool get canEditChainTerms =>
+      isSuperAdmin ||
+      role == 'vendor_admin' ||
+      role == 'admin' ||
+      role == 'national_sales_manager' ||
+      role == 'executive';
+
   /// Approve / reject / merge Sell-In customers. Mirrors dataQualityWriteRoles.
   bool get canWriteCustomerRegistry =>
       isSuperAdmin ||
@@ -13582,6 +13591,15 @@ class SellInExplorerResponse {
   final double totalOfficialListInclVatEgp;
   final double totalDiscountGrantedEgp;
   final double effectiveDiscountPct;
+
+  /// Waterfall split of [totalDiscountGrantedEgp]: invoice discount, the chain's extra discount
+  /// (خصم إضافي للسلسلة) and the remaining list-minus-net difference.
+  final double totalInvoiceDiscountEgp;
+  final double totalExtraChainDiscountEgp;
+  final double totalOtherDifferenceEgp;
+
+  /// Effective VAT % over the selection (the chain's configured rate; 14 by default).
+  final double vatRatePct;
   final double totalNetExclVatEgp;
   final double totalVat14Egp;
   final double totalGrossInclVatEgp;
@@ -13599,6 +13617,10 @@ class SellInExplorerResponse {
     this.totalOfficialListInclVatEgp = 0.0,
     this.totalDiscountGrantedEgp = 0.0,
     this.effectiveDiscountPct = 10.0,
+    this.totalInvoiceDiscountEgp = 0.0,
+    this.totalExtraChainDiscountEgp = 0.0,
+    this.totalOtherDifferenceEgp = 0.0,
+    this.vatRatePct = 14.0,
     this.totalNetExclVatEgp = 0.0,
     this.totalVat14Egp = 0.0,
     this.totalGrossInclVatEgp = 0.0,
@@ -13633,6 +13655,11 @@ class SellInExplorerResponse {
       totalDiscountGrantedEgp: (json['total_discount_granted_egp'] as num?)?.toDouble() ??
           double.parse((totListExcl - totVal).clamp(0.0, double.infinity).toStringAsFixed(2)),
       effectiveDiscountPct: (json['effective_discount_pct'] as num?)?.toDouble() ?? 10.0,
+      totalInvoiceDiscountEgp: (json['total_invoice_discount_egp'] as num?)?.toDouble() ?? 0.0,
+      totalExtraChainDiscountEgp: (json['total_extra_chain_discount_egp'] as num?)?.toDouble() ?? 0.0,
+      totalOtherDifferenceEgp: (json['total_other_difference_egp'] as num?)?.toDouble() ??
+          ((json['total_discount_granted_egp'] as num?)?.toDouble() ?? 0.0),
+      vatRatePct: (json['vat_rate_pct'] as num?)?.toDouble() ?? 14.0,
       totalNetExclVatEgp: (json['total_net_excl_vat_egp'] as num?)?.toDouble() ?? totVal,
       totalVat14Egp: totVat,
       totalGrossInclVatEgp: totGrossIncl,

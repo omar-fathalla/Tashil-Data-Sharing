@@ -184,10 +184,11 @@ void main() {
     final stripRect = tester.getRect(strip);
     for (final label in [
       '1. السعر الرسمي',
-      '2. الخصم',
-      '3. صافي التوريد',
-      '4. الضريبة 14%',
-      '5. الفواتير',
+      '2. خصم الفاتورة',
+      '3. خصم إضافي للسلسلة',
+      '4. صافي التوريد',
+      '5. الضريبة 14%',
+      '6. الفواتير',
     ]) {
       final f = find.text(label);
       expect(f, findsWidgets, reason: 'waterfall missing $label');

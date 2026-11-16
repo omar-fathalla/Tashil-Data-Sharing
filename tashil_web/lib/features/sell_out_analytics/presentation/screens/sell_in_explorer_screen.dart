@@ -1500,9 +1500,13 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     final netExclVat = _data.totalNetExclVatEgp > 0
         ? _data.totalNetExclVatEgp
         : _data.totalValueEgp;
+    final vatPct = _data.vatRatePct;
+    final vatPctLabel = vatPct == vatPct.roundToDouble()
+        ? vatPct.toStringAsFixed(0)
+        : vatPct.toStringAsFixed(1);
     final vat14 = _data.totalVat14Egp > 0
         ? _data.totalVat14Egp
-        : netExclVat * 0.14;
+        : netExclVat * vatPct / 100.0;
     final grossInclVat = _data.totalGrossInclVatEgp > 0
         ? _data.totalGrossInclVatEgp
         : netExclVat + vat14;
@@ -1511,6 +1515,13 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         : netExclVat;
     final discountGranted = _data.totalDiscountGrantedEgp;
     final discountPct = _data.effectiveDiscountPct;
+    final invoiceDiscount = _data.totalInvoiceDiscountEgp;
+    final extraChainDiscount = _data.totalExtraChainDiscountEgp;
+    final otherDifference = _data.totalOtherDifferenceEgp;
+    final showOtherDifference = otherDifference.abs() >= 1.0;
+    String pctOfList(double v) => officialListExcl > 0
+        ? '${(v / officialListExcl * 100).toStringAsFixed(1)}%'
+        : '—';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1630,7 +1641,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
               const SizedBox(height: 10.0),
               LayoutBuilder(
                 builder: (context, stripConstraints) {
-                  final fit = stripConstraints.maxWidth >= 800;
+                  final fit = stripConstraints.maxWidth >= (showOtherDifference ? 1100 : 900);
                   Widget op(IconData icon) => Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4.0),
                         child: Icon(
@@ -1655,22 +1666,51 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                     op(Icons.remove_circle_outline_rounded),
                     _buildWaterfallMetricPill(
                       context,
-                      labelAr: '2. الخصم',
-                      labelTooltip: '2. الخصم التجاري',
+                      labelAr: '2. خصم الفاتورة',
+                      labelTooltip: '2. خصم الفاتورة (حسب إعدادات السلسلة)',
                       valueText:
-                          '${CurrencyFormatter.formatCompactEGP(discountGranted)} (${discountPct.toStringAsFixed(1)}%)',
-                      subText:
-                          'الفرق بين السعر الرسمي وصافي الفاتورة: ${discountPct.toStringAsFixed(1)}%',
+                          '${CurrencyFormatter.formatCompactEGP(invoiceDiscount)} (${pctOfList(invoiceDiscount)})',
+                      subText: 'نسبة خصم الفاتورة من السعر الرسمي',
                       accentColor: M3StatusColors.of(context).accents.alert,
                       icon: Icons.discount_rounded,
                       expand: fit,
                     ),
+                    op(Icons.remove_circle_outline_rounded),
+                    _buildWaterfallMetricPill(
+                      context,
+                      labelAr: '3. خصم إضافي للسلسلة',
+                      labelTooltip:
+                          '3. الخصم الإضافي للسلسلة بعد خصم الفاتورة (حسب إعدادات السلسلة)',
+                      valueText:
+                          '${CurrencyFormatter.formatCompactEGP(extraChainDiscount)} (${pctOfList(extraChainDiscount)})',
+                      subText: 'مستقل عن فروق الأسعار',
+                      accentColor: M3StatusColors.of(context).accents.alert,
+                      icon: Icons.local_offer_rounded,
+                      expand: fit,
+                    ),
+                    if (showOtherDifference) ...[
+                      op(Icons.remove_circle_outline_rounded),
+                      _buildWaterfallMetricPill(
+                        context,
+                        labelAr: '4. فروق أخرى',
+                        labelTooltip:
+                            '4. الفرق المتبقي بين السعر الرسمي وصافي الفاتورة بعد الخصمين (انحراف سعر / عروض)',
+                        valueText:
+                            CurrencyFormatter.formatCompactEGP(otherDifference),
+                        subText:
+                            'إجمالي الخصم ${CurrencyFormatter.formatCompactEGP(discountGranted)} (${discountPct.toStringAsFixed(1)}%)',
+                        accentColor:
+                            M3StatusColors.of(context).accents.neutral,
+                        icon: Icons.compare_arrows_rounded,
+                        expand: fit,
+                      ),
+                    ],
                     op(Icons.drag_handle_rounded),
                     _buildWaterfallMetricPill(
                       context,
-                      labelAr: '3. صافي التوريد',
+                      labelAr: '${showOtherDifference ? 5 : 4}. صافي التوريد',
                       labelTooltip:
-                          '3. صافي Sell-In بعد المرتجعات (بدون الضريبة)',
+                          '${showOtherDifference ? 5 : 4}. صافي Sell-In بعد المرتجعات (بدون الضريبة)',
                       valueText:
                           CurrencyFormatter.formatCompactEGP(netExclVat),
                       subText:
@@ -1682,8 +1722,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                     op(Icons.add_circle_outline_rounded),
                     _buildWaterfallMetricPill(
                       context,
-                      labelAr: '4. الضريبة 14%',
-                      labelTooltip: '4. ضريبة القيمة المضافة (14%)',
+                      labelAr: '${showOtherDifference ? 6 : 5}. الضريبة $vatPctLabel%',
+                      labelTooltip:
+                          '${showOtherDifference ? 6 : 5}. ضريبة القيمة المضافة ($vatPctLabel%) حسب إعدادات السلسلة',
                       valueText: CurrencyFormatter.formatCompactEGP(vat14),
                       subText: '—',
                       accentColor:
@@ -1694,8 +1735,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                     op(AppIcons.arrowForward),
                     _buildWaterfallMetricPill(
                       context,
-                      labelAr: '5. الفواتير',
-                      labelTooltip: '5. قيمة الفواتير',
+                      labelAr: '${showOtherDifference ? 7 : 6}. الفواتير',
+                      labelTooltip: '${showOtherDifference ? 7 : 6}. قيمة الفواتير',
                       valueText:
                           CurrencyFormatter.formatCompactEGP(grossInclVat),
                       subText: 'إجمالي المطالبة على السلسلة',
@@ -1705,7 +1746,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                       expand: fit,
                     ),
                   ];
-                  if (stripConstraints.maxWidth < 800) {
+                  if (!fit) {
                     return Wrap(
                       spacing: 6.0,
                       runSpacing: 8.0,
@@ -1968,6 +2009,10 @@ onChanged: m3Legacy<int>((v) {
     final displaySellOutFactoryCostEgp = useMatchedWindow && d.matchedSellOutFactoryCostEgp > 0
         ? d.matchedSellOutFactoryCostEgp
         : totalSellOutEgp;
+    final displaySellOutFactoryCostExclVatEgp =
+        useMatchedWindow && d.matchedSellOutFactoryCostExclVatEgp > 0
+            ? d.matchedSellOutFactoryCostExclVatEgp
+            : displaySellOutFactoryCostEgp;
     final displaySellOutCases = useMatchedWindow && d.matchedSellOutCases > 0
         ? d.matchedSellOutCases
         : totalSellOutEstCases;
@@ -2140,12 +2185,15 @@ onChanged: m3Legacy<int>((v) {
             );
             final card2 = _buildSummaryCard(
               context,
-              titleAr: 'Sell-Out بالتكلفة',
-              titleTooltip: 'Sell-Out (بتكلفة المصنع)',
-              titleEn: 'Sell-Out at Factory Cost',
+              titleAr: 'Sell-Out بسعر البيع للمستهلك',
+              titleTooltip:
+                  'Sell-Out بسعر البيع للمستهلك (قيمة الكاشير POS)',
+              titleEn: 'Sell-Out at Consumer Retail Price',
               value: CurrencyFormatter.formatCompactEGP(displaySellOutPosEgp),
               subtitle:
-                  '${CurrencyFormatter.formatNumber(displaySellOutCases.round())} كرتونة (${CurrencyFormatter.formatNumber(d.matchedSellOutUnits)} وحدة) • تكلفة المصنع ${CurrencyFormatter.formatCompactEGP(displaySellOutFactoryCostEgp)}',
+                  '${CurrencyFormatter.formatNumber(displaySellOutCases.round())} كرتونة (${CurrencyFormatter.formatNumber(d.matchedSellOutUnits)} وحدة) • تكلفة المصنع ${CurrencyFormatter.formatCompactEGP(displaySellOutFactoryCostExclVatEgp)}',
+              subtitleTooltip:
+                  'تكلفة المصنع بدون ضريبة، بعد خصم الفاتورة والخصم الإضافي للسلسلة',
               icon: Icons.point_of_sale_rounded,
               color: M3StatusColors.of(context).accents.teal,
             );
@@ -2191,12 +2239,16 @@ onChanged: m3Legacy<int>((v) {
               context,
               titleAr: 'هامش السلسلة',
               titleEn: 'Chain Margin',
+              titleTooltip:
+                  'هامش السلسلة = سعر البيع للمستهلك (POS) بدون ضريبة − تكلفة المصنع بدون ضريبة. '
+                  'تكلفة المصنع = السعر الرسمي ÷ (1 + ضريبة السلسلة) × (1 − خصم الفاتورة) × (1 − الخصم الإضافي للسلسلة). '
+                  'الإعدادات من «حاسبة الطلبيات والخصومات والهوامش» في كارتة الأصناف.',
               value: d.matchedSellOutPosValueEgp > 0 && d.matchedSellOutValueWithCostEgp <= 0
                   ? '—'
                   : CurrencyFormatter.formatMarginSummary(d.matchedChainGrossMarginEgp, d.matchedChainGrossMarginPct),
               subtitle: d.matchedMissingCostSellOutEgp > 0
                   ? 'محسوب على الأصناف المعروفة تكلفتها فقط • مستبعد ${CurrencyFormatter.formatCompactEGP(d.matchedMissingCostSellOutEgp)}'
-                  : 'سعر البيع للمستهلك ناقص صافي تكلفة التوريد',
+                  : 'سعر البيع للمستهلك − تكلفة المصنع (كلاهما بدون ضريبة)',
               icon: Icons.paid_rounded,
               // A real loss (negative profit) is shown in the theme error colour.
               color: d.matchedChainGrossMarginEgp < 0
