@@ -31,6 +31,12 @@ type PaginatedSellInRecordsResponse struct {
 	TotalOfficialListInclVATEGP  float64               `json:"total_official_list_incl_vat_egp"`
 	TotalDiscountGrantedEGP      float64               `json:"total_discount_granted_egp"`
 	EffectiveDiscountPct         float64               `json:"effective_discount_pct"`
+	// Waterfall split of TotalDiscountGrantedEGP: invoice discount, the chain's extra discount, and the
+	// remaining list-minus-net difference (price variance / promotions).
+	TotalInvoiceDiscountEGP    float64 `json:"total_invoice_discount_egp"`
+	TotalExtraChainDiscountEGP float64 `json:"total_extra_chain_discount_egp"`
+	TotalOtherDifferenceEGP    float64 `json:"total_other_difference_egp"`
+	VATRatePct                 float64 `json:"vat_rate_pct"`
 	TotalNetExclVATEGP           float64               `json:"total_net_excl_vat_egp"`
 	TotalVAT14EGP                float64               `json:"total_vat_14_egp"`
 	TotalGrossInclVATEGP         float64               `json:"total_gross_incl_vat_egp"`

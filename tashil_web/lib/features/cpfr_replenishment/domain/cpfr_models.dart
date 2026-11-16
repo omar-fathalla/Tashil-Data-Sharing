@@ -669,6 +669,9 @@ class CPFRDashboardModel {
   final double matchedSellOutCases;
   final double matchedSellOutPosValueEgp;
   final double matchedSellOutFactoryCostEgp;
+
+  /// Matched factory cost without VAT (the basis of the chain margin).
+  final double matchedSellOutFactoryCostExclVatEgp;
   final double matchedRemainingCases;
   final double matchedRemainingFactoryValueEgp;
   final double matchedSellThroughPct;
@@ -741,6 +744,7 @@ class CPFRDashboardModel {
     this.matchedSellOutCases = 0.0,
     this.matchedSellOutPosValueEgp = 0.0,
     this.matchedSellOutFactoryCostEgp = 0.0,
+    this.matchedSellOutFactoryCostExclVatEgp = 0.0,
     this.matchedRemainingCases = 0.0,
     this.matchedRemainingFactoryValueEgp = 0.0,
     this.matchedSellThroughPct = 0.0,
@@ -857,6 +861,10 @@ class CPFRDashboardModel {
           (json['matched_sell_out_pos_value_egp'] as num?)?.toDouble() ?? 0.0,
       matchedSellOutFactoryCostEgp:
           (json['matched_sell_out_factory_cost_egp'] as num?)?.toDouble() ?? 0.0,
+      matchedSellOutFactoryCostExclVatEgp:
+          (json['matched_sell_out_factory_cost_excl_vat_egp'] as num?)?.toDouble() ??
+              (json['matched_sell_out_factory_cost_egp'] as num?)?.toDouble() ??
+              0.0,
       matchedRemainingCases:
           (json['matched_remaining_cases'] as num?)?.toDouble() ?? 0.0,
       matchedRemainingFactoryValueEgp:

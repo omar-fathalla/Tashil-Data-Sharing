@@ -53,7 +53,8 @@ func (h *AnalyticsHandler) querySellInTotals(ctx context.Context, tenantID strin
 	defer cancel()
 	res, err := h.sellIn.QuerySellInTotals(c, bqsink.SellInTotalsQuery{
 		TenantID: tenantID, Chain: f.RetailerChain, Year: f.Year, Month: f.Month, Rules: sellInRules(),
-		Limit: f.Limit, Offset: f.Offset,
+		Profiles: h.sellInChainProfiles(c, tenantID),
+		Limit:    f.Limit, Offset: f.Offset,
 	})
 	if err != nil {
 		log.Printf("WARN [sell-in] BigQuery totals failed, serving from memory: %v", err)
@@ -64,6 +65,28 @@ func (h *AnalyticsHandler) querySellInTotals(ctx context.Context, tenantID strin
 	}
 	// Count == 0 with nothing local: an empty BigQuery answer (no wait for the in-memory load).
 	return res, true
+}
+
+// chainProfileSource exposes the saved per-chain terms (VAT, invoice and extra discount).
+type chainProfileSource interface {
+	ChainDiscountProfilesSnapshot(ctx context.Context, tenantID string) []domain.ChainDiscountProfile
+}
+
+// sellInChainProfiles hands the saved chain terms to the BigQuery totals so they match the in-memory rows.
+func (h *AnalyticsHandler) sellInChainProfiles(ctx context.Context, tenantID string) []bqsink.SellInChainProfile {
+	src, ok := h.bqRepo.(chainProfileSource)
+	if !ok {
+		return nil
+	}
+	var out []bqsink.SellInChainProfile
+	for _, p := range src.ChainDiscountProfilesSnapshot(ctx, tenantID) {
+		cp := bqsink.SellInChainProfile{Chain: p.Chain, InvoiceDiscountPct: p.InvoiceDiscountPct, ExtraDiscountPct: p.AdditionalDiscountPct}
+		if v, set := p.VATRate(); set {
+			cp.VATRate = &v
+		}
+		out = append(out, cp)
+	}
+	return out
 }
 
 type sellInSnapshotReader interface {
@@ -138,6 +161,9 @@ func sellInTotalsFromRecords(records []domain.SellInRecord) bqsink.SellInTotals 
 			disc = listExcl - rec.NetValueEGP
 		}
 		t.ListExcl += listExcl
+		inv := listExcl * pctOf(rec.InvoiceDiscountPct) / 100.0
+		t.InvDisc += inv
+		t.ExtraDisc += (listExcl - inv) * pctOf(rec.ExtraDiscountPct) / 100.0
 		t.ListIncl += listExcl * (1.0 + vatRate)
 		if listExcl > 0 {
 			t.NetWithList += rec.NetValueEGP
@@ -153,6 +179,14 @@ func sellInTotalsFromRecords(records []domain.SellInRecord) bqsink.SellInTotals 
 	return t
 }
 
+// pctOf normalises a stored discount to whole-number percent (older rows hold fractions: 0.10 = 10%).
+func pctOf(v float64) float64 {
+	if v > 0 && v <= 1.0 {
+		return v * 100.0
+	}
+	return v
+}
+
 // sellInEffectiveDiscountPct is the discount over rows that have an official list price; 0 when none.
 func sellInEffectiveDiscountPct(t bqsink.SellInTotals) float64 {
 	if t.ListExcl <= 0 {
@@ -163,6 +197,14 @@ func sellInEffectiveDiscountPct(t bqsink.SellInTotals) float64 {
 		return 0
 	}
 	return p
+}
+
+// sellInEffectiveVATPct is VAT / net as a percent (14 when every row uses 14%); 0 with no net value.
+func sellInEffectiveVATPct(t bqsink.SellInTotals) float64 {
+	if t.NetValue <= 0 {
+		return 0
+	}
+	return math.Round(t.VAT/t.NetValue*10000) / 100
 }
 
 func round2(v float64) float64 { return math.Round(v*100) / 100 }
@@ -181,6 +223,10 @@ func buildSellInRecordsResponse(t bqsink.SellInTotals, page []domain.SellInRecor
 		TotalOfficialListExclVATEGP: round2(t.ListExcl),
 		TotalOfficialListInclVATEGP: round2(t.ListIncl),
 		TotalDiscountGrantedEGP:     round2(t.Discount),
+		TotalInvoiceDiscountEGP:     round2(t.InvDisc),
+		TotalExtraChainDiscountEGP:  round2(t.ExtraDisc),
+		TotalOtherDifferenceEGP:     round2(t.Discount - t.InvDisc - t.ExtraDisc),
+		VATRatePct:                  sellInEffectiveVATPct(t),
 		EffectiveDiscountPct:        sellInEffectiveDiscountPct(t),
 		TotalNetExclVATEGP:          round2(t.NetValue),
 		TotalVAT14EGP:               round2(t.VAT),

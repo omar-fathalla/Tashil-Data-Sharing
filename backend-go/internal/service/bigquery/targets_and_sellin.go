@@ -103,6 +103,7 @@ func buildDeterministicTargetID(normTenant, targetType, chain string, year, mont
 
 // GetSellInRecords returns filtered and paginated Supplier Sell-In records for the Sell-In Explorer table.
 func (c *Client) GetSellInRecords(ctx context.Context, tenantID string, filter SellInRecordFilter) ([]domain.SellInRecord, int, error) {
+	c.syncChainDiscounts(ctx, tenantID)
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -1705,6 +1706,7 @@ func (c *Client) computeActualForTargetLocked(normTenant string, t domain.Target
 // EnrichSellInRecords applies the in-memory Sell-In enrichment (chain resolver, product master prices,
 // pieces->cases fix) to rows read elsewhere, e.g. a BigQuery page, exactly as GetSellInRecords does.
 func (c *Client) EnrichSellInRecords(tenantID string, recs []domain.SellInRecord) []domain.SellInRecord {
+	c.syncChainDiscounts(context.Background(), tenantID)
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	normTenant := normalizeTenantKey(tenantID)

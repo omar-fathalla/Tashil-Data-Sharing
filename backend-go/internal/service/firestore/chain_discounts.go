@@ -3,6 +3,7 @@ package firestore
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -44,6 +45,9 @@ func ValidateChainDiscountProfiles(p []domain.ChainDiscountProfile) error {
 		}
 		if p[i].AdditionalDiscountPct < 0 || p[i].AdditionalDiscountPct >= 100 {
 			return fmt.Errorf("additional_discount_pct for %q must be in [0,100)", p[i].Chain)
+		}
+		if v := p[i].VATRatePct; v != nil && (math.IsNaN(*v) || *v < 0 || *v > 100) {
+			return fmt.Errorf("vat_rate_pct for %q must be in [0,100]", p[i].Chain)
 		}
 	}
 	sort.Slice(p, func(i, j int) bool { return NormalizeChainKey(p[i].Chain) < NormalizeChainKey(p[j].Chain) })

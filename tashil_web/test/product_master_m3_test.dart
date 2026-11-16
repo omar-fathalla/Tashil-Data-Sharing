@@ -10,11 +10,27 @@ import 'package:tashil_web/core/widgets/m3_responsive_tab_bar.dart';
 import 'package:tashil_web/core/widgets/m3_summary_kpi_card.dart';
 import 'package:tashil_web/core/widgets/m3_wrap_text.dart';
 import 'package:tashil_web/core/widgets/table_scroll_container.dart';
+import 'package:tashil_web/features/product_master/data/chain_discount_repository.dart';
+import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/screens/sell_out_explorer_screen.dart';
 
 import 'support/live_viewport.dart';
 import 'support/product_master_m3_support.dart';
-import 'support/text_visibility.dart';
+
+class _MemoryChainRepository extends ChainDiscountRepository {
+  _MemoryChainRepository(super.api);
+  List<ChainDiscountProfileModel> _saved = const [];
+
+  @override
+  Future<List<ChainDiscountProfileModel>> load() async => _saved;
+
+  @override
+  Future<List<ChainDiscountProfileModel>> save(
+      List<ChainDiscountProfileModel> profiles) async {
+    _saved = profiles;
+    return profiles;
+  }
+}
 
 class _KpiMetrics {
   _KpiMetrics(this.size, this.padding, this.iconSize, this.fonts, this.weights);
@@ -225,20 +241,8 @@ void main() {
   });
 
   testWidgets(
-      'calculator output cards match Sell-Out 138 at the live 1280 shell',
+      'order-economics tab is a chain terms table: no SKU picker, no simulator cards',
       (tester) async {
-    await pumpProductMaster(
-      tester,
-      width: kLiveViewportWidth,
-      height: 3600,
-      withSidebar: true,
-      page: SellOutExplorerScreen(apiClient: ApiClient()),
-    );
-    final ref = _kpi(
-      tester,
-      find.byKey(const ValueKey('kpi_card_Net Sales (EGP)')),
-    );
-
     final errors = await pumpProductMaster(
       tester,
       width: kLiveViewportWidth,
@@ -250,83 +254,72 @@ void main() {
     await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
     await tester.pumpAndSettle();
 
-    final cards = find.byWidgetPredicate((w) =>
-        w is M3SummaryKpiCard &&
-        w.key is ValueKey<String> &&
-        (w.key as ValueKey<String>).value.startsWith('pm_calc_card_'));
-    expect(cards, findsNWidgets(6));
-    expect(find.byKey(const ValueKey('pm_calc_result_grid')), findsOneWidget);
-
-    for (final e in cards.evaluate()) {
-      final m = _kpi(tester, find.byWidget(e.widget));
-      final why = 'calc ${e.widget.key}: $m\nsell-out: $ref';
-      expect(m.padding, ref.padding, reason: why);
-      expect(m.iconSize, ref.iconSize, reason: why);
-      expect(m.iconSize, M3SummaryKpiStyle.iconSize, reason: why);
-      expect(m.padding, M3SummaryKpiStyle.padding, reason: why);
-      expect(m.size.height, closeTo(ref.size.height, 0.5), reason: why);
-      expect(m.size.height, closeTo(138.0, 1.0), reason: why);
-    }
-
-    // Short on-card titles (full phrase lives in titleTooltip) so the
-    // 138 Sell-Out KPI height budget stays one line.
-    for (final title in [
-      'إجمالي الوحدات',
-      'القيمة قبل الضريبة',
-      'ضريبة القيمة المضافة',
-      'الخصومات التجارية',
-      'صافي الفاتورة',
-      'هامش ربح السلسلة',
-    ]) {
-      final card = cards
-          .evaluate()
-          .map((e) => e.widget)
-          .cast<M3SummaryKpiCard>()
-          .firstWhere(
-            (c) => c.title == title,
-            orElse: () => throw StateError('missing calc card $title'),
-          );
-      expect(
-        labelFullyVisible(
-          tester,
-          title,
-          scope: find.byWidget(card),
-          minMaxLines: 1,
-        ),
-        isTrue,
-        reason: 'calculator title "$title" must sit fully inside the 138 card',
-      );
-    }
+    expect(find.byKey(const ValueKey('chain_discount_profiles_card')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('chain_discount_add_btn')), findsOneWidget);
+    // The single-SKU simulator is gone.
+    expect(find.byKey(const ValueKey('pm_calc_result_grid')), findsNothing);
+    expect(find.byKey(const ValueKey('calc_chain_dropdown')), findsNothing);
+    expect(find.byKey(const ValueKey('product_master_export_order_csv_btn')),
+        findsNothing);
+    expect(find.textContaining('اختر الصنف'), findsNothing);
+    expect(find.textContaining('سعر بيع السلسلة للمستهلك'), findsNothing);
+    expect(find.textContaining('عدد الكراتين'), findsNothing);
   });
 
   testWidgets(
-      'calculator margin shows «—» when shelf price is missing, not fake 0.0%',
+      'chain terms: add a chain (VAT / invoice / extra), see it in the table, edit it by tapping the row',
       (tester) async {
+    final api = liveScaleProductMasterClient();
     final errors = await pumpProductMaster(
       tester,
       width: kLiveViewportWidth,
       height: 3600,
       withSidebar: true,
+      apiClient: api,
+      page: ProductMasterScreen(
+          apiClient: api, chainRepository: _MemoryChainRepository(api)),
     );
     expect(errors, isEmpty, reason: errors.map((e) => e.exception).join('\n'));
-
     await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
     await tester.pumpAndSettle();
 
-    final shelfField = find.widgetWithText(
-      TextField,
-      'سعر بيع السلسلة للمستهلك (Shelf EGP)',
-    );
-    expect(shelfField, findsOneWidget);
-    await tester.enterText(shelfField, '0');
+    await tester.tap(find.byKey(const ValueKey('chain_discount_add_btn')));
+    await tester.pumpAndSettle();
+    // Defaults are prefilled: VAT 14, invoice 10, extra 0.
+    expect(
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('chain_discount_vat_field')))
+            .controller!
+            .text,
+        '14');
+    await tester.enterText(
+        find.byKey(const ValueKey('chain_discount_chain_field')), 'm3-chain');
+    await tester.enterText(
+        find.byKey(const ValueKey('chain_discount_vat_field')), '5');
+    await tester.enterText(
+        find.byKey(const ValueKey('chain_discount_invoice_field')), '12');
+    await tester.enterText(
+        find.byKey(const ValueKey('chain_discount_additional_field')), '20');
+    await tester.tap(find.byKey(const ValueKey('chain_discount_save_btn')));
     await tester.pumpAndSettle();
 
-    final marginCard = tester.widget<M3SummaryKpiCard>(
-      find.byKey(const ValueKey('pm_calc_card_margin')),
-    );
-    expect(marginCard.value, '—');
-    expect(marginCard.subtitle, contains('أدخل سعر بيع السلسلة'));
-    expect(find.textContaining('0.0%'), findsNothing);
+    final row = find.byKey(const ValueKey('chain_terms_row_m3-chain'));
+    expect(row, findsOneWidget);
+    for (final col in ['المؤسسة / السلسلة', 'الضريبة', 'خصم الفاتورة', 'الخصم الإضافي', 'آخر تحديث']) {
+      expect(find.text(col), findsOneWidget, reason: col);
+    }
+    expect(find.text('5%'), findsOneWidget);
+    expect(find.text('12%'), findsOneWidget);
+    expect(find.text('20%'), findsOneWidget);
+
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('chain_discount_vat_field')), '8.5');
+    await tester.tap(find.byKey(const ValueKey('chain_discount_save_btn')));
+    await tester.pumpAndSettle();
+    expect(find.text('8.50%'), findsOneWidget);
   });
 
   bool onScreen(WidgetTester tester, Finder f, {double width = 1280}) {

@@ -38,7 +38,7 @@ import '../../../../core/widgets/table_scroll_container.dart';
 /// 1. Full 389-SKU Catalog searchable by Item Code (`كود الصنف` e.g. FGCL-0550-0001 / FGSL),
 ///    Barcode (`الباركود`), Arabic SKU Name, Brand, Prefix, Packaging, and Item Type (`عادي` / `عرض`).
 /// 2. Interactive Product ID Card Modal (`بطاقة تعريف الصنف`) with inline editing & persistence.
-/// 3. Interactive Carton/Unit Order, VAT (14%), Discount & Retailer Margin Calculator.
+/// 3. Per-chain terms table (VAT, invoice discount, extra discount) that drives Sell-In.
 /// 4. Product Master Excel Workbook Upload & Archive History (`الشيتات المرفوعة وتحديث الكارتة`).
 class ProductMasterScreen extends StatefulWidget {
   final ApiClient apiClient;
@@ -49,7 +49,11 @@ class ProductMasterScreen extends StatefulWidget {
     required this.apiClient,
     this.initialSearchQuery,
     this.repository,
+    this.chainRepository,
   });
+
+  /// Optional injected chain-terms repository (tests).
+  final ChainDiscountRepository? chainRepository;
 
   /// Optional injected repository (tests); defaults to one wrapping [apiClient].
   final ProductMasterRepository? repository;
@@ -105,25 +109,13 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   int _currentPage = 0;
   static const int _pageSize = 50;
 
-  // Calculator state
-  ProductMasterItemModel? _calcSelectedSku;
-  final TextEditingController _calcCartonsCtrl =
-      TextEditingController(text: '10');
-  final TextEditingController _calcInvoiceDiscCtrl =
-      TextEditingController(text: '10.0');
-  final TextEditingController _calcExtraDiscCtrl =
-      TextEditingController(text: '0.0');
-  final TextEditingController _calcRetailPriceCtrl =
-      TextEditingController(text: '0.0');
-
-  // Per-chain discount profiles (Firestore via backend). '' = no chain (defaults 10% / 0%).
+  // Per-chain terms (VAT, invoice discount, extra discount) stored by the backend; they drive Sell-In.
   late final ChainDiscountRepository _chainDiscRepo =
-      ChainDiscountRepository(widget.apiClient);
+      widget.chainRepository ?? ChainDiscountRepository(widget.apiClient);
   List<ChainDiscountProfileModel> _chainProfiles = const [];
   bool _chainProfilesLoading = false;
   bool _chainProfilesSaving = false;
   String? _chainProfilesError;
-  String _calcChain = '';
 
   @override
   void initState() {
@@ -165,16 +157,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     try {
       final saved = await _chainDiscRepo.save(next);
       if (!mounted) return;
-      setState(() {
-        _chainProfiles = saved;
-        if (_calcChain.isNotEmpty &&
-            !saved.any((p) =>
-                ChainDiscountProfileModel.key(p.chain) ==
-                ChainDiscountProfileModel.key(_calcChain))) {
-          _calcChain = '';
-        }
-        _applyCalcChainDiscounts();
-      });
+      setState(() => _chainProfiles = saved);
     } catch (e) {
       if (!mounted) return;
       setState(() => _chainProfilesError = e.toString());
@@ -183,40 +166,10 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     }
   }
 
-  /// Prefills the calculator's two discount fields from the selected chain (or the 10% / 0% defaults).
-  void _applyCalcChainDiscounts() {
-    if (_calcChain.isEmpty) {
-      if (_calcSelectedSku == null) {
-        _calcInvoiceDiscCtrl.text =
-            kDefaultInvoiceDiscountPct.toStringAsFixed(1);
-        _calcExtraDiscCtrl.text =
-            kDefaultAdditionalDiscountPct.toStringAsFixed(1);
-      } else {
-        _calcInvoiceDiscCtrl.text =
-            _calcSelectedSku!.invoiceDiscountPct.toStringAsFixed(1);
-        _calcExtraDiscCtrl.text =
-            _calcSelectedSku!.extraDiscountPct.toStringAsFixed(1);
-      }
-      return;
-    }
-    for (final p in _chainProfiles) {
-      if (ChainDiscountProfileModel.key(p.chain) ==
-          ChainDiscountProfileModel.key(_calcChain)) {
-        _calcInvoiceDiscCtrl.text = p.invoiceDiscountPct.toStringAsFixed(1);
-        _calcExtraDiscCtrl.text = p.additionalDiscountPct.toStringAsFixed(1);
-        return;
-      }
-    }
-  }
-
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
-    _calcCartonsCtrl.dispose();
-    _calcInvoiceDiscCtrl.dispose();
-    _calcExtraDiscCtrl.dispose();
-    _calcRetailPriceCtrl.dispose();
     super.dispose();
   }
 
@@ -270,9 +223,6 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       setState(() {
         _summary = summary;
         _archivedMasterFiles = pmArchives;
-        if (_calcSelectedSku == null && summary.items.isNotEmpty) {
-          _selectCalculatorSku(summary.items.first);
-        }
         _isLoading = false;
       });
     } catch (e) {
@@ -282,16 +232,6 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         _isLoading = false;
       });
     }
-  }
-
-  void _selectCalculatorSku(ProductMasterItemModel sku) {
-    _calcSelectedSku = sku;
-    _calcInvoiceDiscCtrl.text = sku.invoiceDiscountPct.toStringAsFixed(1);
-    _calcExtraDiscCtrl.text = sku.extraDiscountPct.toStringAsFixed(1);
-    if (_calcChain.isNotEmpty) _applyCalcChainDiscounts();
-    final suggestedShelf =
-        sku.unitPriceInclVat > 0 ? (sku.unitPriceInclVat * 1.12) : 25.0;
-    _calcRetailPriceCtrl.text = suggestedShelf.toStringAsFixed(2);
   }
 
   List<ProductMasterItemModel> get _filteredItems {
@@ -2084,29 +2024,6 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
                                     );
                                   },
                                 ),
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 28.0,
-                                    minHeight: 28.0,
-                                  ),
-                                  style: IconButton.styleFrom(
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    minimumSize: const Size(28.0, 28.0),
-                                  ),
-                                  icon: const Icon(
-                                    Icons.calculate_rounded,
-                                    size: 18.0,
-                                  ),
-                                  tooltip: 'حساب طلبية وهامش ربح لهذا الصنف',
-                                  onPressed: () {
-                                    setState(() {
-                                      _selectCalculatorSku(item);
-                                      _tabController.animateTo(1);
-                                    });
-                                  },
-                                ),
                               ],
                             ),
                           ),
@@ -2472,107 +2389,13 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
     }
   }
 
-  void _exportCalculatorOrderToCsv({
-    required ProductMasterItemModel sku,
-    required double cartons,
-    required int totalUnits,
-    required double grossExclVat,
-    required double vatAmount,
-    required double grossInclVat,
-    required double invDiscPct,
-    required double extraDiscPct,
-    required double totalDiscountEgp,
-    required double netPayable,
-    required double netUnitCost,
-    required double shelfUnitPrice,
-    required double retailerProfitEgp,
-    required double retailerMarginPct,
-  }) {
-    final csv = ExcelExportService.generateCsv(
-      headers: const [
-        'كود الصنف (Item Code)',
-        'الاسم الرسمي للصنف (Official Name)',
-        'الباركود (Barcode)',
-        'الكمية بالكرتونة (Cartons)',
-        'الشدة بالكرتونة (Units/Carton)',
-        'إجمالي الوحدات (Total Units)',
-        'إجمالي القيمة قبل الضريبة (Gross Excl VAT)',
-        'ضريبة القيمة المضافة 14% (VAT EGP)',
-        'الإجمالي شامل الضريبة (Gross Incl VAT)',
-        'خصم الفاتورة % (Invoice Disc %)',
-        'خصم إضافي % (Extra Disc %)',
-        'إجمالي الخصومات (Total Discount EGP)',
-        'صافي الفاتورة المستحق لأدكو (Net Payable EGP)',
-        'صافي تكلفة الوحدة (Net Unit Cost EGP)',
-        'سعر بيع السلسلة للمستهلك (Shelf Price EGP)',
-        'هامش ربح السلسلة المتوقع % (Retailer Margin %)',
-        'إجمالي ربح السلسلة (Retailer Profit EGP)',
-      ],
-      rows: [
-        [
-          sku.itemCode,
-          sku.officialName,
-          sku.barcode,
-          cartons.toStringAsFixed(1),
-          sku.unitsPerCarton.toString(),
-          totalUnits.toString(),
-          grossExclVat.toStringAsFixed(2),
-          vatAmount.toStringAsFixed(2),
-          grossInclVat.toStringAsFixed(2),
-          '${invDiscPct.toStringAsFixed(1)}%',
-          '${extraDiscPct.toStringAsFixed(1)}%',
-          totalDiscountEgp.toStringAsFixed(2),
-          netPayable.toStringAsFixed(2),
-          netUnitCost.toStringAsFixed(2),
-          shelfUnitPrice.toStringAsFixed(2),
-          '${retailerMarginPct.toStringAsFixed(1)}%',
-          retailerProfitEgp.toStringAsFixed(2),
-        ],
-      ],
-    );
-    ExcelExportService.downloadCsv(
-      'Adeco_Order_${sku.itemCode}_${DateTime.now().millisecondsSinceEpoch}.csv',
-      csv,
-    );
-  }
-
+  /// «حاسبة الطلبيات والخصومات والهامش»: per-chain VAT / invoice / extra discount settings.
+  /// They are the single source of truth for that chain's Sell-In everywhere.
   Widget _buildCalculatorTab(
     ThemeData theme,
     ColorScheme cs,
     ProductMasterSummaryModel summary,
   ) {
-    final sku = _calcSelectedSku ??
-        (summary.items.isNotEmpty ? summary.items.first : null);
-    if (sku == null) {
-      return const Center(child: Text('لا توجد أصناف متاحة بالحاسبة'));
-    }
-
-    final cartons = double.tryParse(_calcCartonsCtrl.text.trim()) ?? 1.0;
-    final invDiscPct = double.tryParse(_calcInvoiceDiscCtrl.text.trim()) ??
-        sku.invoiceDiscountPct;
-    final extraDiscPct =
-        double.tryParse(_calcExtraDiscCtrl.text.trim()) ?? sku.extraDiscountPct;
-    final shelfUnitPrice = double.tryParse(_calcRetailPriceCtrl.text.trim()) ??
-        sku.unitPriceInclVat;
-
-    final totalUnits = (cartons * sku.unitsPerCarton).round();
-    final grossExclVat = cartons * sku.cartonPriceExclVat;
-    final vatAmount = grossExclVat * sku.vatRate;
-    final grossInclVat = cartons * sku.cartonPriceInclVat;
-
-    final afterInvDisc = grossInclVat * (1.0 - (invDiscPct / 100.0));
-    final netPayable = afterInvDisc * (1.0 - (extraDiscPct / 100.0));
-    final totalDiscountEgp = grossInclVat - netPayable;
-    final netUnitCost = totalUnits > 0 ? netPayable / totalUnits : 0.0;
-
-    final shelfMissing = shelfUnitPrice <= 0;
-    final totalShelfRevenue = shelfMissing ? 0.0 : totalUnits * shelfUnitPrice;
-    final retailerProfitEgp =
-        shelfMissing ? 0.0 : totalShelfRevenue - netPayable;
-    final retailerMarginPct = !shelfMissing && totalShelfRevenue > 0
-        ? (retailerProfitEgp / totalShelfRevenue) * 100.0
-        : 0.0;
-
     return ListView(
       padding: const EdgeInsetsDirectional.fromSTEB(24.0, 12.0, 24.0, 32.0),
       children: [
@@ -2581,259 +2404,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           loading: _chainProfilesLoading,
           saving: _chainProfilesSaving,
           error: _chainProfilesError,
+          canEdit:
+              widget.apiClient.currentUser?.canEditChainTerms ?? true,
           onSave: _saveChainProfiles,
-        ),
-        const SizedBox(height: 16.0),
-        Container(
-          padding: const EdgeInsets.all(20.0),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLow,
-            borderRadius: M3Shape.radiusLg,
-            border:
-                Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12.0,
-                runSpacing: 8.0,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'حاسبة الطلبيات والخصومات وضريبة القيمة المضافة وهامش ربح السلسلة',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        'Order Economics, VAT (14%), Trade Discounts & Retailer Shelf Margin Simulator',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                  FilledButton.tonalIcon(
-                    key: const ValueKey('product_master_export_order_csv_btn'),
-                    onPressed: () => _exportCalculatorOrderToCsv(
-                      sku: sku,
-                      cartons: cartons,
-                      totalUnits: totalUnits,
-                      grossExclVat: grossExclVat,
-                      vatAmount: vatAmount,
-                      grossInclVat: grossInclVat,
-                      invDiscPct: invDiscPct,
-                      extraDiscPct: extraDiscPct,
-                      totalDiscountEgp: totalDiscountEgp,
-                      netPayable: netPayable,
-                      netUnitCost: netUnitCost,
-                      shelfUnitPrice: shelfUnitPrice,
-                      retailerProfitEgp: retailerProfitEgp,
-                      retailerMarginPct: retailerMarginPct,
-                    ),
-                    icon: const Icon(Icons.download_rounded, size: 18.0),
-                    label: const Text('تصدير أمر التوريد Excel (CSV)'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16.0),
-              M3Dropdown<String>(
-                key: const ValueKey('calc_chain_dropdown'),
-                value: _calcChain,
-                label: 'السلسلة (تملأ الخصمين تلقائياً)',
-                expand: true,
-                options: [
-                  const M3DropdownOption('', 'بدون سلسلة — 10% / 0%'),
-                  for (final p in _chainProfiles)
-                    M3DropdownOption(
-                      p.chain,
-                      '${p.chain} — ${p.invoiceDiscountPct}% / ${p.additionalDiscountPct}%',
-                    ),
-                ],
-                onChanged: (v) => setState(() {
-                  _calcChain = v;
-                  _applyCalcChainDiscounts();
-                }),
-              ),
-              const SizedBox(height: 16.0),
-              M3Dropdown<ProductMasterItemModel>(
-                value: summary.items.contains(sku) ? sku : summary.items.first,
-                label: 'اختر الصنف من كارتة الأصناف (Select SKU)',
-                expand: true,
-                options:
-                    m3OptionsFromMenuItems<ProductMasterItemModel>(summary.items
-                        .take(200)
-                        .map(
-                          (item) => DropdownMenuItem<ProductMasterItemModel>(
-                            value: item,
-                            child: Text(
-                              '[${item.itemCode}] ${item.officialName} • باركود: ${item.barcode} (${item.unitsPerCarton} وحدة/كرتونة)',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList()),
-                onChanged: m3Legacy<ProductMasterItemModel>((val) {
-                  if (val != null) {
-                    setState(() => _selectCalculatorSku(val));
-                  }
-                }),
-              ),
-              const SizedBox(height: 16.0),
-              Wrap(
-                spacing: 16.0,
-                runSpacing: 12.0,
-                children: [
-                  SizedBox(
-                    width: 210,
-                    child: TextField(
-                      controller: _calcCartonsCtrl,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'الكمية بالكرتونة (Cartons)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 210,
-                    child: TextField(
-                      controller: _calcInvoiceDiscCtrl,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'خصم الفاتورة % (Invoice Disc %)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 210,
-                    child: TextField(
-                      controller: _calcExtraDiscCtrl,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'خصم إضافي % (Extra Disc %)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 240,
-                    child: TextField(
-                      controller: _calcRetailPriceCtrl,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'سعر بيع السلسلة للمستهلك (Shelf EGP)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20.0),
-              const Divider(),
-              const SizedBox(height: 12.0),
-              LayoutBuilder(
-                builder: (context, calcConstraints) {
-                  // Same 138dp shared cards as the Product Master / Sell-Out
-                  // KPIs. 3 columns at the live 1030 shell (inner ~942 after
-                  // page + card padding); 2 columns on the 1024 shell.
-                  final columns = calcConstraints.maxWidth >= 720
-                      ? 3
-                      : (calcConstraints.maxWidth >= 520 ? 2 : 1);
-                  return M3EqualHeightGrid(
-                    key: const ValueKey('pm_calc_result_grid'),
-                    columns: columns,
-                    spacing: M3Spacing.sm,
-                    runSpacing: M3Spacing.sm,
-                    children: [
-                      M3SummaryKpiCard(
-                        key: const ValueKey('pm_calc_card_total_units'),
-                        title: 'إجمالي الوحدات',
-                        titleTooltip: 'إجمالي الوحدات بالطلبية',
-                        titleMaxLines: 1,
-                        subtitleMaxLines: 1,
-                        value: '${_intFmt.format(totalUnits)} وحدة',
-                        subtitle: 'Total Units Ordered · ${sku.packagingType}',
-                        icon: Icons.inventory_2_rounded,
-                        color: cs.primary,
-                      ),
-                      M3SummaryKpiCard(
-                        key: const ValueKey('pm_calc_card_gross'),
-                        title: 'القيمة قبل الضريبة',
-                        titleTooltip: 'إجمالي القيمة قبل الضريبة',
-                        titleMaxLines: 1,
-                        subtitleMaxLines: 1,
-                        value: '${_currFmt.format(grossExclVat)} ج.م',
-                        subtitle: 'Gross Value Excl. VAT',
-                        icon: Icons.payments_rounded,
-                        color: cs.onSurface,
-                      ),
-                      M3SummaryKpiCard(
-                        key: const ValueKey('pm_calc_card_vat'),
-                        title: 'ضريبة القيمة المضافة',
-                        titleTooltip: 'قيمة ضريبة القيمة المضافة (14%)',
-                        titleMaxLines: 1,
-                        subtitleMaxLines: 1,
-                        value: '${_currFmt.format(vatAmount)} ج.م',
-                        subtitle: 'VAT Amount (14%)',
-                        icon: Icons.receipt_long_rounded,
-                        color: M3Palette.warning,
-                      ),
-                      M3SummaryKpiCard(
-                        key: const ValueKey('pm_calc_card_discounts'),
-                        title: 'الخصومات التجارية',
-                        titleTooltip: 'إجمالي قيمة الخصومات التجارية',
-                        titleMaxLines: 1,
-                        subtitleMaxLines: 1,
-                        value: CurrencyFormatter.formatEGP(-totalDiscountEgp, showDecimals: true),
-                        subtitle: 'Total Invoice & Extra Discounts',
-                        icon: Icons.discount_rounded,
-                        color: M3Palette.danger,
-                      ),
-                      M3SummaryKpiCard(
-                        key: const ValueKey('pm_calc_card_net'),
-                        title: 'صافي الفاتورة',
-                        titleTooltip: 'صافي الفاتورة المستحق لأدكو',
-                        titleMaxLines: 1,
-                        subtitleMaxLines: 1,
-                        value: '${_currFmt.format(netPayable)} ج.م',
-                        subtitle:
-                            'Net Payable · الوحدة: ${_currFmt.format(netUnitCost)}',
-                        icon: Icons.account_balance_wallet_rounded,
-                        color: M3Palette.teal,
-                      ),
-                      M3SummaryKpiCard(
-                        key: const ValueKey('pm_calc_card_margin'),
-                        title: 'هامش ربح السلسلة',
-                        titleTooltip: 'هامش ربح السلسلة المتوقع',
-                        titleMaxLines: 1,
-                        subtitleMaxLines: 1,
-                        value: shelfMissing
-                            ? '—'
-                            : '${retailerMarginPct.toStringAsFixed(1)}%',
-                        subtitle: shelfMissing
-                            ? 'أدخل سعر بيع السلسلة لحساب الهامش'
-                            : 'Shelf Margin · ${_currFmt.format(retailerProfitEgp)} ج.م',
-                        icon: Icons.trending_up_rounded,
-                        color: M3Palette.indigo,
-                        textValue: shelfMissing,
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
         ),
       ],
     );

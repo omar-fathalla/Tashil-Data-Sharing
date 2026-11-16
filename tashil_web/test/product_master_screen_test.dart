@@ -437,10 +437,12 @@ void main() {
     expect(itemCode('FGCL-0550-0001'), findsWidgets);
     expect(itemCode('PRCL-0102-0015'), findsNothing);
 
-    // Switch to Tab 2 (Calculator) and verify Order CSV export button
+    // Switch to Tab 2 (chain terms) and verify the per-chain table with its add action
     await tester.tap(find.textContaining('حاسبة الطلبيات والخصومات والهامش'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('product_master_export_order_csv_btn')), findsOneWidget);
+    expect(find.byKey(const ValueKey('chain_discount_profiles_card')), findsOneWidget);
+    expect(find.byKey(const ValueKey('chain_discount_add_btn')), findsOneWidget);
+    expect(find.byKey(const ValueKey('product_master_export_order_csv_btn')), findsNothing);
   });
 
   testWidgets(

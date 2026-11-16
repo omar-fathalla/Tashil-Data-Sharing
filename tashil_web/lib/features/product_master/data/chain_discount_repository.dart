@@ -8,12 +8,16 @@ import '../../../core/network/api_endpoints.dart';
 /// Default discounts used for every chain that has no saved profile (backend uses the same values).
 const double kDefaultInvoiceDiscountPct = 10.0;
 const double kDefaultAdditionalDiscountPct = 0.0;
+const double kDefaultVatRatePct = 14.0;
 
-/// One chain's discounts. Percentages are whole numbers (10 = 10%).
+/// One chain's terms (VAT, invoice discount, extra discount). Percentages are whole numbers (10 = 10%).
 class ChainDiscountProfileModel {
   final String chain;
   final double invoiceDiscountPct;
   final double additionalDiscountPct;
+
+  /// null = not set on the server (the Product Master column, then 14%, applies).
+  final double? vatRatePct;
   final DateTime? updatedAt;
   final String updatedBy;
 
@@ -21,14 +25,19 @@ class ChainDiscountProfileModel {
     required this.chain,
     required this.invoiceDiscountPct,
     required this.additionalDiscountPct,
+    this.vatRatePct,
     this.updatedAt,
     this.updatedBy = '',
   });
+
+  /// The VAT shown / applied for this chain.
+  double get effectiveVatRatePct => vatRatePct ?? kDefaultVatRatePct;
 
   factory ChainDiscountProfileModel.fromJson(Map<String, dynamic> j) => ChainDiscountProfileModel(
         chain: (j['chain'] ?? '').toString(),
         invoiceDiscountPct: _toDouble(j['invoice_discount_pct']),
         additionalDiscountPct: _toDouble(j['additional_discount_pct']),
+        vatRatePct: j['vat_rate_pct'] is num ? (j['vat_rate_pct'] as num).toDouble() : null,
         updatedAt: DateTime.tryParse((j['updated_at'] ?? '').toString()),
         updatedBy: (j['updated_by'] ?? '').toString(),
       );
@@ -37,11 +46,12 @@ class ChainDiscountProfileModel {
         'chain': chain,
         'invoice_discount_pct': invoiceDiscountPct,
         'additional_discount_pct': additionalDiscountPct,
+        if (vatRatePct != null) 'vat_rate_pct': vatRatePct,
       };
 
-  /// Cost per piece = list price incl. VAT × (1 − invoice%) × (1 − additional%).
-  double netUnitCost(double unitPriceInclVat) =>
-      unitPriceInclVat * (1 - invoiceDiscountPct / 100) * (1 - additionalDiscountPct / 100);
+  /// Cost per piece = list price × (1 − invoice%) × (1 − additional%) (same VAT basis as the list price).
+  double netUnitCost(double unitPrice) =>
+      unitPrice * (1 - invoiceDiscountPct / 100) * (1 - additionalDiscountPct / 100);
 
   static String key(String chain) => chain.trim().toLowerCase();
 }

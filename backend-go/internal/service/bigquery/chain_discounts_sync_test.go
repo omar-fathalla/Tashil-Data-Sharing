@@ -86,3 +86,25 @@ func TestChainDiscountsSyncAcrossInstances(t *testing.T) {
 		t.Fatal("delete must bump the version")
 	}
 }
+
+// Changing only the VAT rate on instance A must reach instance B (the fingerprint covers VAT).
+func TestChainDiscountsSyncPicksUpVATOnlyChange(t *testing.T) {
+	store := &sharedStore{data: map[string][]domain.ChainDiscountProfile{}}
+	const ttl = 20 * time.Millisecond
+	b := (&Client{}).WithChainDiscountSource(store, ttl)
+	ctx := context.Background()
+	const tenant = "tenant-adeco"
+	v14, v5 := 14.0, 5.0
+
+	store.save(tenant, []domain.ChainDiscountProfile{{Chain: "fathalla", InvoiceDiscountPct: 10, VATRatePct: &v14}})
+	b.syncChainDiscounts(ctx, tenant)
+	before := b.AnalyticsSourceVersion()
+
+	store.save(tenant, []domain.ChainDiscountProfile{{Chain: "fathalla", InvoiceDiscountPct: 10, VATRatePct: &v5}})
+	time.Sleep(ttl + 10*time.Millisecond)
+	b.syncChainDiscounts(ctx, tenant)
+	got, _ := b.chainDiscountProfile(normalizeTenantKey(tenant), "fathalla")
+	if got.VATRatePct == nil || *got.VATRatePct != 5 || b.AnalyticsSourceVersion() <= before {
+		t.Fatalf("VAT-only change not synced: %+v", got)
+	}
+}
