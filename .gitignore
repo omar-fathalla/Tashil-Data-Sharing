@@ -34,3 +34,7 @@ e2e/playwright/.cache/
 *.tar.gz
 *.zip
 backend-go/tashil_backend
+
+# Sell-Out category refresh inputs/outputs (client data, never committed)
+sellout_category_fix_*.csv
+*category_totals*.csv
