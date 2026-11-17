@@ -413,7 +413,10 @@ SDK (Rosetta) at `$HOME/toolchains/flutter` works but burns CPU under parallel
 2. First existing `flutter` binary wins (prepended to `PATH` / `GITHUB_PATH`).
 3. Self-hosted jobs **refuse** `flutter-action` downloads (`use_action=true` → error).
 4. After a successful detect, `scripts/ci_assert_flutter_arm64.sh` requires the
-   selected SDK’s `flutter_tester` / Dart to be **arm64** (not x64/Rosetta).
+   selected SDK’s Dart / `flutter_tester` to be **arm64** (not x86_64/Rosetta).
+   Arch is sniffed with `lipo`/`file` on those binaries — **not** from engine
+   folder names. Official arm64 zips often still keep host artifacts under
+   `bin/cache/artifacts/engine/darwin-x64/`.
 
 ### Install / promote (ops, as `tashil-ci`)
 

@@ -131,17 +131,26 @@ echo "Warming dart/flutter tooling (precache macOS host artifacts) ..."
 flutter --version
 flutter precache --macos || flutter precache
 
+# Arch comes from lipo/file on dart / flutter_tester — NOT from darwin-x64 folder names
+# (official arm64 zips still use engine/darwin-x64/ for host artifacts).
 arch="$(ci_flutter_sdk_arch "${TARGET}")"
 tester="$(ci_flutter_tester_path "${TARGET}" || true)"
+dart_bin="${TARGET}/bin/cache/dart-sdk/bin/dart"
 echo "Installed SDK arch=${arch} root=${TARGET}"
+if [[ -e "${dart_bin}" ]]; then
+  echo "dart=${dart_bin} cpu=$(ci_flutter_binary_cpu "${dart_bin}")"
+  if command -v file >/dev/null 2>&1; then
+    file "${dart_bin}" || true
+  fi
+fi
 if [[ -n "${tester}" ]]; then
-  echo "flutter_tester=${tester}"
+  echo "flutter_tester=${tester} cpu=$(ci_flutter_binary_cpu "${tester}")"
   if command -v file >/dev/null 2>&1; then
     file "${tester}" || true
   fi
 fi
 if [[ "${arch}" != "arm64" ]]; then
-  echo "error: expected arm64 SDK after install (got ${arch})" >&2
+  echo "error: expected arm64 SDK after install (got ${arch} via binary sniff; ignore darwin-* dir names)" >&2
   exit 1
 fi
 

@@ -2,6 +2,10 @@
 # Shared helpers: host CPU arch + Flutter SDK / flutter_tester arch for tashil-mac.
 # Sourced by detect / assert / install scripts. Safe under bash 3.2 (macOS).
 #
+# IMPORTANT: Official macOS arm64 Flutter zips still place host engine artifacts
+# under bin/cache/artifacts/engine/darwin-x64/. Never infer CPU arch from that
+# folder name — inspect the Mach-O with lipo/file instead.
+#
 # Env overrides (tests / dry diagnostics only):
 #   CI_FLUTTER_FORCE_HOST_ARCH=arm64|x86_64
 #   CI_FLUTTER_FORCE_SDK_ARCH=arm64|x64|unknown
@@ -60,7 +64,60 @@ ci_flutter_sdk_root() {
   printf '%s\n' "${root}"
 }
 
-# Detect SDK CPU arch: arm64 | x64 | unknown
+# CPU arch of one binary: arm64 | x64 | unknown
+# Uses lipo -archs / file. Never uses parent directory names.
+# Unit-test stub: a non-Mach-O file whose first line is "# ci_flutter_cpu: arm64|x64".
+ci_flutter_binary_cpu() {
+  local bin="${1:-}"
+  if [[ -z "${bin}" || ! -e "${bin}" ]]; then
+    echo "unknown"
+    return 0
+  fi
+
+  local info=""
+  if command -v lipo >/dev/null 2>&1; then
+    info="$(lipo -archs "${bin}" 2>/dev/null || true)"
+  fi
+  if [[ -z "${info}" ]] && command -v file >/dev/null 2>&1; then
+    info="$(file -b "${bin}" 2>/dev/null || true)"
+  fi
+  case "${info}" in
+    *arm64*) echo "arm64"; return 0 ;;
+    *x86_64*|*x86-64*) echo "x64"; return 0 ;;
+  esac
+
+  local line
+  line="$(head -n1 "${bin}" 2>/dev/null || true)"
+  case "${line}" in
+    "# ci_flutter_cpu: arm64") echo "arm64"; return 0 ;;
+    "# ci_flutter_cpu: x64") echo "x64"; return 0 ;;
+  esac
+
+  echo "unknown"
+}
+
+# Locate flutter_tester under the SDK (folder may be darwin-x64 even for arm64).
+ci_flutter_tester_path() {
+  local root="${1:-}"
+  local p
+  if [[ -z "${root}" ]]; then
+    root="$(ci_flutter_sdk_root)"
+  fi
+  if [[ -z "${root}" ]]; then
+    return 0
+  fi
+  # Prefer darwin-arm64 if present; else darwin-x64 (common for arm64 SDK zips).
+  for p in \
+    "${root}/bin/cache/artifacts/engine/darwin-arm64/flutter_tester" \
+    "${root}/bin/cache/artifacts/engine/darwin-x64/flutter_tester"; do
+    if [[ -e "${p}" ]]; then
+      printf '%s\n' "${p}"
+      return 0
+    fi
+  done
+}
+
+# Detect SDK CPU arch: arm64 | x64 | unknown — from binaries only.
 ci_flutter_sdk_arch() {
   local root="${1:-}"
   if [[ -n "${CI_FLUTTER_FORCE_SDK_ARCH:-}" ]]; then
@@ -75,54 +132,24 @@ ci_flutter_sdk_arch() {
     return 0
   fi
 
-  local tester_arm tester_x64 dart_bin
-  tester_arm="${root}/bin/cache/artifacts/engine/darwin-arm64/flutter_tester"
-  tester_x64="${root}/bin/cache/artifacts/engine/darwin-x64/flutter_tester"
-  if [[ -x "${tester_arm}" && ! -x "${tester_x64}" ]]; then
-    echo "arm64"
-    return 0
-  fi
-  if [[ -x "${tester_x64}" && ! -x "${tester_arm}" ]]; then
-    echo "x64"
-    return 0
-  fi
-  # Both or neither: inspect dart (shipped in the SDK zip).
+  local dart_bin tester cpu
   dart_bin="${root}/bin/cache/dart-sdk/bin/dart"
-  if [[ -x "${dart_bin}" ]]; then
-    local info=""
-    if command -v lipo >/dev/null 2>&1; then
-      info="$(lipo -archs "${dart_bin}" 2>/dev/null || true)"
+  if [[ -e "${dart_bin}" ]]; then
+    cpu="$(ci_flutter_binary_cpu "${dart_bin}")"
+    if [[ "${cpu}" != "unknown" ]]; then
+      printf '%s\n' "${cpu}"
+      return 0
     fi
-    if [[ -z "${info}" ]]; then
-      info="$(file -b "${dart_bin}" 2>/dev/null || true)"
-    fi
-    case "${info}" in
-      *arm64*) echo "arm64"; return 0 ;;
-      *x86_64*|*x86-64*) echo "x64"; return 0 ;;
-    esac
   fi
-  # Engine dir names as a last resort (precache may only have one).
-  if [[ -d "${root}/bin/cache/artifacts/engine/darwin-arm64" ]]; then
-    echo "arm64"
-    return 0
-  fi
-  if [[ -d "${root}/bin/cache/artifacts/engine/darwin-x64" ]]; then
-    echo "x64"
-    return 0
-  fi
-  echo "unknown"
-}
 
-ci_flutter_tester_path() {
-  local root="${1:-}"
-  local arch
-  if [[ -z "${root}" ]]; then
-    root="$(ci_flutter_sdk_root)"
+  tester="$(ci_flutter_tester_path "${root}" || true)"
+  if [[ -n "${tester}" ]]; then
+    cpu="$(ci_flutter_binary_cpu "${tester}")"
+    if [[ "${cpu}" != "unknown" ]]; then
+      printf '%s\n' "${cpu}"
+      return 0
+    fi
   fi
-  arch="$(ci_flutter_sdk_arch "${root}")"
-  case "${arch}" in
-    arm64) printf '%s\n' "${root}/bin/cache/artifacts/engine/darwin-arm64/flutter_tester" ;;
-    x64) printf '%s\n' "${root}/bin/cache/artifacts/engine/darwin-x64/flutter_tester" ;;
-    *) return 0 ;;
-  esac
+
+  echo "unknown"
 }
