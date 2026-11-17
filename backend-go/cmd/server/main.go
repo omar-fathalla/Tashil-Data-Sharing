@@ -290,7 +290,7 @@ func main() {
 	log.Printf("[competitor-suggest] gemini model=%s tier2_fallback=%s (404 model-not-found → tier2)",
 		cfg.GeminiModel, cfg.GeminiTier2Model)
 	competitorSuggestionsHandler := handlers.NewCompetitorSuggestionsHandler(fsRepo, fsRepo, bqRepo, competitorSuggestRanker)
-	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo)
+	chainDiscountHandler := handlers.NewChainDiscountHandler(fsRepo, fsRepo, bqRepo).WithKnownChains(bqRepo)
 	dataQualityHandler := handlers.NewDataQualityHandler(dqService, fsRepo)
 	productMatchHandler := handlers.NewProductMatchHandler(productMatchQueue, bqRepo)
 	// Sell-In Gemini assist (layout + SELLIN_CUSTOMER_CHAIN_MAP suggestions). Human approval only;
@@ -361,6 +361,7 @@ func main() {
 	mux.HandleFunc("POST /api/v1/product-master/upload", uploadHandler.HandleUploadProductMaster)
 	mux.HandleFunc("GET /api/v1/product-master/chain-discounts", chainDiscountHandler.HandleGet)
 	mux.HandleFunc("PUT /api/v1/product-master/chain-discounts", chainDiscountHandler.HandlePut)
+	mux.HandleFunc("GET /api/v1/product-master/chains", chainDiscountHandler.HandleListChains)
 	mux.HandleFunc("GET /api/v1/analytics/executive-summary", analyticsHandler.HandleExecutiveSummary)
 	mux.HandleFunc("GET /api/v1/analytics/executive", analyticsHandler.HandleExecutiveSummary)
 	mux.HandleFunc("GET /api/v1/analytics/records", analyticsHandler.HandleRecords)

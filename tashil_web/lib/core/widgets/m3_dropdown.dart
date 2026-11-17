@@ -79,6 +79,7 @@ class M3Dropdown<T> extends StatelessWidget {
               : width),
       menuHeight: menuHeight,
       requestFocusOnTap: false,
+      enableFilter: false,
       enableSearch: false,
       label: label == null ? null : Text(label!),
       hintText: hint,

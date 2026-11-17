@@ -72,6 +72,72 @@ void main() {
         kChainDiscountConnectionMessage);
   });
 
+  test('known chains: 200 keeps the normalized key, not the display name', () async {
+    final server = MockClient((req) async {
+      expect(req.url.path, '/api/v1/product-master/chains');
+      return http.Response(
+          jsonEncode({
+            'chains': [
+              {
+                'key': 'fathalla',
+                'name': 'fathalla',
+                'display_name': 'أسواق فتح الله (Fathalla Market)',
+                'row_count': 4,
+                'last_data_date': '2026-05-01'
+              }
+            ]
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'});
+    });
+    await http.runWithClient(() async {
+      final list = await repo().loadKnownChains();
+      expect(list.single.key, 'fathalla');
+      expect(list.single.displayName, 'أسواق فتح الله (Fathalla Market)');
+      expect(list.single.rowCount, 4);
+      expect(list.single.lastDataDate, '2026-05-01');
+    }, () => server);
+  });
+
+  test('known chains: 504 and a hang become the Arabic timeout, never the raw exception',
+      () async {
+    final server = MockClient((req) async => http.Response(
+        jsonEncode({'error': 'known chains lookup timed out'}), 504));
+    await http.runWithClient(() async {
+      await expectLater(
+        repo().loadKnownChains(),
+        throwsA(isA<ChainDiscountException>().having(
+            (e) => e.message, 'message', kKnownChainsTimeoutMessage)),
+      );
+    }, () => server);
+
+    ChainDiscountRepository.loadTimeout = const Duration(milliseconds: 30);
+    final hung = MockClient((req) async {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      return http.Response('{}', 200);
+    });
+    await http.runWithClient(() async {
+      await expectLater(
+        repo().loadKnownChains(),
+        throwsA(isA<ChainDiscountException>()
+            .having((e) => e.message, 'message', kKnownChainsTimeoutMessage)
+            .having((e) => e.toString(), 'toString',
+                isNot(contains('TimeoutException')))),
+      );
+    }, () => hung);
+  });
+
+  test('known chains: connection errors stay Arabic', () async {
+    final server = MockClient((req) async => throw http.ClientException('x'));
+    await http.runWithClient(() async {
+      await expectLater(
+        repo().loadKnownChains(),
+        throwsA(isA<ChainDiscountException>().having(
+            (e) => e.message, 'message', kKnownChainsConnectionMessage)),
+      );
+    }, () => server);
+  });
+
   test('200 parses profiles', () async {
     final server = MockClient((req) async => http.Response(
         jsonEncode({

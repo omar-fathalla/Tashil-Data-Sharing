@@ -56,6 +56,7 @@ class ApiEndpoints {
   static String get productMasterItem => '$baseUrl/api/v1/product-master/item';
   static String get productMasterUpload => '$baseUrl/api/v1/product-master/upload';
   static String get productMasterChainDiscounts => '$baseUrl/api/v1/product-master/chain-discounts';
+  static String get productMasterChains => '$baseUrl/api/v1/product-master/chains';
   static String get dataQualityIssues => '$baseUrl/api/v1/data-quality/issues';
   static String get dataQualitySummary => '$baseUrl/api/v1/data-quality/summary';
   static String get dataYears => '$baseUrl/api/v1/sell-in/years';

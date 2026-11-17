@@ -71,6 +71,59 @@ const String kChainDiscountTimeoutMessage =
 const String kChainDiscountConnectionMessage =
     'تعذّر الاتصال بالخادم لتحميل إعدادات السلاسل. أعد المحاولة بعد قليل.';
 
+const String kKnownChainsTimeoutMessage =
+    'انتهت مهلة تحميل السلاسل المعروفة. تحقّق من الاتصال ثم أعد المحاولة.';
+const String kKnownChainsConnectionMessage =
+    'تعذّر الاتصال بالخادم لتحميل السلاسل. أعد المحاولة بعد قليل.';
+const String kKnownChainsFailedMessage =
+    'تعذّر تحميل السلاسل المعروفة. أعد المحاولة.';
+const String kKnownChainsEmptyMessage =
+    'لا توجد سلاسل ببيانات مرفوعة حتى الآن. ارفع شيت Sell-In أو Sell-Out ثم أعد المحاولة.';
+const String kKnownChainsAllAddedMessage =
+    'كل السلاسل المعروفة مضافة بالفعل. عدّل السلسلة بالضغط على صفها في الجدول.';
+const String kKnownChainsPickMessage = 'اختر سلسلة من القائمة';
+const String kKnownChainsAlreadyAdded = 'مضافة بالفعل';
+
+/// A chain the backend has already recognized in counted Sell-In / Sell-Out data.
+/// [key] is the exact normalized value enrichment matches on (for example `fathalla`).
+class KnownChain {
+  final String key;
+  final String displayName;
+  final int rowCount;
+  final int sellInRows;
+  final int sellOutRows;
+  final String lastDataDate;
+
+  const KnownChain({
+    required this.key,
+    required this.displayName,
+    this.rowCount = 0,
+    this.sellInRows = 0,
+    this.sellOutRows = 0,
+    this.lastDataDate = '',
+  });
+
+  factory KnownChain.fromJson(Map<String, dynamic> j) {
+    final key = (j['key'] ?? j['name'] ?? '').toString().trim();
+    final display = (j['display_name'] ?? '').toString().trim();
+    return KnownChain(
+      key: key,
+      displayName: display.isEmpty ? key : display,
+      rowCount: j['row_count'] is num ? (j['row_count'] as num).toInt() : 0,
+      sellInRows: j['sell_in_rows'] is num ? (j['sell_in_rows'] as num).toInt() : 0,
+      sellOutRows: j['sell_out_rows'] is num ? (j['sell_out_rows'] as num).toInt() : 0,
+      lastDataDate: (j['last_data_date'] ?? '').toString(),
+    );
+  }
+}
+
+/// User-facing Arabic text for a known-chains load failure (never a raw exception).
+String friendlyKnownChainsError(Object error) {
+  if (error is ChainDiscountException) return error.message;
+  if (error is TimeoutException) return kKnownChainsTimeoutMessage;
+  return kKnownChainsConnectionMessage;
+}
+
 /// User-facing Arabic text for a chain-terms load/save failure (never a raw exception).
 String friendlyChainDiscountError(Object error) {
   if (error is ChainDiscountException) return error.message;
@@ -141,6 +194,39 @@ class ChainDiscountRepository {
     }
     _offline[api.tenantId] = List.of(profiles);
     return profiles;
+  }
+
+  /// Chains with counted Sell-In / Sell-Out data. Never invents a name when the call fails.
+  Future<List<KnownChain>> loadKnownChains() async {
+    try {
+      final res = await BackendHttp.get(
+        Uri.parse(ApiEndpoints.productMasterChains),
+        headers: api.requestHeaders,
+      ).timeout(loadTimeout);
+      if (res.statusCode == 200) {
+        return _parseChains(res.bodyBytes);
+      }
+      throw ChainDiscountException(res.statusCode == 504
+          ? kKnownChainsTimeoutMessage
+          : kKnownChainsFailedMessage);
+    } on ChainDiscountException {
+      rethrow;
+    } catch (e) {
+      throw ChainDiscountException(friendlyKnownChainsError(e));
+    }
+  }
+
+  List<KnownChain> _parseChains(List<int> bytes) {
+    final data = jsonDecode(utf8.decode(bytes));
+    if (data is! Map) return const [];
+    final list = (data['chains'] as List?) ?? const [];
+    final out = <KnownChain>[];
+    for (final item in list) {
+      if (item is! Map) continue;
+      final chain = KnownChain.fromJson(Map<String, dynamic>.from(item));
+      if (chain.key.isNotEmpty) out.add(chain);
+    }
+    return out;
   }
 
   List<ChainDiscountProfileModel> _parse(List<int> bytes) {

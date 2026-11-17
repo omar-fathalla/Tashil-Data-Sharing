@@ -14,6 +14,7 @@ import 'package:tashil_web/features/product_master/data/chain_discount_repositor
 import 'package:tashil_web/features/product_master/presentation/screens/product_master_screen.dart';
 import 'package:tashil_web/features/product_master/presentation/widgets/pm_catalog_table.dart';
 
+import 'helpers/m3_dropdown_tester.dart';
 import 'support/live_viewport.dart';
 import 'support/product_master_m3_support.dart';
 
@@ -30,6 +31,11 @@ class _MemoryChainRepository extends ChainDiscountRepository {
     _saved = profiles;
     return profiles;
   }
+
+  @override
+  Future<List<KnownChain>> loadKnownChains() async => const [
+        KnownChain(key: 'm3-chain', displayName: 'm3-chain'),
+      ];
 }
 
 /// First load times out exactly like the live bug, the retry succeeds.
@@ -439,8 +445,12 @@ void main() {
             .controller!
             .text,
         '14');
-    await tester.enterText(
-        find.byKey(const ValueKey('chain_discount_chain_field')), 'm3-chain');
+    expect(find.byKey(const ValueKey('chain_discount_chain_field')), findsNothing);
+    await selectM3Option(
+      tester,
+      find.byKey(const ValueKey('chain_discount_chain_dropdown')),
+      'm3-chain',
+    );
     await tester.enterText(
         find.byKey(const ValueKey('chain_discount_vat_field')), '5');
     await tester.enterText(

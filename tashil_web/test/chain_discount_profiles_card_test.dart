@@ -1,7 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/features/product_master/data/chain_discount_repository.dart';
 import 'package:tashil_web/features/product_master/presentation/widgets/chain_discount_profiles_card.dart';
+
+import 'helpers/m3_dropdown_tester.dart';
+
+const _fathalla = KnownChain(
+  key: 'fathalla',
+  displayName: 'أسواق فتح الله (Fathalla Market)',
+);
+const _gomla = KnownChain(
+  key: 'gomla',
+  displayName: 'جملة ماركت (Gomla Market)',
+);
 
 Widget _host(Widget child) => MaterialApp(
       home: Directionality(
@@ -54,18 +67,49 @@ void main() {
       saved = next;
     }
 
-    await tester.pumpWidget(_host(ChainDiscountProfilesCard(profiles: profiles, onSave: onSave)));
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: profiles,
+      knownChains: const [_fathalla],
+      onSave: onSave,
+    )));
     expect(find.textContaining('لا توجد سلاسل مضافة'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('chain_discount_add_btn')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('chain_discount_chain_field')), 'fathalla');
+    expect(find.byKey(const ValueKey('chain_discount_chain_field')), findsNothing);
+    expect(find.byType(DropdownMenu<String>), findsOneWidget);
+    final menu = tester.widget<DropdownMenu<String>>(find.byType(DropdownMenu<String>));
+    expect(menu.enableSearch, isFalse);
+    expect(menu.enableFilter, isFalse);
+    expect(menu.requestFocusOnTap, isFalse);
+    final chainField = tester.widget<TextField>(find.descendant(
+      of: find.byKey(const ValueKey('chain_discount_chain_dropdown')),
+      matching: find.byType(TextField),
+    ));
+    expect(chainField.readOnly, isTrue, reason: 'the chain control accepts no typing');
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const ValueKey('chain_discount_chain_dropdown')),
+        matching: find.byType(TextField),
+      ),
+      'typed-chain',
+    );
+    await tester.tap(find.byKey(const ValueKey('chain_discount_save_btn')));
+    await tester.pumpAndSettle();
+    expect(find.text(kKnownChainsPickMessage), findsOneWidget);
+    expect(saved, isEmpty);
+    await selectM3Option(
+      tester,
+      find.byKey(const ValueKey('chain_discount_chain_dropdown')),
+      'فتح الله',
+    );
     await tester.enterText(find.byKey(const ValueKey('chain_discount_vat_field')), '5');
     await tester.enterText(find.byKey(const ValueKey('chain_discount_invoice_field')), '12');
     await tester.enterText(find.byKey(const ValueKey('chain_discount_additional_field')), '20');
     await tester.tap(find.byKey(const ValueKey('chain_discount_save_btn')));
     await tester.pumpAndSettle();
-    expect(saved.single.chain, 'fathalla');
+    expect(saved.single.chain, 'fathalla',
+        reason: 'the saved key is the enrichment key, not the Arabic display name');
     expect(saved.single.vatRatePct, 5);
     expect(saved.single.invoiceDiscountPct, 12);
     expect(saved.single.additionalDiscountPct, 20);
@@ -112,22 +156,97 @@ void main() {
     expect(saved, isEmpty);
   });
 
-  testWidgets('duplicate chain names are rejected', (tester) async {
+  testWidgets('chains already saved are disabled with مضافة بالفعل', (tester) async {
     _bigView(tester);
-    var calls = 0;
+    List<ChainDiscountProfileModel> saved = [];
     await tester.pumpWidget(_host(ChainDiscountProfilesCard(
       profiles: const [
         ChainDiscountProfileModel(chain: 'Fathalla', invoiceDiscountPct: 10, additionalDiscountPct: 0)
       ],
-      onSave: (_) async => calls++,
+      knownChains: const [_fathalla, _gomla],
+      onSave: (next) async => saved = next,
     )));
     await tester.tap(find.byKey(const ValueKey('chain_discount_add_btn')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const ValueKey('chain_discount_chain_field')), ' fathalla ');
+    await tester.tap(find.byKey(const ValueKey('chain_discount_chain_dropdown')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(kKnownChainsAlreadyAdded), findsWidgets);
+    final disabled = tester
+        .widgetList<MenuItemButton>(find.byType(MenuItemButton))
+        .where((b) => b.onPressed == null);
+    expect(disabled, isNotEmpty, reason: 'the saved chain cannot be chosen again');
+    expect(
+      tester.widgetList<MenuItemButton>(find.byType(MenuItemButton)).where((b) => b.onPressed != null),
+      isNotEmpty,
+      reason: 'a chain without saved terms stays selectable',
+    );
+    await tester.tap(find.descendant(
+      of: find.byKey(const ValueKey('chain_discount_chain_dropdown')),
+      matching: find.byType(TextField),
+    ));
+    await tester.pumpAndSettle();
+    await selectM3Option(
+      tester,
+      find.byKey(const ValueKey('chain_discount_chain_dropdown')),
+      'جملة',
+    );
+    await tester.enterText(find.byKey(const ValueKey('chain_discount_vat_field')), '14');
     await tester.tap(find.byKey(const ValueKey('chain_discount_save_btn')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('مضافة بالفعل'), findsOneWidget);
-    expect(calls, 0);
+    expect(saved.map((p) => p.chain).toList(), ['Fathalla', 'gomla']);
+  });
+
+  testWidgets('empty chain list shows Arabic retry and no free-text field', (tester) async {
+    _bigView(tester);
+    var calls = 0;
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: const [],
+      loadKnownChains: () async {
+        calls++;
+        if (calls == 1) return const [];
+        return const [_fathalla];
+      },
+      onSave: (_) async {},
+    )));
+    await tester.tap(find.byKey(const ValueKey('chain_discount_add_btn')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('chain_discount_chains_empty')), findsOneWidget);
+    expect(find.text(kKnownChainsEmptyMessage), findsOneWidget);
+    expect(find.byKey(const ValueKey('chain_discount_chain_field')), findsNothing);
+    expect(find.byType(DropdownMenu<String>), findsNothing);
+    expect(tester.widget<FilledButton>(find.byKey(const ValueKey('chain_discount_save_btn'))).onPressed, isNull);
+    await tester.tap(find.byKey(const ValueKey('chain_discount_chains_retry')));
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    expect(find.byKey(const ValueKey('chain_discount_chain_dropdown')), findsOneWidget);
+  });
+
+  testWidgets('chain list failure shows Arabic retry and never a raw exception', (tester) async {
+    _bigView(tester);
+    var calls = 0;
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: const [],
+      loadKnownChains: () async {
+        calls++;
+        if (calls == 1) {
+          throw TimeoutException('Future not completed', const Duration(seconds: 5));
+        }
+        return const [_fathalla];
+      },
+      onSave: (_) async => fail('must not save without a selected chain'),
+    )));
+    await tester.tap(find.byKey(const ValueKey('chain_discount_add_btn')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('chain_discount_chains_error')), findsOneWidget);
+    expect(find.text(kKnownChainsTimeoutMessage), findsOneWidget);
+    expect(find.textContaining('TimeoutException'), findsNothing);
+    expect(find.textContaining('Future not completed'), findsNothing);
+    expect(find.byType(DropdownMenu<String>), findsNothing);
+    expect(find.byKey(const ValueKey('chain_discount_chain_field')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('chain_discount_chains_retry')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('chain_discount_chain_dropdown')), findsOneWidget);
+    expect(calls, 2);
   });
 
   testWidgets('read-only for non-admin roles: no add, no save, no delete', (tester) async {

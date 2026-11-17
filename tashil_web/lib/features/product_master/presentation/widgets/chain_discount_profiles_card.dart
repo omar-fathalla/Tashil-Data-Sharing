@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/widgets/app_icons.dart';
+import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/m3_states.dart';
 import '../../data/chain_discount_repository.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
@@ -27,6 +28,12 @@ class ChainDiscountProfilesCard extends StatelessWidget {
   final bool canEdit;
   final Future<void> Function(List<ChainDiscountProfileModel> next) onSave;
 
+  /// Chains already present in counted Sell-In / Sell-Out. Used when [loadKnownChains] is null.
+  final List<KnownChain> knownChains;
+
+  /// Reloads [knownChains] when the add dialog opens and when the user retries.
+  final Future<List<KnownChain>> Function()? loadKnownChains;
+
   const ChainDiscountProfilesCard({
     super.key,
     required this.profiles,
@@ -37,6 +44,8 @@ class ChainDiscountProfilesCard extends StatelessWidget {
     this.errorTitle = 'تعذّر تحميل إعدادات السلاسل',
     this.onRetry,
     this.canEdit = true,
+    this.knownChains = const [],
+    this.loadKnownChains,
   });
 
   static String pct(double v) =>
@@ -51,7 +60,9 @@ class ChainDiscountProfilesCard extends StatelessWidget {
           readOnly: !canEdit,
           taken: profiles
               .map((p) => ChainDiscountProfileModel.key(p.chain))
-              .toSet()),
+              .toSet(),
+          knownChains: knownChains,
+          loadKnownChains: loadKnownChains),
     );
     if (result == null || !canEdit) return;
     final next = List<ChainDiscountProfileModel>.of(profiles);
@@ -234,8 +245,15 @@ class _ChainTermsDialog extends StatefulWidget {
   final ChainDiscountProfileModel? existing;
   final Set<String> taken;
   final bool readOnly;
-  const _ChainTermsDialog(
-      {this.existing, required this.taken, this.readOnly = false});
+  final List<KnownChain> knownChains;
+  final Future<List<KnownChain>> Function()? loadKnownChains;
+  const _ChainTermsDialog({
+    this.existing,
+    required this.taken,
+    this.readOnly = false,
+    this.knownChains = const [],
+    this.loadKnownChains,
+  });
 
   @override
   State<_ChainTermsDialog> createState() => _ChainTermsDialogState();
@@ -247,9 +265,21 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
   late final TextEditingController _inv;
   late final TextEditingController _add;
   String? _err;
+  List<KnownChain> _chains = const [];
+  bool _chainsLoading = false;
+  String? _chainsError;
+  String? _selectedKey;
 
   static String _fmt(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+
+  bool _takenKey(String key) =>
+      widget.taken.contains(ChainDiscountProfileModel.key(key));
+
+  bool get _adding => widget.existing == null;
+
+  bool get _hasSelectable =>
+      _chains.any((c) => c.key.isNotEmpty && !_takenKey(c.key));
 
   @override
   void initState() {
@@ -262,6 +292,40 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
         text: _fmt(e?.invoiceDiscountPct ?? kDefaultInvoiceDiscountPct));
     _add = TextEditingController(
         text: _fmt(e?.additionalDiscountPct ?? kDefaultAdditionalDiscountPct));
+    _chains = List<KnownChain>.of(widget.knownChains);
+    if (_adding && widget.loadKnownChains != null) {
+      _chainsLoading = _chains.isEmpty;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadChains());
+    }
+  }
+
+  Future<void> _loadChains() async {
+    final load = widget.loadKnownChains;
+    if (load == null) return;
+    setState(() {
+      _chainsLoading = true;
+      _chainsError = null;
+    });
+    try {
+      final list = await load();
+      if (!mounted) return;
+      setState(() {
+        _chains = list;
+        _chainsLoading = false;
+        if (_selectedKey != null &&
+            !list.any((c) => c.key == _selectedKey && !_takenKey(c.key))) {
+          _selectedKey = null;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _chains = const [];
+        _chainsLoading = false;
+        _chainsError = friendlyKnownChainsError(e);
+        _selectedKey = null;
+      });
+    }
   }
 
   @override
@@ -273,8 +337,16 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
     super.dispose();
   }
 
+  String _optionLabel(KnownChain chain) {
+    final base = chain.displayName.trim().isEmpty ? chain.key : chain.displayName;
+    final shown = base.toLowerCase().contains(chain.key.toLowerCase())
+        ? base
+        : '$base (${chain.key})';
+    return _takenKey(chain.key) ? '$shown — $kKnownChainsAlreadyAdded' : shown;
+  }
+
   void _submit() {
-    final chain = _chain.text.trim();
+    final chain = _adding ? (_selectedKey ?? '') : _chain.text.trim();
     final vat = double.tryParse(_vat.text.trim());
     final inv = double.tryParse(_inv.text.trim());
     final add = double.tryParse(_add.text.trim());
@@ -283,7 +355,7 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
         ChainDiscountProfileModel.key(widget.existing!.chain) != key;
     String? err;
     if (chain.isEmpty) {
-      err = 'اسم السلسلة مطلوب';
+      err = _adding ? kKnownChainsPickMessage : 'اسم السلسلة مطلوب';
     } else if (isRename && widget.taken.contains(key)) {
       err = 'هذه السلسلة مضافة بالفعل';
     } else if (vat == null || vat < 0 || vat > 100) {
@@ -332,11 +404,125 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
     }
   }
 
+  Widget _chainPicker(ThemeData theme) {
+    if (!_adding) {
+      return TextField(
+        key: const ValueKey('chain_discount_chain_field'),
+        controller: _chain,
+        enabled: false,
+        textDirection: TextDirection.ltr,
+        decoration: const InputDecoration(
+          labelText: 'السلسلة',
+          border: OutlineInputBorder(),
+        ),
+      );
+    }
+    if (_chainsLoading) {
+      return const Column(
+        key: ValueKey('chain_discount_chains_loading'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LinearProgressIndicator(),
+          SizedBox(height: 8.0),
+          Text('جاري تحميل السلاسل…'),
+        ],
+      );
+    }
+    if (_chainsError != null) {
+      return _chainsNotice(
+        key: const ValueKey('chain_discount_chains_error'),
+        message: _chainsError!,
+        color: theme.colorScheme.error,
+      );
+    }
+    if (_chains.isEmpty) {
+      return _chainsNotice(
+        key: const ValueKey('chain_discount_chains_empty'),
+        message: kKnownChainsEmptyMessage,
+        color: theme.colorScheme.onSurfaceVariant,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!_hasSelectable)
+          Padding(
+            key: const ValueKey('chain_discount_chains_all_added'),
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Text(
+              kKnownChainsAllAddedMessage,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        M3Dropdown<String>(
+          key: const ValueKey('chain_discount_chain_dropdown'),
+          width: 440,
+          fitOptions: true,
+          dense: true,
+          label: 'السلسلة',
+          hint: 'اختر سلسلة',
+          value: _selectedKey ?? '',
+          options: [
+            for (final c in _chains)
+              if (c.key.isNotEmpty)
+                M3DropdownOption<String>(
+                  c.key,
+                  _optionLabel(c),
+                  enabled: !_takenKey(c.key),
+                ),
+          ],
+          onChanged: (v) => setState(() {
+            _selectedKey = v;
+            _err = null;
+          }),
+        ),
+        if (_chains.any((c) => _takenKey(c.key)))
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Text(
+              'السلاسل المضافة بالفعل تُعدَّل من الجدول.',
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _chainsNotice({
+    required Key key,
+    required String message,
+    required Color color,
+  }) {
+    return Column(
+      key: key,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(message, style: TextStyle(color: color)),
+        if (widget.loadKnownChains != null)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton(
+              key: const ValueKey('chain_discount_chains_retry'),
+              onPressed: _chainsLoading ? null : _loadChains,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final existing = widget.existing;
     final ro = widget.readOnly;
+    final addBlocked = _adding &&
+        (_chainsLoading ||
+            _chainsError != null ||
+            _chains.isEmpty ||
+            !_hasSelectable);
     return Directionality(
       textDirection: TextDirection.rtl,
       child: AlertDialog(
@@ -344,22 +530,11 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
             ? 'إضافة سلسلة'
             : (ro ? 'إعدادات السلسلة' : 'تعديل إعدادات السلسلة')),
         content: SizedBox(
-          width: 360,
+          width: 480,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                key: const ValueKey('chain_discount_chain_field'),
-                controller: _chain,
-                enabled: existing == null && !ro,
-                textDirection: TextDirection.ltr,
-                decoration: const InputDecoration(
-                  labelText: 'السلسلة (كما في شيت الكاشير)',
-                  hintText: 'fathalla',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
-                ),
-              ),
+              _chainPicker(theme),
               const SizedBox(height: 12.0),
               TextField(
                 key: const ValueKey('chain_discount_vat_field'),
@@ -415,7 +590,7 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
           if (!ro)
             FilledButton(
               key: const ValueKey('chain_discount_save_btn'),
-              onPressed: _submit,
+              onPressed: addBlocked ? null : _submit,
               child: const Text('حفظ'),
             ),
         ],
