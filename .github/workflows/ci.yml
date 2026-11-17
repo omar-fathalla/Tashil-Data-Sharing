@@ -71,6 +71,10 @@ jobs:
             flutter:
               - 'tashil_web/**'
               - 'scripts/ci_detect_flutter.sh'
+              - 'scripts/ci_detect_flutter_test.sh'
+              - 'scripts/ci_flutter_arch.sh'
+              - 'scripts/ci_assert_flutter_arm64.sh'
+              - 'scripts/ci_install_flutter_macos_arm64.sh'
               - 'scripts/ci_runner_env.sh'
               - 'scripts/ci_pub_cache_isolation_test.sh'
               - 'scripts/wait_mac_heavy_free.sh'
@@ -395,7 +399,7 @@ jobs:
           chmod +x scripts/mac_lock_ci.sh
           bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 12 8
 
-      # Prefer $HOME/toolchains/flutter; never download via flutter-action on self-hosted.
+      # Prefer $HOME/toolchains/flutter-arm64 (Apple Silicon) then flutter; never flutter-action on self-hosted.
       # PUB_CACHE is forced to $RUNNER_TEMP/pub-cache by scripts/ci_runner_env.sh (ignores presets).
       - name: Detect preinstalled Flutter
         id: flutter_pre
@@ -403,14 +407,23 @@ jobs:
         env:
           FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
         run: |
-          chmod +x scripts/ci_detect_flutter.sh
+          chmod +x scripts/ci_detect_flutter.sh scripts/ci_flutter_arch.sh
           bash scripts/ci_detect_flutter.sh
 
       - name: Require preinstalled Flutter on self-hosted
         if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
         run: |
-          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install at \$HOME/toolchains/flutter — do not download via flutter-action (drops Mac runners)."
+          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install native arm64 at \$HOME/toolchains/flutter-arm64 via scripts/ci_install_flutter_macos_arm64.sh — do not download via flutter-action (drops Mac runners)."
           exit 1
+
+      - name: Require native arm64 Flutter on Apple Silicon
+        if: steps.flutter_pre.outputs.use_action == 'false' && runner.environment == 'self-hosted'
+        working-directory: .
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          chmod +x scripts/ci_assert_flutter_arm64.sh scripts/ci_flutter_arch.sh
+          bash scripts/ci_assert_flutter_arm64.sh
 
       - uses: subosito/flutter-action@v2
         if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
