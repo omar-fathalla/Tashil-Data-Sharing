@@ -35,6 +35,6 @@ Desktop-first Material Design 3 (M3) executive web portal built for FMCG and ret
 Run `scripts/deploy_web.sh` from the repo root. It bumps `tashil_web/deploy_version.txt`,
 builds with `--dart-define=APP_VERSION=<n>`, deploys to Firebase Hosting
 (`tashil-data-sharing`), and commits the version file as `chore: web deploy vN` (no push).
-On failure the previous number is restored. The version appears next to "Tashil Portal"
-in the sidebar (e.g. `v3`); local runs without the define show `dev`.
+On failure the previous number is restored. The version appears in the sidebar
+footer (`Tashil • Data Sharing Platform • v3`); local runs without the define show `dev`.
 Counter started at 1 on 2026-10-24 (earlier manual deploys were not counted).

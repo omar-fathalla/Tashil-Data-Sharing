@@ -5,7 +5,6 @@ import '../../../core/network/api_client.dart';
 import '../../../core/testing/test_semantics.dart';
 import '../../../core/theme/m3_motion.dart';
 import '../../../core/theme/m3_spacing.dart';
-import '../../../core/widgets/data_sharing_logo.dart';
 import 'tenant_profile_card.dart';
 
 /// DesktopSidebar provides a permanent Material Design 3 Navigation Drawer
@@ -20,6 +19,13 @@ class DesktopSidebar extends StatelessWidget {
   final VoidCallback? onNavigateToAdmin;
   final bool isSuperAdmin;
 
+  /// Optional tenant logo (`TenantProfileModel.logoUrl`). Null falls back to
+  /// the catalog profile; empty shows the letter avatar.
+  final String? tenantLogoUrl;
+
+  /// Test / preview image. Wins over [tenantLogoUrl].
+  final ImageProvider<Object>? tenantLogoImage;
+
   const DesktopSidebar({
     super.key,
     required this.selectedIndex,
@@ -30,6 +36,8 @@ class DesktopSidebar extends StatelessWidget {
     this.onOpenProfile,
     this.onNavigateToAdmin,
     this.isSuperAdmin = false,
+    this.tenantLogoUrl,
+    this.tenantLogoImage,
   });
 
   @override
@@ -139,64 +147,10 @@ class DesktopSidebar extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header: Brand & App Title
+            // Tenant brand. LTR inside the card so the English name sits on the left.
             Padding(
               padding:
                   const EdgeInsetsDirectional.fromSTEB(16.0, 24.0, 16.0, 16.0),
-              child: Row(
-                children: [
-                  const DataSharingLogo(
-                    size: 40.0,
-                    showSquircle: true,
-                  ),
-                  M3Spacing.gapSM,
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Tashil Portal',
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6.0),
-                            ValueListenableBuilder<String>(
-                              valueListenable: AppVersion.listenable,
-                              builder: (context, versionLabel, _) {
-                                return Text(
-                                  versionLabel,
-                                  key: const ValueKey('sidebar-app-version'),
-                                  textDirection: TextDirection.ltr,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                        Text(
-                          'Data Sharing Platform',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Tenant Profile Switcher
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: TenantProfileCard(
                 activeTenant: activeTenant,
                 currentUser: currentUser,
@@ -204,10 +158,10 @@ class DesktopSidebar extends StatelessWidget {
                 onOpenProfile: onOpenProfile,
                 onNavigateToAdmin: onNavigateToAdmin,
                 isSuperAdmin: isSuperAdmin,
+                logoUrl: tenantLogoUrl,
+                logoImage: tenantLogoImage,
               ),
             ),
-
-            M3Spacing.gapMD,
 
             // Navigation Items
             Expanded(
@@ -337,26 +291,49 @@ class DesktopSidebar extends StatelessWidget {
             Padding(
               padding:
                   const EdgeInsetsDirectional.fromSTEB(16.0, 8.0, 16.0, 12.0),
-              child: Row(
-                key: const ValueKey('sidebar_footer_status'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Only the status dot uses primary; icon + text stay neutral.
-                  CircleAvatar(
-                      radius: 4.0, backgroundColor: colorScheme.primary),
-                  const SizedBox(width: 6.0),
-                  Icon(Icons.bolt_rounded,
-                      size: 16.0, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 6.0),
-                  Expanded(
-                    child: Text(
-                      'Smart Ingestion Active',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
+                  Row(
+                    key: const ValueKey('sidebar_footer_status'),
+                    children: [
+                      // Only the status dot uses primary; icon + text stay neutral.
+                      CircleAvatar(
+                          radius: 4.0, backgroundColor: colorScheme.primary),
+                      const SizedBox(width: 6.0),
+                      Icon(Icons.bolt_rounded,
+                          size: 16.0, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 6.0),
+                      Expanded(
+                        child: Text(
+                          'Smart Ingestion Active',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                  const SizedBox(height: 4.0),
+                  ValueListenableBuilder<String>(
+                    valueListenable: AppVersion.listenable,
+                    builder: (context, versionLabel, _) {
+                      return Text(
+                        'Tashil • Data Sharing Platform • $versionLabel',
+                        key: const ValueKey('sidebar-app-version'),
+                        textDirection: TextDirection.ltr,
+                        textAlign: TextAlign.left,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w300,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
