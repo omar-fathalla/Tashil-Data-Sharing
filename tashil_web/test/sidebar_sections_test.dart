@@ -309,7 +309,8 @@ Future<void> _saveBoundary(
   String name,
 ) async {
   final dir = Directory('/opt/cursor/artifacts');
-  if (!dir.existsSync()) dir.createSync(recursive: true);
+  // CI runners cannot create /opt/cursor. Screenshots are optional evidence.
+  if (!dir.existsSync()) return;
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(ValueKey(key)),
   );
