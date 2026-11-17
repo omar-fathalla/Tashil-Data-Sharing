@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/m3_shape.dart';
+import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/m3_states.dart';
@@ -8,6 +9,12 @@ import '../../data/chain_discount_repository.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_wrap_text.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+
+/// «آخر تحديث» cell: calendar date only (`yyyy-MM-dd`), never email or time.
+String formatChainDiscountUpdatedAt(DateTime? at) {
+  if (at == null) return '';
+  return AppDateFormat.formatDate(at);
+}
 
 /// Product Master → «حاسبة الطلبيات»: one row per chain with its VAT, invoice
 /// discount and extra discount. Saved terms are the single source of truth for that chain's Sell-In
@@ -212,16 +219,8 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                               textAlign: TextAlign.center)),
                           DataCell(Text(pct(p.additionalDiscountPct),
                               textAlign: TextAlign.center)),
-                          DataCell(M3WrapText(
-                            [
-                              if (p.updatedAt != null)
-                                p.updatedAt!
-                                    .toLocal()
-                                    .toString()
-                                    .substring(0, 16),
-                              if (p.updatedBy.isNotEmpty) p.updatedBy,
-                            ].join(' • '),
-                            maxLines: 3,
+                          DataCell(Text(
+                            formatChainDiscountUpdatedAt(p.updatedAt),
                             textAlign: TextAlign.center,
                             style: theme.textTheme.labelSmall,
                           )),

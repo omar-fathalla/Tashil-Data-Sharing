@@ -193,6 +193,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
       final saved = await _chainDiscRepo.save(next);
       if (!mounted) return;
       setState(() => _chainProfiles = saved);
+      // PUT returns after Firestore; Sell-In re-enrichment continues in the
+      // background. Never show a red timeout when the list is actually stored.
+      M3Feedback.showSuccess(context, kChainDiscountSavedUpdatingMessage);
     } catch (e) {
       if (!mounted) return;
       setState(() {

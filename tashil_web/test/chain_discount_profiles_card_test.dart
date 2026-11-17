@@ -267,6 +267,36 @@ void main() {
     expect(tester.widget<TextField>(find.byKey(const ValueKey('chain_discount_vat_field'))).enabled, isFalse);
   });
 
+  test('آخر تحديث is date only — never email or clock time', () {
+    expect(
+      formatChainDiscountUpdatedAt(DateTime.utc(2026, 11, 17, 19, 45)),
+      '2026-11-17',
+    );
+    expect(formatChainDiscountUpdatedAt(null), isEmpty);
+  });
+
+  testWidgets('آخر تحديث column shows yyyy-MM-dd only, not email or time',
+      (tester) async {
+    _bigView(tester);
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: [
+        ChainDiscountProfileModel(
+          chain: 'fathalla',
+          invoiceDiscountPct: 10,
+          additionalDiscountPct: 10,
+          vatRatePct: 14,
+          updatedAt: DateTime.utc(2026, 11, 17, 19, 45),
+          updatedBy: 'admin@adeco.test',
+        ),
+      ],
+      onSave: (_) async {},
+    )));
+    expect(find.text('2026-11-17'), findsOneWidget);
+    expect(find.textContaining('admin@adeco.test'), findsNothing);
+    expect(find.textContaining('19:45'), findsNothing);
+    expect(find.textContaining('21:45'), findsNothing);
+  });
+
   testWidgets('while saving the add button and the table rows are disabled', (tester) async {
     _bigView(tester);
     var saves = 0;

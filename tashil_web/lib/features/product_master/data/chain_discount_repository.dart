@@ -96,6 +96,16 @@ const String kChainDiscountSaveUnverifiedTitle = 'تعذّر التأكد من �
 const String kChainDiscountSaveUnverifiedMessage =
     'لم يصل تأكيد الحفظ من الخادم، وقد تكون التغييرات حُفظت. أعد المحاولة للتأكد.';
 
+/// Soft success after a PUT that returned (or was verified). Apply to Sell-In
+/// costs continues in the background — never a red error.
+const String kChainDiscountSavedUpdatingMessage =
+    'تم الحفظ — جاري تحديث التكاليف…';
+
+/// Legacy live (v218) timeout copy. Must never appear when the list was actually
+/// stored — the save path verifies via re-GET instead of throwing this.
+const String kChainDiscountSaveTimeoutMessage =
+    'انتهت مهلة حفظ إعدادات السلاسل. أعد المحاولة.';
+
 const String kChainDiscountTimeoutMessage =
     'انتهت مهلة تحميل إعدادات السلاسل. تحقّق من الاتصال ثم أعد المحاولة.';
 const String kChainDiscountConnectionMessage =
@@ -224,6 +234,8 @@ class ChainDiscountRepository {
     } on ChainDiscountException {
       rethrow;
     } on TimeoutException {
+      // Live v218 threw [kChainDiscountSaveTimeoutMessage] here while Firestore
+      // had already stored the list. Re-read instead: a matching list is success.
       final stored = await _readBack(profiles);
       if (stored != null) return stored;
       if (!api.allowMockFallback) throw const ChainDiscountSaveUnverifiedException();

@@ -230,6 +230,27 @@ void main() {
       expect(methods, ['PUT', 'GET']);
     });
 
+    test(
+        'slow-but-successful save never throws the live v218 «انتهت مهلة حفظ» error',
+        () async {
+      ChainDiscountRepository.saveTimeout = const Duration(milliseconds: 30);
+      final server = MockClient((req) async {
+        if (req.method == 'PUT') {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          return http.Response('{}', 200);
+        }
+        return http.Response(
+            body([row('kazyon', 12, 2, vat: 14), row('fathalla', 10, 0)]), 200,
+            headers: jsonHeaders);
+      });
+      await http.runWithClient(() async {
+        final out = await repo().save(sent);
+        expect(out, hasLength(2));
+      }, () => server);
+      // Guard: the old 12s-timeout path threw this while Firestore had the list.
+      expect(kChainDiscountSaveTimeoutMessage, contains('انتهت مهلة حفظ'));
+    });
+
     test('PUT times out and the stored list differs -> unverified, not saved',
         () async {
       ChainDiscountRepository.saveTimeout = const Duration(milliseconds: 30);

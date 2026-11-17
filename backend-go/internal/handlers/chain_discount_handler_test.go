@@ -371,6 +371,9 @@ func (a *gatedApplier) SetChainDiscountProfiles(_ string, p []domain.ChainDiscou
 }
 
 func TestChainDiscountPutReturnsWhileApplierBlockedAndCoalescesSaves(t *testing.T) {
+	// Contract for the live «false timeout» bug: PUT must answer as soon as Firestore
+	// has the list, even while Sell-In re-enrichment is still running. The client then
+	// shows success (not «انتهت مهلة حفظ») and re-reads if its own budget expires.
 	fs := firestore.NewClient("", true)
 	app := newGatedApplier()
 	h := NewChainDiscountHandler(fs, fs, app)
@@ -380,6 +383,7 @@ func TestChainDiscountPutReturnsWhileApplierBlockedAndCoalescesSaves(t *testing.
 	put := func(invoice float64) {
 		t.Helper()
 		done := make(chan int, 1)
+		start := time.Now()
 		go func() {
 			rec, _ := tmDo(t, mux, admin, "PUT", "/api/v1/product-master/chain-discounts", map[string]interface{}{
 				"profiles": []map[string]interface{}{{"chain": "kazyon", "invoice_discount_pct": invoice}},
@@ -390,6 +394,9 @@ func TestChainDiscountPutReturnsWhileApplierBlockedAndCoalescesSaves(t *testing.
 		case code := <-done:
 			if code != 200 {
 				t.Fatalf("PUT: %d", code)
+			}
+			if d := time.Since(start); d > 500*time.Millisecond {
+				t.Fatalf("PUT took %v while applier was blocked — must return after Firestore only", d)
 			}
 		case <-time.After(2 * time.Second):
 			t.Fatal("PUT blocked on the applier (analytics write lock)")
