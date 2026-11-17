@@ -200,17 +200,19 @@ void main() {
     expect(rp.getMinIntrinsicWidth(double.infinity),
         lessThanOrEqualTo(rp.size.width + 0.5));
     // Short status chips + descriptions are not truncated mid-word.
+    // urgent_replenishment keeps description only (no «تموين» chip).
     for (final label in const [
       'سليم',
       'زائد',
       'مخزون زائد',
-      'تموين',
       'يحتاج إعادة توريد',
     ]) {
       final tag = tester.renderObject<RenderParagraph>(
           find.descendant(of: table, matching: find.text(label)));
       expect(tag.didExceedMaxLines, isFalse, reason: label);
     }
+    expect(find.descendant(of: table, matching: find.text('تموين')),
+        findsNothing);
   });
 
   testWidgets(
