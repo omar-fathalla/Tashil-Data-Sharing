@@ -28,6 +28,7 @@ import '../../product_master/presentation/screens/product_master_screen.dart';
 import '../../data_quality/presentation/screens/data_quality_screen.dart';
 import '../../trade_marketing/presentation/screens/trade_marketing_roi_screen.dart';
 import 'desktop_sidebar.dart';
+import 'tenant_logo_slot.dart';
 import 'not_found_page.dart';
 
 class _NavDestinationSpec {
@@ -497,6 +498,7 @@ class _AppShellState extends State<AppShell> {
                     onDestinationSelected: (index) => _selectPage(index),
                     activeTenant: widget.activeTenant,
                     currentUser: widget.apiClient.currentUser,
+                    tenantLogoUrl: widget.apiClient.currentTenantProfile?.logoUrl,
                     onTenantChanged: widget.onTenantChanged,
                     onOpenProfile: _openUserProfile,
                     onNavigateToAdmin: widget.onNavigateToAdmin,
@@ -523,19 +525,37 @@ class _AppShellState extends State<AppShell> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const DataSharingLogo(size: 38.0, showShadow: false),
+              Tooltip(
+                message: 'Account & profile',
+                child: InkWell(
+                  key: const ValueKey('rail_tenant_header'),
+                  customBorder: const CircleBorder(),
+                  onTap: _openUserProfile,
+                  child: TenantLogoSlot(
+                    tenantSlug: widget.activeTenant,
+                    logoUrl: widget.apiClient.currentTenantProfile?.logoUrl,
+                    radius: 18.0,
+                  ),
+                ),
+              ),
               const SizedBox(height: 6.0),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 8.0,
                   vertical: 2.0,
                 ),
+                constraints: const BoxConstraints(maxWidth: 72.0),
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
                   borderRadius: M3Shape.radiusFull,
                 ),
                 child: Text(
-                  widget.activeTenant.toUpperCase(),
+                  ApiClient.getEnglishDisplayNameForTenant(widget.activeTenant),
+                  key: const ValueKey('rail_tenant_name'),
+                  textDirection: TextDirection.ltr,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: theme.textTheme.labelSmall?.copyWith(
                     fontSize: M3FontSize.microPlus,
                     fontWeight: FontWeight.w800,
