@@ -107,6 +107,97 @@ func TestSellOutCategoryRefreshViolations(t *testing.T) {
 	}
 }
 
+func TestPlanMatchesStoredRecordIDWithoutTenantPrefix(t *testing.T) {
+	const tail = "_fathalla_fat_1__6223001111001_2026-03-01"
+	stored := soFact("fact_adeco"+tail, "fathalla", "fat_1", "", true, "منظفات وعناية منزلية", 5, 50)
+	stored.Barcode = "6223001111001"
+	stored.IngestionBatchID = "batch_live"
+	replay := soFact("fact_tenant-adeco"+tail, "fathalla", "fat_1", "", true, "صابون سائل اطباق", 5, 50)
+	replay.Barcode = "6223001111001"
+	replay.IngestionBatchID = "batch_replay"
+	// A different tenant's prefix must not collapse onto adeco, and the slug form of another
+	// tenant must not match this row.
+	other := soFact("fact_tenant-other"+tail, "fathalla", "fat_1", "", true, "صابون سائل اطباق", 5, 50)
+	other.TenantID = "tenant-other"
+	stacked := soFact("fact_tenant-tenant-adeco"+tail, "fathalla", "fat_1", "", true, "صابون سائل اطباق", 5, 50)
+
+	p := PlanSellOutCategoryRefresh("tenant-adeco", []domain.SellOutFact{stored}, []domain.SellOutFact{replay, other, stacked})
+	if p.Matched != 1 || p.OnlyReplay != 1 || len(p.Changes) != 1 || len(p.Blocked) != 0 {
+		t.Fatalf("plan: matched=%d onlyReplay=%d changes=%d blocked=%d", p.Matched, p.OnlyReplay, len(p.Changes), len(p.Blocked))
+	}
+	if p.Changes[0].RecordID != stored.RecordID || p.Changes[0].BatchID != "batch_live" || p.Changes[0].NewCategory != "صابون سائل اطباق" {
+		t.Fatalf("change must keep the stored id: %+v", p.Changes[0])
+	}
+	var buf bytes.Buffer
+	if err := WriteSellOutCategoryMappingCSV(&buf, p); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "fact_adeco"+tail) || strings.Contains(buf.String(), "fact_tenant-adeco") {
+		t.Fatalf("mapping csv: %s", buf.String())
+	}
+
+	// Both spellings of the same id on the replay side are one row twice: blocked, not applied.
+	dup := PlanSellOutCategoryRefresh("tenant-adeco", []domain.SellOutFact{stored}, []domain.SellOutFact{replay, soFact("FACT_ADECO"+tail, "fathalla", "fat_1", "", true, "صابون سائل اطباق", 5, 50)})
+	if len(dup.Changes) != 0 || dup.DuplicateIDs != 1 || len(dup.Blocked) != 1 {
+		t.Fatalf("duplicate prefix spellings must block: %+v blocked=%+v", dup, dup.Blocked)
+	}
+}
+
+func TestReconcileExpectedFiltersYearAndCompetitor(t *testing.T) {
+	own26 := soFact("a", "fathalla", "fat_1", "", true, "منظفات وعناية منزلية", 1, 10)
+	own25 := soFact("b", "fathalla", "fat_1", "", true, "صابون سائل اطباق", 1, 7)
+	own25.TransactionDate = "2025-06-01"
+	comp26 := soFact("c", "fathalla", "fat_2", "Henkel", false, "منظف ارضيات", 1, 4)
+	comp26b := soFact("d", "fathalla", "fat_2", "Henkel", false, "كلور عادى", 1, 3)
+	stored := []domain.SellOutFact{own26, own25, comp26, comp26b}
+	replay := []domain.SellOutFact{
+		soFact("a", "fathalla", "fat_1", "", true, "صابون سائل اطباق", 1, 10),
+		own25,
+		soFact("c", "fathalla", "fat_2", "Henkel", false, "مطهر ارضيات", 1, 4),
+		comp26b,
+	}
+	csv := "chain,category,scope,year,net_revenue\n" +
+		"*,صابون سائل اطباق,own,2026,10\n" +
+		"*,صابون سائل اطباق,own,2025,7\n" +
+		"*,مطهر ارضيات,competitor,2026,4\n" +
+		"*,صابون سائل اطباق,all,,17\n" +
+		"fathalla,صابون سائل اطباق,own-brand,2026,\"10\"\n"
+	exp, err := ParseExpectedCategoryCSV(strings.NewReader(csv))
+	if err != nil || len(exp) != 5 || exp[2].Scope != "competitor" || exp[3].Year != 0 || exp[4].Scope != "own" {
+		t.Fatalf("parse: %v %+v", err, exp)
+	}
+	rec := ReconcileExpected(PlanSellOutCategoryRefresh("tenant-adeco", stored, replay), exp)
+	if rec[0].Before != 0 || rec[0].After != 10 || rec[0].Delta() != 0 {
+		t.Fatalf("2026 own dish must exclude 2025 and competitors: %+v", rec[0])
+	}
+	if rec[1].After != 7 {
+		t.Fatalf("2025 own: %+v", rec[1])
+	}
+	if rec[2].Before != 0 || rec[2].After != 4 {
+		t.Fatalf("2026 competitor floor cleaner: %+v", rec[2])
+	}
+	if rec[3].After != 17 {
+		t.Fatalf("all years, both sides: %+v", rec[3])
+	}
+	if rec[4].After != 10 {
+		t.Fatalf("own-brand alias: %+v", rec[4])
+	}
+	// Competitor moves keep own=false. They are the sheet category, not an own-flag flip.
+	plan := PlanSellOutCategoryRefresh("tenant-adeco", stored, replay)
+	var compChange SellOutCategoryChange
+	for _, c := range plan.Changes {
+		if !c.IsOwnBrand {
+			compChange = c
+		}
+	}
+	if compChange.IsOwnBrand || compChange.OldCategory != "منظف ارضيات" || compChange.NewCategory != "مطهر ارضيات" {
+		t.Fatalf("competitor change: %+v", compChange)
+	}
+	if _, err := ParseExpectedCategoryCSV(strings.NewReader("chain,category,scope,year,net_revenue\nx,y,competitor,20x6,1\n")); err == nil {
+		t.Fatal("bad year must fail")
+	}
+}
+
 func TestReconcileExpectedNormalizesSpelling(t *testing.T) {
 	stored := []domain.SellOutFact{
 		soFact("a", "fathalla", "fat_1", "", true, "منظفات وعناية منزلية", 1, 34.42),

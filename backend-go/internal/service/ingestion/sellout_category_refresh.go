@@ -45,10 +45,12 @@ type SellOutCategoryBlock struct {
 }
 
 // SellOutCategoryTotal sums one (chain, category, own brand) bucket.
+// Year is 0 on the all-years totals and the transaction year on the by-year totals.
 type SellOutCategoryTotal struct {
 	Chain      string
 	Category   string
 	IsOwnBrand bool
+	Year       int
 	Rows       int
 	Quantity   int64
 	NetRevenue float64
@@ -56,18 +58,22 @@ type SellOutCategoryTotal struct {
 
 // SellOutCategoryRefreshPlan is the read-only result of PlanSellOutCategoryRefresh.
 type SellOutCategoryRefreshPlan struct {
-	TenantID       string
-	StoredRows     int
-	ReplayRows     int
-	Matched        int
-	Unchanged      int
-	OnlyStored     int
-	OnlyReplay     int
-	DuplicateIDs   int
-	Changes        []SellOutCategoryChange
-	Blocked        []SellOutCategoryBlock
-	Before         []SellOutCategoryTotal
-	After          []SellOutCategoryTotal
+	TenantID     string
+	StoredRows   int
+	ReplayRows   int
+	Matched      int
+	Unchanged    int
+	OnlyStored   int
+	OnlyReplay   int
+	DuplicateIDs int
+	Changes      []SellOutCategoryChange
+	Blocked      []SellOutCategoryBlock
+	Before       []SellOutCategoryTotal
+	After        []SellOutCategoryTotal
+	// BeforeByYear / AfterByYear split the same rows by transaction year for Excel checks.
+	// Before / After stay the all-years totals the safety checks use.
+	BeforeByYear   []SellOutCategoryTotal
+	AfterByYear    []SellOutCategoryTotal
 	BeforeQuantity int64
 	AfterQuantity  int64
 	BeforeRevenue  float64
@@ -97,12 +103,60 @@ func sameSellOutIdentity(stored, replay domain.SellOutFact) string {
 	return ""
 }
 
+// sellOutRecordMatchKey folds the tenant segment of a sell-out record_id so a replay can meet the
+// row BigQuery already stores.
+//
+// Ingest builds record_id as fact_{tenantID}_{chain}_{store}_{supplier}_{barcode}_{date}
+// (processor.go) from the tenant string it was given, and the sink writes that string unchanged.
+// Rows loaded before the archive tenant was canonical live as fact_adeco_…; a replay is handed the
+// archive tenant and builds fact_tenant-adeco_…. The sink's NormalizeTenant strips exactly one
+// leading "tenant-" or "tenant_" and lower-cases the slug. This applies that same strip to the
+// segment after "fact_" only, so a later segment (a store id, a supplier) is never rewritten and a
+// stacked prefix (tenant-tenant-adeco) cannot collapse onto adeco. The mapping CSV keeps the stored
+// record_id; this key is for matching only.
+func sellOutRecordMatchKey(recordID string) string {
+	id := strings.TrimSpace(recordID)
+	const prefix = "fact_"
+	if len(id) < len(prefix) || !strings.EqualFold(id[:len(prefix)], prefix) {
+		return id
+	}
+	rest := id[len(prefix):]
+	tenant, tail := rest, ""
+	if i := strings.IndexByte(rest, '_'); i >= 0 {
+		tenant, tail = rest[:i], rest[i:]
+	}
+	tenant = strings.ToLower(tenant)
+	switch {
+	case strings.HasPrefix(tenant, "tenant-"):
+		tenant = strings.TrimPrefix(tenant, "tenant-")
+	case strings.HasPrefix(tenant, "tenant_"):
+		tenant = strings.TrimPrefix(tenant, "tenant_")
+	}
+	if tenant == "" {
+		tenant = "system"
+	}
+	return prefix + tenant + tail
+}
+
+func sellOutFactYear(f domain.SellOutFact) int {
+	d := strings.TrimSpace(f.TransactionDate)
+	if len(d) < 4 {
+		return 0
+	}
+	y, err := strconv.Atoi(d[:4])
+	if err != nil || y < 2000 || y > 2100 {
+		return 0
+	}
+	return y
+}
+
 // PlanSellOutCategoryRefresh compares stored facts (the BigQuery read view) with facts re-parsed from
 // the archive and proposes category-only changes keyed by record_id + ingestion batch.
 //
-// A row changes only when record_id is unique on both sides, chain/store/supplier/own-brand/barcode/
-// date and quantity/revenue all match, and the re-parsed category is non-empty. Stored rows without a
-// re-parsed twin keep their category; re-parsed rows absent from BigQuery are reported, never added.
+// A row changes only when its match key (see sellOutRecordMatchKey) is unique on both sides,
+// chain/store/supplier/own-brand/barcode/date and quantity/revenue all match, and the re-parsed
+// category is non-empty. Stored rows without a re-parsed twin keep their category; re-parsed rows
+// absent from BigQuery are reported, never added. The change list carries the stored record_id.
 func PlanSellOutCategoryRefresh(tenantID string, stored, replayed []domain.SellOutFact) *SellOutCategoryRefreshPlan {
 	tenant := bqsink.NormalizeTenant(tenantID)
 	inTenant := func(f domain.SellOutFact) bool { return bqsink.NormalizeTenant(f.TenantID) == tenant }
@@ -115,7 +169,7 @@ func PlanSellOutCategoryRefresh(tenantID string, stored, replayed []domain.SellO
 			continue
 		}
 		plan.ReplayRows++
-		id := strings.TrimSpace(f.RecordID)
+		id := sellOutRecordMatchKey(f.RecordID)
 		if _, ok := replayByID[id]; ok {
 			replayDup[id] = true
 		}
@@ -124,17 +178,19 @@ func PlanSellOutCategoryRefresh(tenantID string, stored, replayed []domain.SellO
 	storedCount := map[string]int{}
 	for _, f := range stored {
 		if inTenant(f) {
-			storedCount[strings.TrimSpace(f.RecordID)]++
+			storedCount[sellOutRecordMatchKey(f.RecordID)]++
 		}
 	}
 
 	before := map[string]*SellOutCategoryTotal{}
 	after := map[string]*SellOutCategoryTotal{}
-	add := func(m map[string]*SellOutCategoryTotal, f domain.SellOutFact, category string) {
-		k := strings.ToLower(strings.TrimSpace(f.RetailerChain)) + "|" + category + "|" + strconv.FormatBool(f.IsOwnBrand)
+	beforeYear := map[string]*SellOutCategoryTotal{}
+	afterYear := map[string]*SellOutCategoryTotal{}
+	add := func(m map[string]*SellOutCategoryTotal, f domain.SellOutFact, category string, year int) {
+		k := strings.ToLower(strings.TrimSpace(f.RetailerChain)) + "|" + category + "|" + strconv.FormatBool(f.IsOwnBrand) + "|" + strconv.Itoa(year)
 		t := m[k]
 		if t == nil {
-			t = &SellOutCategoryTotal{Chain: strings.ToLower(strings.TrimSpace(f.RetailerChain)), Category: category, IsOwnBrand: f.IsOwnBrand}
+			t = &SellOutCategoryTotal{Chain: strings.ToLower(strings.TrimSpace(f.RetailerChain)), Category: category, IsOwnBrand: f.IsOwnBrand, Year: year}
 			m[k] = t
 		}
 		t.Rows++
@@ -151,11 +207,14 @@ func PlanSellOutCategoryRefresh(tenantID string, stored, replayed []domain.SellO
 		plan.BeforeQuantity += int64(s.QuantitySold)
 		plan.BeforeRevenue += s.NetRevenue
 		oldCat := strings.TrimSpace(s.Category)
-		add(before, s, oldCat)
+		year := sellOutFactYear(s)
+		add(before, s, oldCat, 0)
+		add(beforeYear, s, oldCat, year)
 		newCat := oldCat
 
 		id := strings.TrimSpace(s.RecordID)
-		r, ok := replayByID[id]
+		key := sellOutRecordMatchKey(id)
+		r, ok := replayByID[key]
 		block := func(reason string) {
 			plan.Blocked = append(plan.Blocked, SellOutCategoryBlock{RecordID: id, Chain: s.RetailerChain, Reason: reason})
 		}
@@ -164,12 +223,12 @@ func PlanSellOutCategoryRefresh(tenantID string, stored, replayed []domain.SellO
 			block("empty record_id")
 		case !ok:
 			plan.OnlyStored++
-		case replayDup[id] || storedCount[id] > 1:
-			seenReplay[id] = true
+		case replayDup[key] || storedCount[key] > 1:
+			seenReplay[key] = true
 			plan.DuplicateIDs++
 			block("record_id not unique")
 		default:
-			seenReplay[id] = true
+			seenReplay[key] = true
 			plan.Matched++
 			replayCat := strings.TrimSpace(r.Category)
 			if reason := sameSellOutIdentity(s, r); reason != "" {
@@ -190,7 +249,8 @@ func PlanSellOutCategoryRefresh(tenantID string, stored, replayed []domain.SellO
 		plan.AfterRows++
 		plan.AfterQuantity += int64(s.QuantitySold)
 		plan.AfterRevenue += s.NetRevenue
-		add(after, s, newCat)
+		add(after, s, newCat, 0)
+		add(afterYear, s, newCat, year)
 	}
 	for id := range replayByID {
 		if !seenReplay[id] {
@@ -199,6 +259,8 @@ func PlanSellOutCategoryRefresh(tenantID string, stored, replayed []domain.SellO
 	}
 	plan.Before = sortedCategoryTotals(before)
 	plan.After = sortedCategoryTotals(after)
+	plan.BeforeByYear = sortedCategoryTotals(beforeYear)
+	plan.AfterByYear = sortedCategoryTotals(afterYear)
 	sort.Slice(plan.Changes, func(i, j int) bool { return plan.Changes[i].RecordID < plan.Changes[j].RecordID })
 	sort.Slice(plan.Blocked, func(i, j int) bool { return plan.Blocked[i].RecordID < plan.Blocked[j].RecordID })
 	return plan
@@ -212,6 +274,9 @@ func sortedCategoryTotals(m map[string]*SellOutCategoryTotal) []SellOutCategoryT
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Chain != out[j].Chain {
 			return out[i].Chain < out[j].Chain
+		}
+		if out[i].Year != out[j].Year {
+			return out[i].Year < out[j].Year
 		}
 		if out[i].IsOwnBrand != out[j].IsOwnBrand {
 			return out[i].IsOwnBrand
@@ -254,40 +319,121 @@ func (p *SellOutCategoryRefreshPlan) Violations() []string {
 }
 
 // ExpectedCategoryTotal is one reference figure from the client's Excel (kept outside the repo).
+// Year 0 means every year. Scope is own (Adeco), competitor, or all.
 type ExpectedCategoryTotal struct {
 	Chain      string
 	Category   string
-	OwnOnly    bool
+	Scope      string
+	Year       int
 	NetRevenue float64
 }
 
-// ParseExpectedCategoryCSV reads "chain,category,scope,net_revenue" (scope: own | all), header optional.
+func isExpectedHeader(row []string) bool {
+	for _, c := range row {
+		switch strings.ToLower(strings.TrimSpace(c)) {
+		case "chain", "category", "scope", "year", "net_revenue":
+			return true
+		}
+	}
+	return false
+}
+
+func csvCell(row []string, col map[string]int, name string) string {
+	i, ok := col[name]
+	if !ok || i >= len(row) {
+		return ""
+	}
+	return row[i]
+}
+
+func parseCategoryScope(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "own", "own-brand", "own_brand":
+		return "own", nil
+	case "competitor", "competitors":
+		return "competitor", nil
+	case "all":
+		return "all", nil
+	default:
+		return "", fmt.Errorf("scope %q must be own, competitor, or all", raw)
+	}
+}
+
+func parseCategoryYear(raw string) (int, error) {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	if s == "" || s == "*" || s == "all" {
+		return 0, nil
+	}
+	y, err := strconv.Atoi(s)
+	if err != nil || y < 2000 || y > 2100 {
+		return 0, fmt.Errorf("year %q", raw)
+	}
+	return y, nil
+}
+
+// ParseExpectedCategoryCSV reads a reconciliation file.
+//
+// With a header, columns are named (any order): chain, category, scope, net_revenue, and optional
+// year. Without a header, four columns are chain,category,scope,net_revenue (every year) and five
+// are chain,category,scope,year,net_revenue. scope is own (Adeco), competitor, or all. year empty,
+// * or all means every year. Thousands separators in net_revenue are ignored.
 func ParseExpectedCategoryCSV(r io.Reader) ([]ExpectedCategoryTotal, error) {
 	cr := csv.NewReader(r)
 	cr.TrimLeadingSpace = true
+	cr.FieldsPerRecord = -1
 	rows, err := cr.ReadAll()
 	if err != nil {
 		return nil, err
 	}
-	var out []ExpectedCategoryTotal
-	for i, row := range rows {
-		if len(row) < 4 {
-			return nil, fmt.Errorf("line %d: want chain,category,scope,net_revenue", i+1)
+	start := 0
+	col := map[string]int{}
+	if len(rows) > 0 && isExpectedHeader(rows[0]) {
+		for i, h := range rows[0] {
+			col[strings.ToLower(strings.TrimSpace(h))] = i
 		}
-		rev, err := strconv.ParseFloat(strings.ReplaceAll(strings.TrimSpace(row[3]), ",", ""), 64)
-		if err != nil {
-			if i == 0 {
-				continue
+		for _, need := range []string{"chain", "category", "scope", "net_revenue"} {
+			if _, ok := col[need]; !ok {
+				return nil, fmt.Errorf("header missing %s", need)
 			}
-			return nil, fmt.Errorf("line %d: net_revenue %q: %w", i+1, row[3], err)
 		}
-		scope := strings.ToLower(strings.TrimSpace(row[2]))
-		if scope != "own" && scope != "all" {
-			return nil, fmt.Errorf("line %d: scope %q must be own or all", i+1, row[2])
+		start = 1
+	}
+	var out []ExpectedCategoryTotal
+	for i := start; i < len(rows); i++ {
+		row := rows[i]
+		if strings.TrimSpace(strings.Join(row, "")) == "" {
+			continue
+		}
+		var chain, category, scopeRaw, yearRaw, revRaw string
+		if len(col) > 0 {
+			chain, category = csvCell(row, col, "chain"), csvCell(row, col, "category")
+			scopeRaw, yearRaw, revRaw = csvCell(row, col, "scope"), csvCell(row, col, "year"), csvCell(row, col, "net_revenue")
+		} else {
+			if len(row) < 4 {
+				return nil, fmt.Errorf("line %d: want chain,category,scope,net_revenue or chain,category,scope,year,net_revenue", i+1)
+			}
+			chain, category, scopeRaw = row[0], row[1], row[2]
+			if len(row) >= 5 {
+				yearRaw, revRaw = row[3], row[4]
+			} else {
+				revRaw = row[3]
+			}
+		}
+		scope, err := parseCategoryScope(scopeRaw)
+		if err != nil {
+			return nil, fmt.Errorf("line %d: %w", i+1, err)
+		}
+		year, err := parseCategoryYear(yearRaw)
+		if err != nil {
+			return nil, fmt.Errorf("line %d: %w", i+1, err)
+		}
+		rev, err := strconv.ParseFloat(strings.ReplaceAll(strings.TrimSpace(revRaw), ",", ""), 64)
+		if err != nil {
+			return nil, fmt.Errorf("line %d: net_revenue %q: %w", i+1, revRaw, err)
 		}
 		out = append(out, ExpectedCategoryTotal{
-			Chain: strings.ToLower(strings.TrimSpace(row[0])), Category: strings.TrimSpace(row[1]),
-			OwnOnly: scope == "own", NetRevenue: rev,
+			Chain: strings.ToLower(strings.TrimSpace(chain)), Category: strings.TrimSpace(category),
+			Scope: scope, Year: year, NetRevenue: rev,
 		})
 	}
 	return out, nil
@@ -307,11 +453,21 @@ func sumCategory(totals []SellOutCategoryTotal, e ExpectedCategoryTotal) float64
 	want := domain.NormalizeProductCategory(e.Category)
 	var s float64
 	for _, t := range totals {
+		if e.Year > 0 && t.Year != e.Year {
+			continue
+		}
 		if e.Chain != "" && e.Chain != "*" && t.Chain != e.Chain {
 			continue
 		}
-		if e.OwnOnly && !t.IsOwnBrand {
-			continue
+		switch e.Scope {
+		case "own":
+			if !t.IsOwnBrand {
+				continue
+			}
+		case "competitor":
+			if t.IsOwnBrand {
+				continue
+			}
 		}
 		if domain.NormalizeProductCategory(t.Category) == want {
 			s += t.NetRevenue
@@ -320,11 +476,16 @@ func sumCategory(totals []SellOutCategoryTotal, e ExpectedCategoryTotal) float64
 	return s
 }
 
-// ReconcileExpected matches expected figures by chain ("*" = all chains) and spelling-normalized category.
+// ReconcileExpected matches expected figures by chain ("*" = all chains), year (0 = every year),
+// scope (own / competitor / all) and spelling-normalized category.
 func ReconcileExpected(p *SellOutCategoryRefreshPlan, expected []ExpectedCategoryTotal) []CategoryReconciliation {
 	out := make([]CategoryReconciliation, 0, len(expected))
 	for _, e := range expected {
-		out = append(out, CategoryReconciliation{Expected: e, Before: sumCategory(p.Before, e), After: sumCategory(p.After, e)})
+		before, after := p.Before, p.After
+		if e.Year > 0 {
+			before, after = p.BeforeByYear, p.AfterByYear
+		}
+		out = append(out, CategoryReconciliation{Expected: e, Before: sumCategory(before, e), After: sumCategory(after, e)})
 	}
 	return out
 }
@@ -455,13 +616,13 @@ func FormatSellOutCategoryRefreshPlan(p *SellOutCategoryRefreshPlan, focus []str
 	}
 
 	if len(rec) > 0 {
-		fmt.Fprintf(&b, "\n-- Excel reconciliation (chain | scope | category | expected | before | after | after-expected)\n")
+		fmt.Fprintf(&b, "\n-- Excel reconciliation (chain | year | scope | category | expected | before | after | after-expected)\n")
 		for _, r := range rec {
-			scope := "all"
-			if r.Expected.OwnOnly {
-				scope = "own"
+			year := "*"
+			if r.Expected.Year > 0 {
+				year = strconv.Itoa(r.Expected.Year)
 			}
-			fmt.Fprintf(&b, "%-12s %-4s %s | %.2f | %.2f | %.2f | %+.2f\n", r.Expected.Chain, scope, r.Expected.Category,
+			fmt.Fprintf(&b, "%-12s %-4s %-10s %s | %.2f | %.2f | %.2f | %+.2f\n", r.Expected.Chain, year, r.Expected.Scope, r.Expected.Category,
 				r.Expected.NetRevenue, r.Before, r.After, r.Delta())
 		}
 	}

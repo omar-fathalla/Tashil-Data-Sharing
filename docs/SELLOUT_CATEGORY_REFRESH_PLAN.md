@@ -73,8 +73,13 @@ rewrites far more than the category and can change totals.
   count, SUM(quantity) and SUM(net revenue) before and after. If any of them differs,
   `Violations()` returns the problem, the report prints `RESULT: UNSAFE`, and the tool exits 1.
 - **No cross-customer attribution.** A row changes only when its re-parsed twin has the same
-  `record_id` and the same chain, store, supplier, own-brand flag, barcode, date, quantity and
-  revenue. Duplicate ids, empty re-parsed categories and any other drift are **blocked**: the row
+  match key and the same chain, store, supplier, own-brand flag, barcode, date, quantity and
+  revenue. The match key is the stored `record_id` with one leading `tenant-` / `tenant_` stripped
+  from the segment after `fact_` (the same one-prefix strip `bqsink.NormalizeTenant` uses). The
+  mapping CSV and the UPDATE keep the stored id (`fact_adeco_…`), so a replay id of
+  `fact_tenant-adeco_…` still hits the BigQuery row. A stacked prefix is not stripped twice, so
+  `fact_tenant-tenant-adeco_…` cannot land on `adeco`. Duplicate ids, empty re-parsed categories
+  and any other drift are **blocked**: the row
   keeps its stored category and is listed by reason. Rows found only in the re-parsed data are
   reported and **never inserted**.
 - **Unknown customers stay quarantined.** Customer quarantine (Sell-In registry,
@@ -100,16 +105,26 @@ TASHIL_ARCHIVE_DIR=/secure/archive PROJECT_ID=tashil-data-sharing BIGQUERY_DATAS
   -mapping-out=/secure/sellout_category_fix_YYYYMMDD.csv
 ```
 
-- `-expected` is a CSV with columns `chain,category,scope,net_revenue`. `scope` is `own` (Adeco only)
-  or `all` (whole market), and `chain` `*` means every chain. Example rows: `*,سائل اطباق,own,43440000`,
-  `fathalla,كلور عادى,all,…`, `fathalla,كلور ألوان,all,…`, `fathalla,كلور ارضيات,all,…`.
-  Categories are matched after spelling normalization.
+- `-expected` is a CSV. With a header the columns are named, in any order:
+  `chain,category,scope,year,net_revenue` (`year` may be omitted). Without a header, four columns
+  are `chain,category,scope,net_revenue` (every year) and five are
+  `chain,category,scope,year,net_revenue`. `scope` is `own` (Adeco), `competitor`, or `all`.
+  `year` empty, `*` or `all` sums every year; `2026` is that transaction year only. `chain` `*`
+  means every chain. Categories are matched after spelling normalization. The 2026 Adeco check is:
+
+```csv
+chain,category,scope,year,net_revenue
+*,صابون سائل اطباق,own,2026,43438310.05
+*,كلور عادى,own,2026,7312599.10
+*,كلور ألوان,own,2026,7801322.10
+*,كلور ارضيات,own,2026,522531
+```
 - The report prints:
   - the counts: stored, re-parsed, matched, unchanged, to change, blocked, only-stored, only-re-parsed
   - rows, quantity and net revenue **before and after**, which must be identical
   - category moves, per chain and own/competitor: `from -> to | rows | revenue`
   - per-chain category totals before and after, for the focus words (default: كلور, اطباق, صحون)
-  - the Excel reconciliation: expected, before, after, and after minus expected
+  - the Excel reconciliation: chain, year, scope, expected, before, after, and after minus expected
   - blocked rows grouped by reason, and `RESULT: SAFE/UNSAFE`
 - Independent SQL cross-checks (read-only, run in the BigQuery console):
 
@@ -127,8 +142,33 @@ Acceptance criteria for the dry run:
 - `RESULT: SAFE`
 - `only re-parsed` = 0, or every such row explained
 - blocked rows reviewed
-- Adeco dish soap "after" within 0.5% of the Excel 43.44M
-- «كلور عادى / ألوان / ارضيات» each match the Excel per chain
+- Adeco 2026 own-brand "after" matches the Excel figures in the CSV above. The read-only run on
+  2026-11-17 landed at 43,438,262.05 (dish soap, Excel 43,438,310.05), 7,312,599.10 (كلور عادى),
+  7,801,322.10 (كلور ألوان) and 522,528 (كلور ارضيات, Excel 522,531). The 48 and 3 EGP gaps are
+  inside those categories; row count and the revenue SUM did not move. They stay visible as
+  after-minus-expected and need a spot check before approval.
+
+## 4.1 What the read-only run showed
+
+Nothing was written. Two findings:
+
+**Record id prefix (blocking, fixed in this PR).** The first run matched 0 rows. Re-parse builds
+`fact_{tenantID}_…` and the archive tenant is `tenant-adeco`, so replay ids are `fact_tenant-adeco_…`.
+BigQuery stores `fact_adeco_…`: ingest used the slug it was given (`processor.go`, the `fact_%s_…`
+format) and the sink writes `record_id` unchanged while it normalizes the `tenant_id` column.
+Folding that one prefix the way `bqsink.NormalizeTenant` does, offline, gave matched 109,313,
+blocked 0, duplicate ids 0, totals identical, and 28,646 category changes. The mapping keeps the
+stored `fact_adeco_…` id.
+
+**Competitor rows that move are the old alias, not an own-flag bug.** Two competitor moves showed
+up: منظف ارضيات → مطهر ارضيات (238 rows, 1.62M) and منظف ارضيات → كلور ارضيات (30 rows, 0.37M),
+both `own=false`. Before #225, `productCategoryAliases` mapped both «مطهر ارضيات» and «كلور ارضيات»
+to «منظف ارضيات». The wide-matrix parser runs `NormalizeProductCategory` on «المجموعة» for every
+supplier before it splits own-brand from competitor (`wide_matrix_parser.go`, `sheetCat` then
+`isOwn` / `wideMatrixRecordCategory`), so competitor rows were stored under the merged name too.
+#225 dropped those type-changing aliases and kept spelling-only normalization, for Adeco and
+competitors alike. The planner changes a row only when `IsOwnBrand` matches, and this run blocked
+0 rows, so the flag did not flip. The moves are the approved rule: the sheet category wins.
 
 ## 5. Backup, execution, rollback (each step needs owner approval)
 

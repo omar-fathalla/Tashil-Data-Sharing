@@ -9,6 +9,9 @@
 //	  go run ./cmd/selloutcategoryplan -tenant=tenant-adeco \
 //	  [-expected=/secure/excel_2026_totals.csv] [-mapping-out=/secure/category_mapping.csv]
 //
+// -expected columns: chain,category,scope,year,net_revenue. scope is own (Adeco), competitor, or all.
+// year 2026 limits the check to that year; empty year sums every year.
+//
 // -expected and -mapping-out must point outside any git work tree (client data is never committed).
 // See docs/SELLOUT_CATEGORY_REFRESH_PLAN.md.
 package main
