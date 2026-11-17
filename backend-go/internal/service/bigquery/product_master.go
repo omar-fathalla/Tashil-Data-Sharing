@@ -1187,6 +1187,8 @@ func (c *Client) enrichSellOutFactLocked(r *domain.SellOutFact) {
 		r.CartonPriceInclVAT = pm.CartonPriceInclVAT
 		r.NetCartonInvoiceCost = pm.NetCartonInvoiceCost
 		r.InvoiceDiscountPct = pm.InvoiceDiscountPct
+		// A category already on the row (the sheet «المجموعة») stays. Product Master
+		// fills only a blank cell, or the unclassified placeholder.
 		if r.Category == "" || r.Category == "غير مصنف" {
 			r.Category = pm.Category
 		}

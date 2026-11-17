@@ -141,7 +141,7 @@ var (
 // Bump it whenever a change to the ingestion parsers or the in-memory models would make
 // an existing snapshot produce different data. Unrelated deploys keep the snapshot valid,
 // so a new build no longer forces a multi-minute full archive replay.
-const SnapshotParserVersion = "parser-2026-11-01b-extended-price"
+const SnapshotParserVersion = "parser-2026-11-17-sheet-category-spelling"
 
 // currentBuildID returns the snapshot compatibility key (schema + parser version), not a
 // hash of the binary, so the snapshot survives deploys that do not change parsing.

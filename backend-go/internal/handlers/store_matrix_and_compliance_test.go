@@ -397,21 +397,21 @@ func TestExecutiveAndRecordsDateRangeQueryParams(t *testing.T) {
 }
 
 func TestPricingCompliancePaginationAndCategoryNormalization(t *testing.T) {
-	// 1. Verify NormalizeProductCategory merges Arabic spelling variants into canonical categories
+	// 1. Spelling variants collapse. Different category names do not.
 	cases := map[string]string{
-		"صابون سائل للاطباق":     "صابون سائل اطباق",
-		"صابون سائل اطباق":      "صابون سائل اطباق",
-		"كلور ألوان":            "كلور ألوان",
-		"كلور الوان":            "كلور ألوان",
-		"كلور ارضيات":           "منظف ارضيات",
-		"صابون سائل للارضيات":    "منظف ارضيات",
-		"مطهر ارضيات":           "منظف ارضيات",
-		"منظف ارضيات":           "منظف ارضيات",
-		"هاند وواش":             "هاند وواش",
-		"هاند ووش":              "هاند وواش",
-		"مطهرعام":               "مطهر عام",
-		"مطهر عام":              "مطهر عام",
-		"مسحوق بودر غسالات اطباق": "مسحوق غسالات اطباق",
+		"صابون سائل للاطباق":      "صابون سائل للاطباق",
+		"صابون سائل اطباق":        "صابون سائل اطباق",
+		"كلور ألوان":              "كلور ألوان",
+		"كلور الوان":              "كلور ألوان",
+		"كلور ارضيات":             "كلور ارضيات",
+		"صابون سائل للارضيات":     "صابون سائل للارضيات",
+		"مطهر ارضيات":             "مطهر ارضيات",
+		"منظف ارضيات":             "منظف ارضيات",
+		"هاند وواش":               "هاند وواش",
+		"هاند ووش":                "هاند ووش",
+		"مطهرعام":                 "مطهر عام",
+		"مطهر عام":                "مطهر عام",
+		"مسحوق بودر غسالات اطباق": "مسحوق بودر غسالات اطباق",
 	}
 	for raw, expected := range cases {
 		got := domain.NormalizeProductCategory(raw)
@@ -488,9 +488,10 @@ func TestPricingCompliancePaginationAndCategoryNormalization(t *testing.T) {
 		t.Errorf("expected violation_count=20, compliant_count=40, got violations=%d compliant=%d", respPage1.ViolationCount, respPage1.CompliantCount)
 	}
 
-	// Verify available_categories are deduplicated into exact 4 canonical categories and do NOT contain unapproved seed categories
-	if len(respPage1.AvailableCategories) != 4 {
-		t.Errorf("expected 4 deduplicated canonical categories, got %d: %v", len(respPage1.AvailableCategories), respPage1.AvailableCategories)
+	// Spelling pairs collapse (كلور الوان/ألوان). Different names stay separate,
+	// so the eight raw labels become seven categories.
+	if len(respPage1.AvailableCategories) != 7 {
+		t.Errorf("expected 7 spelling-normalized categories, got %d: %v", len(respPage1.AvailableCategories), respPage1.AvailableCategories)
 	}
 	for _, cat := range respPage1.AvailableCategories {
 		if cat == "زيوت طعام" || cat == "صلصة ومعلبات" || cat == "بقوليات ومعلبات" {
@@ -537,9 +538,6 @@ func TestPricingCompliancePaginationAndCategoryNormalization(t *testing.T) {
 		t.Errorf("expected 15 promo items, got total=%d len=%d", respPromo.TotalCount, len(respPromo.Items))
 	}
 }
-
-
-
 
 func TestStoreMatrixMatchedMonthsHandler(t *testing.T) {
 	handler, bq := setupTestAnalyticsHandler()
