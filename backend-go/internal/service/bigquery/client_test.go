@@ -2,6 +2,8 @@ package bigquery
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -523,6 +525,119 @@ func TestReplaceTenantFactsSingleMonthPreservesOtherMonths(t *testing.T) {
 	}
 }
 
+// The category drill-down lists every own-brand barcode on the category card,
+// including SKUs past the 80% line and past the old 100-row cap. Two sell-out
+// names for one barcode stay one SKU; revenue is still summed.
+func TestExecutiveKPIsParetoIncludesEveryCategoryBarcode(t *testing.T) {
+	client := NewClient("test-project", "test-dataset", true)
+	ctx := context.Background()
+	tenantID := "tenant-pareto-all-barcodes"
+	today := time.Now().Format("2006-01-02")
+	const soft = "Cat Softeners"
+	const bulk = "Cat Bulk"
 
+	facts := []domain.SellOutFact{
+		{
+			RecordID: "soft-dup-a", TenantID: tenantID, RetailerChain: "carrefour",
+			StoreID: "s1", Barcode: "BC-1", SKUName: "اسم أول", Category: soft,
+			QuantitySold: 1, NetRevenue: 10, TransactionDate: today, IsOwnBrand: true,
+		},
+		{
+			RecordID: "soft-dup-b", TenantID: tenantID, RetailerChain: "carrefour",
+			StoreID: "s1", Barcode: "BC-1", SKUName: "اسم ثاني", Category: soft,
+			QuantitySold: 4, NetRevenue: 40, TransactionDate: today, IsOwnBrand: true,
+		},
+	}
+	for i := 2; i <= 29; i++ {
+		facts = append(facts, domain.SellOutFact{
+			RecordID: fmt.Sprintf("soft-%d", i), TenantID: tenantID, RetailerChain: "carrefour",
+			StoreID: "s1", Barcode: fmt.Sprintf("BC-%d", i), SKUName: fmt.Sprintf("صنف %d", i),
+			Category: soft, QuantitySold: 1, NetRevenue: 1, TransactionDate: today, IsOwnBrand: true,
+		})
+	}
+	// Higher-revenue SKUs in another category. A top-100 cut would drop the
+	// softener tail (BC-11 … BC-29).
+	for i := 1; i <= 90; i++ {
+		facts = append(facts, domain.SellOutFact{
+			RecordID: fmt.Sprintf("bulk-%d", i), TenantID: tenantID, RetailerChain: "carrefour",
+			StoreID: "s1", Barcode: fmt.Sprintf("BK-%d", i), SKUName: fmt.Sprintf("Bulk %d", i),
+			Category: bulk, QuantitySold: 10, NetRevenue: 1000, TransactionDate: today, IsOwnBrand: true,
+		})
+	}
+	facts = append(facts, domain.SellOutFact{
+		RecordID: "comp-1", TenantID: tenantID, RetailerChain: "carrefour",
+		StoreID: "s1", Barcode: "COMP-1", SKUName: "منافس", Category: soft,
+		Supplier: "منافس خارجي", IsOwnBrand: false, QuantitySold: 9, NetRevenue: 5000,
+		TransactionDate: today,
+	})
+	if err := client.InsertSellOutFacts(ctx, facts); err != nil {
+		t.Fatalf("insert: %v", err)
+	}
 
+	kpis, err := client.GetExecutiveKPIs(ctx, tenantID, "MTD")
+	if err != nil {
+		t.Fatalf("kpis: %v", err)
+	}
+	if len(kpis.ParetoSKUs) <= 100 {
+		t.Fatalf("pareto list still capped, got %d SKUs", len(kpis.ParetoSKUs))
+	}
 
+	var softCat *domain.CategoryContribution
+	for i := range kpis.CategoryContributions {
+		if kpis.CategoryContributions[i].Category == soft {
+			softCat = &kpis.CategoryContributions[i]
+		}
+	}
+	if softCat == nil {
+		t.Fatal("missing Cat Softeners contribution")
+	}
+	if softCat.SKUCount != 29 {
+		t.Fatalf("category card SKUCount = %d, want 29 distinct barcodes", softCat.SKUCount)
+	}
+
+	seen := map[string]bool{}
+	var rev float64
+	var tailKept bool
+	for _, s := range kpis.ParetoSKUs {
+		if s.Barcode == "COMP-1" {
+			t.Fatal("competitor barcode included in own-brand SKU list")
+		}
+		if s.Category != soft {
+			continue
+		}
+		if seen[s.Barcode] {
+			t.Fatalf("barcode %s listed twice", s.Barcode)
+		}
+		seen[s.Barcode] = true
+		rev += s.TotalRevenue
+		if s.Barcode == "BC-1" {
+			if s.SKUName != "اسم ثاني" || s.TotalRevenue != 50 || s.TotalUnits != 5 {
+				t.Errorf("merged BC-1 = %+v, want name اسم ثاني revenue 50 units 5", s)
+			}
+		}
+		if !s.IsTop80Contributor {
+			tailKept = true
+		}
+	}
+	if len(seen) != softCat.SKUCount {
+		t.Fatalf("pareto rows for category = %d, category card = %d", len(seen), softCat.SKUCount)
+	}
+	if !seen["BC-29"] || !seen["BC-1"] {
+		t.Fatalf("missing barcodes in pareto list: %+v", seen)
+	}
+	if !tailKept {
+		t.Fatal("SKUs past the 80% line were removed")
+	}
+	if math.Abs(rev-softCat.TotalRevenue) > 0.01 {
+		t.Fatalf("pareto revenue %v != category revenue %v", rev, softCat.TotalRevenue)
+	}
+	var share float64
+	for _, s := range kpis.ParetoSKUs {
+		if s.Category == soft && softCat.TotalRevenue > 0 {
+			share += s.TotalRevenue / softCat.TotalRevenue * 100
+		}
+	}
+	if math.Abs(share-100) > 0.01 {
+		t.Fatalf("category contribution shares sum to %v, want 100", share)
+	}
+}
