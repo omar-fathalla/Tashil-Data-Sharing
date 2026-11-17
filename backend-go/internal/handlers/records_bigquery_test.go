@@ -95,14 +95,14 @@ func TestHandleRecordsCategoryUsesBigQueryPath(t *testing.T) {
 			Stores: 12, SKUs: 28, MatchedSKUs: 28,
 		},
 		SKUs: []bqsink.RecordsSKU{{
-			ItemCode: "RH-DISH", SKUName: "Rahab Dish Liquid", Category: "صابون سائل للاطباق",
+			ItemCode: "RH-DISH", SKUName: "Rahab Dish Liquid", Category: "كلور الوان",
 			UnitsSold: 100, NetRevenue: 5000, UnitsPerCarton: 12, FactoryUnitCost: 40, Stores: 3,
 		}},
-		Page: []domain.SellOutFact{{RecordID: "bq_cat_1", Category: "صابون سائل للاطباق", NetRevenue: 5000}},
+		Page: []domain.SellOutFact{{RecordID: "bq_cat_1", Category: "كلور الوان", NetRevenue: 5000}},
 	}}
 	handler.WithRecordsQuerier(fake)
 
-	cat := "صابون سائل اطباق"
+	cat := "كلور ألوان"
 	q := url.Values{
 		"chain": {"fathalla"}, "category": {cat}, "year": {"2026"}, "month": {"1"}, "supplier": {"own"},
 	}

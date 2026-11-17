@@ -36,6 +36,24 @@ type xlsxRelationship struct {
 	Target string `xml:"Target,attr"`
 }
 
+// BlankWideMatrixCategory is used when «المجموعة» is empty and Product Master
+// does not supply a category. Competitor rows always keep it.
+const BlankWideMatrixCategory = "منظفات وعناية منزلية"
+
+// wideMatrixRecordCategory is the category stored on a Sell-Out, pricing, or OOS row.
+// A non-empty «المجموعة» cell is kept for every supplier (already normalized).
+// An empty cell stays empty on own-brand rows so ingestion can fall back to the
+// Product Master category; competitor rows keep the shared placeholder.
+func wideMatrixRecordCategory(normalizedSheetCategory string, ownBrand bool) string {
+	if normalizedSheetCategory != "" {
+		return normalizedSheetCategory
+	}
+	if ownBrand {
+		return ""
+	}
+	return BlankWideMatrixCategory
+}
+
 type wideMatrixLayout struct {
 	categoryIdx int
 	supplierIdx int
@@ -537,7 +555,7 @@ var knownBranchSlugMap = map[string]knownBranchSlug{
 	normalizeBranchKey("دمياط الجديدة"):          {"new_damietta", "دمياط", "دمياط الجديدة"},
 	normalizeBranchKey("المعادي"):                {"maadi", "القاهرة", "المعادي"},
 	normalizeBranchKey("الدقي"):                  {"dokki", "الجيزة", "الدقي"},
-	normalizeBranchKey("مدينة نصر"):             {"nasr_city", "القاهرة", "مدينة نصر"},
+	normalizeBranchKey("مدينة نصر"):              {"nasr_city", "القاهرة", "مدينة نصر"},
 }
 
 // BuildBranchStoreMetadata maps any raw branch name from Excel (or creates a new deterministic branch)
@@ -1270,9 +1288,10 @@ func buildPayloadFromWideMatrix(
 			continue
 		}
 
-		rawCat := domain.NormalizeProductCategory(getCell(row, layout.categoryIdx))
+		sheetCat := domain.NormalizeProductCategory(getCell(row, layout.categoryIdx))
+		rawCat := sheetCat
 		if rawCat == "" {
-			rawCat = "منظفات وعناية منزلية"
+			rawCat = BlankWideMatrixCategory
 		}
 		rawSup := getCell(row, layout.supplierIdx)
 		if rawSup == "" {
@@ -1298,6 +1317,7 @@ func buildPayloadFromWideMatrix(
 		}
 
 		isOwn := isAdcoOrTenantSupplier(rawSup)
+		recordCat := wideMatrixRecordCategory(sheetCat, isOwn)
 		if isOwn {
 			categorySet[rawCat] = true
 		}
@@ -1380,7 +1400,7 @@ func buildPayloadFromWideMatrix(
 					ResolvedStoreID:  obs.branch.storeID,
 					Barcode:          cleanedBarcode,
 					SKUName:          rawSKU,
-					Category:         rawCat,
+					Category:         recordCat,
 					Supplier:         rawSup,
 					IsOwnBrand:       true,
 					QuantitySold:     obs.qty,
@@ -1409,7 +1429,7 @@ func buildPayloadFromWideMatrix(
 							TenantID:         "tenant-adeco",
 							SKUName:          rawSKU,
 							Barcode:          cleanedBarcode,
-							Category:         rawCat,
+							Category:         recordCat,
 							RetailerChain:    retailer,
 							StoreName:        obs.branch.displayName,
 							ActualPrice:      uPrice,
@@ -1427,7 +1447,7 @@ func buildPayloadFromWideMatrix(
 				oosCandidates = append(oosCandidates, adcoSKUZeroBranch{
 					barcode:      cleanedBarcode,
 					skuName:      rawSKU,
-					category:     rawCat,
+					category:     recordCat,
 					totalRev:     rowTotalRev,
 					activeStores: namedObsCount,
 					zeroBranches: zeroBranches,
@@ -1471,7 +1491,7 @@ func buildPayloadFromWideMatrix(
 					ResolvedStoreID:  topBranch.storeID,
 					Barcode:          cleanedBarcode,
 					SKUName:          rawSKU,
-					Category:         rawCat,
+					Category:         recordCat,
 					Supplier:         rawSup,
 					IsOwnBrand:       false,
 					QuantitySold:     namedQty,
@@ -1488,7 +1508,7 @@ func buildPayloadFromWideMatrix(
 					ResolvedStoreID:  unallocObs.branch.storeID,
 					Barcode:          cleanedBarcode,
 					SKUName:          rawSKU,
-					Category:         rawCat,
+					Category:         recordCat,
 					Supplier:         rawSup,
 					IsOwnBrand:       false,
 					QuantitySold:     unallocObs.qty,
@@ -1535,11 +1555,13 @@ func buildPayloadFromWideMatrix(
 			if rawSKU == "" {
 				rawSKU = cleanedBarcode
 			}
-			rawCat := domain.NormalizeProductCategory(getCell(row, shLayout.categoryIdx))
+			sheetCat := domain.NormalizeProductCategory(getCell(row, shLayout.categoryIdx))
+			rawCat := sheetCat
 			if rawCat == "" {
-				rawCat = "منظفات وعناية منزلية"
+				rawCat = BlankWideMatrixCategory
 			}
 			isOwn := isAdcoOrTenantSupplier(rawSup)
+			recordCat := wideMatrixRecordCategory(sheetCat, isOwn)
 			if isOwn {
 				categorySet[rawCat] = true
 			}
@@ -1569,7 +1591,7 @@ func buildPayloadFromWideMatrix(
 						ResolvedStoreID:  obs.branch.storeID,
 						Barcode:          cleanedBarcode,
 						SKUName:          rawSKU,
-						Category:         rawCat,
+						Category:         recordCat,
 						Supplier:         rawSup,
 						IsOwnBrand:       true,
 						QuantitySold:     obs.qty,
@@ -1616,7 +1638,7 @@ func buildPayloadFromWideMatrix(
 						ResolvedStoreID:  topBranch.storeID,
 						Barcode:          cleanedBarcode,
 						SKUName:          rawSKU,
-						Category:         rawCat,
+						Category:         recordCat,
 						Supplier:         rawSup,
 						IsOwnBrand:       false,
 						QuantitySold:     namedQty,
@@ -1634,7 +1656,7 @@ func buildPayloadFromWideMatrix(
 						ResolvedStoreID:  unallocObs.branch.storeID,
 						Barcode:          cleanedBarcode,
 						SKUName:          rawSKU,
-						Category:         rawCat,
+						Category:         recordCat,
 						Supplier:         rawSup,
 						IsOwnBrand:       false,
 						QuantitySold:     unallocObs.qty,
@@ -1734,7 +1756,7 @@ func buildPayloadFromWideMatrix(
 					}
 					rawCat := domain.NormalizeProductCategory(getCell(row, shLayout.categoryIdx))
 					if rawCat == "" {
-						rawCat = "منظفات وعناية منزلية"
+						rawCat = BlankWideMatrixCategory
 					}
 					isOwn := isAdcoOrTenantSupplier(rawSup)
 					// Market-share only (records already emitted above); do not re-accumulate recon warnings.

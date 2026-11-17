@@ -22,42 +22,42 @@ type PricingComplianceItem struct {
 	SKUName            string  `json:"sku_name"`
 	RetailerRawSKUName string  `json:"retailer_raw_sku_name,omitempty"`
 	Barcode            string  `json:"barcode"`
-	Category          string  `json:"category"`
-	RetailerChain     string  `json:"retailer_chain"`
-	StoreName         string  `json:"store_name"`
-	ActualPrice       float64 `json:"actual_price"`
-	RecommendedPrice  float64 `json:"recommended_price"` // RRP
-	FactoryUnitCost   float64 `json:"factory_unit_cost,omitempty"`
-	RetailerMarginPct float64 `json:"retailer_margin_pct,omitempty"`
-	UnitsPerCarton    int     `json:"units_per_carton,omitempty"`
-	ItemType          string  `json:"item_type,omitempty"`
-	PriceDeltaPct     float64 `json:"price_delta_pct"`
-	ViolationType     string  `json:"violation_type"` // 'compliant', 'under_cutting', 'price_gouging'
-	IsPromoActive     bool    `json:"is_promo_active"`
-	PromoUpliftPct    float64 `json:"promo_uplift_pct"`
-	TransactionDate   string  `json:"transaction_date,omitempty"`
+	Category           string  `json:"category"`
+	RetailerChain      string  `json:"retailer_chain"`
+	StoreName          string  `json:"store_name"`
+	ActualPrice        float64 `json:"actual_price"`
+	RecommendedPrice   float64 `json:"recommended_price"` // RRP
+	FactoryUnitCost    float64 `json:"factory_unit_cost,omitempty"`
+	RetailerMarginPct  float64 `json:"retailer_margin_pct,omitempty"`
+	UnitsPerCarton     int     `json:"units_per_carton,omitempty"`
+	ItemType           string  `json:"item_type,omitempty"`
+	PriceDeltaPct      float64 `json:"price_delta_pct"`
+	ViolationType      string  `json:"violation_type"` // 'compliant', 'under_cutting', 'price_gouging'
+	IsPromoActive      bool    `json:"is_promo_active"`
+	PromoUpliftPct     float64 `json:"promo_uplift_pct"`
+	TransactionDate    string  `json:"transaction_date,omitempty"`
 }
 
 // MonthlyPriceElasticityPoint represents monthly average price vs. revenue and volume performance.
 type MonthlyPriceElasticityPoint struct {
-	MonthKey         string  `json:"month_key"`          // e.g. "2026-01"
-	MonthLabel       string  `json:"month_label"`        // e.g. "يناير 2026"
-	AveragePrice     float64 `json:"average_price"`      // Average actual selling price in EGP
-	RecommendedPrice float64 `json:"recommended_price"`  // Average RRP in EGP
-	TotalRevenue     float64 `json:"total_revenue"`      // Total sales revenue in EGP
-	TotalUnits       int     `json:"total_units"`        // Total units sold
-	PriceChangePct   float64 `json:"price_change_pct"`   // MoM price change %
-	RevenueChangePct float64 `json:"revenue_change_pct"` // MoM revenue change %
-	UnitsChangePct   float64 `json:"units_change_pct"`   // MoM volume change %
-	ElasticityVerdict string `json:"elasticity_verdict"` // Strategic analytical verdict
+	MonthKey          string  `json:"month_key"`          // e.g. "2026-01"
+	MonthLabel        string  `json:"month_label"`        // e.g. "يناير 2026"
+	AveragePrice      float64 `json:"average_price"`      // Average actual selling price in EGP
+	RecommendedPrice  float64 `json:"recommended_price"`  // Average RRP in EGP
+	TotalRevenue      float64 `json:"total_revenue"`      // Total sales revenue in EGP
+	TotalUnits        int     `json:"total_units"`        // Total units sold
+	PriceChangePct    float64 `json:"price_change_pct"`   // MoM price change %
+	RevenueChangePct  float64 `json:"revenue_change_pct"` // MoM revenue change %
+	UnitsChangePct    float64 `json:"units_change_pct"`   // MoM volume change %
+	ElasticityVerdict string  `json:"elasticity_verdict"` // Strategic analytical verdict
 }
 
 // PriceElasticitySummary provides an executive overview of the price-to-revenue correlation.
 type PriceElasticitySummary struct {
-	OverallVerdict     string  `json:"overall_verdict"`
-	AvgPriceCurrent    float64 `json:"avg_price_current"`
-	AvgPriceBaseline   float64 `json:"avg_price_baseline"`
-	NetPriceChangePct  float64 `json:"net_price_change_pct"`
+	OverallVerdict      string  `json:"overall_verdict"`
+	AvgPriceCurrent     float64 `json:"avg_price_current"`
+	AvgPriceBaseline    float64 `json:"avg_price_baseline"`
+	NetPriceChangePct   float64 `json:"net_price_change_pct"`
 	NetRevenueGrowthPct float64 `json:"net_revenue_growth_pct"`
 }
 
@@ -99,61 +99,15 @@ func CalculatePromoUpliftPct(promoQty, baselineQty int) float64 {
 	return math.Round(uplift*10) / 10
 }
 
-// productCategoryAliases maps known retail spelling variants to their canonical category.
-// Keys and values are whitespace-collapsed (see collapseCategoryWhitespace).
-var productCategoryAliases = map[string]string{
-	"صابون سائل للاطباق":      "صابون سائل اطباق",
-	"صابون سائل للأطباق":      "صابون سائل اطباق",
-	"سائل اطباق":              "صابون سائل اطباق",
-	"سائل أطباق":              "صابون سائل اطباق",
-	"كلور الوان":              "كلور ألوان",
-	"كلور ألوان":              "كلور ألوان",
-	"كلور عادي":               "كلور عادى",
-	"كلور عادى":               "كلور عادى",
-	"هاند ووش":                "هاند وواش",
-	"هاند وواش":               "هاند وواش",
-	"مطهرعام":                 "مطهر عام",
-	"مطهر عام":                "مطهر عام",
-	"منظف ارضيات":             "منظف ارضيات",
-	"كلور ارضيات":             "منظف ارضيات",
-	"صابون سائل للارضيات":     "منظف ارضيات",
-	"صابون سائل للأرضيات":     "منظف ارضيات",
-	"مطهر ارضيات":             "منظف ارضيات",
-	"منظفات أرضيات وحوائط":    "منظف ارضيات",
-	"منعمات ملابس عادية":      "منعمات ملابس",
-	"منعمات ملابس مركزة":      "منعمات ملابس",
-	"منعم ملابس":              "منعمات ملابس",
-	"مسحوق جيل":               "مساحيق جيل اتوماتيك",
-	"مساحيق جيل اوتوماتيك":    "مساحيق جيل اتوماتيك",
-	"مساحيق جيل اتوماتيك":     "مساحيق جيل اتوماتيك",
-	"مسحوق بودر غسالات اطباق": "مسحوق غسالات اطباق",
-	"منظفات غسالات الاطباق":   "مسحوق غسالات اطباق",
-	"مسحوق غسالات اطباق":      "مسحوق غسالات اطباق",
-	"مسلكات احواض":            "مسلك احواض وبالوعات",
-	"مسلك احواض":              "مسلك احواض وبالوعات",
-	"مسلك احواض وبالوعات":     "مسلك احواض وبالوعات",
-	"ملمع زجاج - نجف":         "ملمع زجاج وكريستال",
-	"ملمع زجاج":               "ملمع زجاج وكريستال",
-	"ملمع زجاج وكريستال":      "ملمع زجاج وكريستال",
-	"ملمع اخشاب - باركيه":     "ملمع اخشاب وباركيه",
-	"ملمع اخشاب وباركيه":      "ملمع اخشاب وباركيه",
-	"منظفات مطابخ":            "منظفات مطبخ",
-	"منظف مطبخ":              "منظفات مطبخ",
-	"منظفات مطبخ":            "منظفات مطبخ",
-	"منظفات سجاد":             "منظفات سجاد ومفروشات",
-	"منظف سجاد":              "منظفات سجاد ومفروشات",
-	"منظفات سجاد ومفروشات":   "منظفات سجاد ومفروشات",
-	"مطهر تواليت":             "منظفات تواليت",
-	"منظف تواليت":            "منظفات تواليت",
-	"منظفات التواليت":         "منظفات تواليت",
-	"منظفات تواليت":           "منظفات تواليت",
-	"مزيلات بقع":              "مزيلات بقع ملابس",
-	"مزيل بقع":               "مزيلات بقع ملابس",
-	"مزيلات بقع ملابس":        "مزيلات بقع ملابس",
-	"معطر جو سائل":            "معطر جو",
-	"معطر جو":                "معطر جو",
-	"شاور جل":                "شاور جيل",
-	"شاور جيل":               "شاور جيل",
+// spellingCategoryAliases restores a preferred sheet spelling after hamza/yeh
+// folding. Keys are already folded (bare alef, alef maqsura). Values differ
+// only by hamza or a missing space — never by category type, singular/plural,
+// or an added or dropped word.
+//
+// ة/ه is not folded: no existing alias used that pair.
+var spellingCategoryAliases = map[string]string{
+	"كلور الوان": "كلور ألوان",
+	"مطهرعام":    "مطهر عام",
 }
 
 func collapseCategoryWhitespace(raw string) string {
@@ -176,38 +130,111 @@ func collapseCategoryWhitespace(raw string) string {
 	return clean
 }
 
-// NormalizeProductCategory canonicalizes product category names across different retail Excel sheets
-// (e.g. unifying Fathalla and Gomla spelling variations so categories are cleanly deduplicated).
+// foldCategorySpelling applies spelling-only folds: hamza seats (أ إ آ ٱ → ا)
+// and a word-final yeh (ي → ى). It does not insert or drop words.
+func foldCategorySpelling(s string) string {
+	rs := []rune(s)
+	for i, r := range rs {
+		switch r {
+		case 'أ', 'إ', 'آ', 'ٱ':
+			rs[i] = 'ا'
+		}
+	}
+	for i, r := range rs {
+		if r == 'ي' && (i == len(rs)-1 || rs[i+1] == ' ') {
+			rs[i] = 'ى'
+		}
+	}
+	return string(rs)
+}
+
+// NormalizeProductCategory canonicalizes spelling only (whitespace, hamza, ى/ي,
+// and the missing-space aliases above). Different category names stay different,
+// including across chains. Singular/plural wording is not merged.
 func NormalizeProductCategory(raw string) string {
 	clean := collapseCategoryWhitespace(raw)
 	if clean == "" {
 		return ""
 	}
-	if canon, ok := productCategoryAliases[clean]; ok {
+	folded := foldCategorySpelling(clean)
+	if canon, ok := spellingCategoryAliases[folded]; ok {
 		return canon
 	}
-	return clean
+	return folded
 }
 
-// ProductCategoryMatchValues returns every known raw spelling (plus the canonical form) that
-// NormalizeProductCategory maps to the same target as raw. Used by BigQuery IN UNNEST filters.
+// ProductCategoryMatchValues returns spellings that normalize to the same category
+// as raw (canonical form, alias keys, and hamza / ى-ي preimages). Used by BigQuery
+// IN UNNEST filters. It does not include a different category name.
 func ProductCategoryMatchValues(raw string) []string {
 	target := NormalizeProductCategory(raw)
 	if target == "" {
 		return nil
 	}
-	seen := map[string]struct{}{target: {}}
-	out := []string{target}
-	for alias, canon := range productCategoryAliases {
-		if canon != target {
-			continue
+	seen := map[string]struct{}{}
+	var out []string
+	add := func(s string) {
+		s = collapseCategoryWhitespace(s)
+		if s == "" {
+			return
 		}
-		if _, ok := seen[alias]; ok {
-			continue
+		if _, ok := seen[s]; ok {
+			return
 		}
-		seen[alias] = struct{}{}
-		out = append(out, alias)
+		if NormalizeProductCategory(s) != target {
+			return
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	add(target)
+	add(raw)
+	for alias, canon := range spellingCategoryAliases {
+		if canon == target || NormalizeProductCategory(alias) == target {
+			add(alias)
+		}
+	}
+	for _, v := range spellingPreimages(target) {
+		add(v)
 	}
 	return out
 }
 
+// spellingPreimages lists single-step hamza and word-final yeh variants of s.
+// Each result is checked by the caller against NormalizeProductCategory.
+func spellingPreimages(s string) []string {
+	var out []string
+	seen := map[string]bool{s: true}
+	cur := []string{s}
+	type swap struct{ a, b rune }
+	swaps := []swap{{'ا', 'أ'}, {'إ', 'ا'}, {'آ', 'ا'}, {'ى', 'ي'}}
+	for _, sw := range swaps {
+		var next []string
+		for _, item := range cur {
+			rs := []rune(item)
+			for i, r := range rs {
+				if r != sw.a && r != sw.b {
+					continue
+				}
+				if (sw.a == 'ى' || sw.b == 'ي') && !(i == len(rs)-1 || (i+1 < len(rs) && rs[i+1] == ' ')) {
+					continue
+				}
+				cp := append([]rune(nil), rs...)
+				if r == sw.a {
+					cp[i] = sw.b
+				} else {
+					cp[i] = sw.a
+				}
+				v := string(cp)
+				if seen[v] {
+					continue
+				}
+				seen[v] = true
+				next = append(next, v)
+				out = append(out, v)
+			}
+		}
+		cur = append(cur, next...)
+	}
+	return out
+}

@@ -30,7 +30,7 @@ func TestRecordsFilterSQL(t *testing.T) {
 		t.Errorf("supplier filter missing: %s", supWhere)
 	}
 
-	catWhere, catParams := RecordsFilterSQL(RecordsQuery{TenantID: "t", Category: "صابون سائل اطباق", Supplier: "all_market"})
+	catWhere, catParams := RecordsFilterSQL(RecordsQuery{TenantID: "t", Category: "كلور ألوان", Supplier: "all_market"})
 	if !strings.Contains(catWhere, "IN UNNEST(@categories)") {
 		t.Errorf("category filter missing: %s", catWhere)
 	}
@@ -40,18 +40,17 @@ func TestRecordsFilterSQL(t *testing.T) {
 			cats, _ = p.Value.([]string)
 		}
 	}
-	if len(cats) < 2 {
-		t.Fatalf("expected alias list for dish liquid, got %#v", cats)
-	}
 	foundAlias := false
 	for _, c := range cats {
-		if c == "صابون سائل للاطباق" || c == "سائل اطباق" {
+		if c == "كلور الوان" {
 			foundAlias = true
-			break
+		}
+		if c == "كلور ارضيات" || c == "كلور عادى" {
+			t.Errorf("different bleach category %q included in %#v", c, cats)
 		}
 	}
 	if !foundAlias {
-		t.Errorf("expected known dish-liquid aliases in %#v", cats)
+		t.Errorf("expected hamza spelling كلور الوان in %#v", cats)
 	}
 }
 

@@ -24,6 +24,19 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/service/gemini/guardrails"
 )
 
+// sheetOrProductMasterCategory returns the Sell-Out category for an own-brand row.
+// sheetCategory wins whenever the uploaded «المجموعة» cell is non-empty (already
+// normalized the same way as competitor rows). pmCategory is used only for a blank cell.
+func sheetOrProductMasterCategory(sheetCategory, pmCategory string) string {
+	if strings.TrimSpace(sheetCategory) != "" {
+		return sheetCategory
+	}
+	if cat := domain.NormalizeProductCategory(pmCategory); cat != "" {
+		return cat
+	}
+	return strings.TrimSpace(pmCategory)
+}
+
 // IngestionResult contains the outcome of an ingestion operation returned to caller.
 type IngestionResult struct {
 	UploadWarnings         []UploadIssue                            `json:"upload_warnings,omitempty"`
@@ -470,18 +483,26 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 			recommendedPrice = unitPrice
 		}
 
-		// Intelligent category resolution
+		// Category comes from the sheet «المجموعة», normalized the same way for
+		// own-brand and competitors. A blank cell is still blank here for own-brand
+		// wide-matrix rows (the parser leaves it empty so Product Master can fill
+		// it). Competitors already carry the shared placeholder.
+		sheetCategoryBlank := strings.TrimSpace(rec.Category) == ""
 		category := rec.Category
-		if category == "" {
-			lowerName := strings.ToLower(rec.SKUName)
-			if strings.Contains(lowerName, "oil") || strings.Contains(rec.SKUName, "زيت") {
-				category = "زيوت طعام"
-			} else if strings.Contains(lowerName, "tomato") || strings.Contains(rec.SKUName, "طماطم") || strings.Contains(rec.SKUName, "صلصة") {
-				category = "صلصة ومعلبات"
-			} else if strings.Contains(lowerName, "bean") || strings.Contains(rec.SKUName, "فول") || strings.Contains(rec.SKUName, "بقوليات") {
-				category = "بقوليات ومعلبات"
+		if sheetCategoryBlank {
+			if payload.IsWideMatrixWorkbook {
+				category = gemini.BlankWideMatrixCategory
 			} else {
-				category = "منتجات تجزئة"
+				lowerName := strings.ToLower(rec.SKUName)
+				if strings.Contains(lowerName, "oil") || strings.Contains(rec.SKUName, "زيت") {
+					category = "زيوت طعام"
+				} else if strings.Contains(lowerName, "tomato") || strings.Contains(rec.SKUName, "طماطم") || strings.Contains(rec.SKUName, "صلصة") {
+					category = "صلصة ومعلبات"
+				} else if strings.Contains(lowerName, "bean") || strings.Contains(rec.SKUName, "فول") || strings.Contains(rec.SKUName, "بقوليات") {
+					category = "بقوليات ومعلبات"
+				} else {
+					category = "منتجات تجزئة"
+				}
 			}
 		} else if len(payload.NormalizedRecords) < 1000 {
 			category = domain.NormalizeProductCategory(category)
@@ -566,10 +587,13 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 					fact.SKUName = pm.OfficialName
 					cleanRec.SKUName = pm.OfficialName
 				}
-				if pm.Category != "" {
-					fact.Category = pm.Category
-					cleanRec.Category = pm.Category
-					discoveredCatSet[pm.Category] = true
+				// Sheet category wins. Product Master fills a blank «المجموعة» only.
+				if sheetCategoryBlank {
+					if cat := sheetOrProductMasterCategory("", pm.Category); cat != "" {
+						fact.Category = cat
+						cleanRec.Category = cat
+						discoveredCatSet[cat] = true
+					}
 				}
 				if pm.UnitsPerCarton > 0 {
 					fact.UnitsPerCarton = pm.UnitsPerCarton
@@ -651,7 +675,8 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 	if p.bqRepo != nil {
 		for i := range payload.ComputedOOSAlerts {
 			a := &payload.ComputedOOSAlerts[i]
-			if pm, ok := p.bqRepo.LookupProductMaster(tenantID, a.ItemCode, a.Barcode, a.SKUName); ok {
+			pm, ok := p.bqRepo.LookupProductMaster(tenantID, a.ItemCode, a.Barcode, a.SKUName)
+			if ok {
 				a.ItemCode = pm.ItemCode
 				if pm.Barcode != "" && a.Barcode == "" {
 					a.Barcode = pm.Barcode
@@ -665,6 +690,29 @@ func (p *Processor) ProcessUploadWithDryRun(ctx context.Context, tenantID, filen
 				if pm.ItemType != "" {
 					a.ItemType = pm.ItemType
 				}
+				if strings.TrimSpace(a.Category) == "" {
+					if cat := sheetOrProductMasterCategory("", pm.Category); cat != "" {
+						a.Category = cat
+					}
+				}
+			}
+			if strings.TrimSpace(a.Category) == "" && payload.IsWideMatrixWorkbook {
+				a.Category = gemini.BlankWideMatrixCategory
+			}
+		}
+		for i := range payload.ComputedPricingItems {
+			item := &payload.ComputedPricingItems[i]
+			if strings.TrimSpace(item.Category) != "" {
+				continue
+			}
+			if pm, ok := p.bqRepo.LookupProductMaster(tenantID, item.ItemCode, item.Barcode, item.SKUName); ok {
+				if cat := sheetOrProductMasterCategory("", pm.Category); cat != "" {
+					item.Category = cat
+					continue
+				}
+			}
+			if payload.IsWideMatrixWorkbook {
+				item.Category = gemini.BlankWideMatrixCategory
 			}
 		}
 	}

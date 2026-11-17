@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
@@ -359,7 +360,6 @@ func TestProcessorGomlaUploadWithGomlaTargetDoesNotTriggerMismatch(t *testing.T)
 	if err != nil {
 		t.Fatalf("ProcessUploadWithDryRun failed: %v", err)
 	}
-
 
 	if res.ChainMismatchDetected {
 		t.Errorf("expected ChainMismatchDetected to be false, got true (suggested: %s)", res.SuggestedChain)
@@ -820,3 +820,155 @@ func TestLargeBook6StreamingXLSXIngestion(t *testing.T) {
 	}
 }
 
+func TestSheetOrProductMasterCategory(t *testing.T) {
+	cases := []struct {
+		sheet, pm, want string
+	}{
+		{sheet: "صابون سائل اطباق", pm: "كلور ومبيضات", want: "صابون سائل اطباق"},
+		{sheet: "", pm: "صابون سائل للاطباق", want: "صابون سائل للاطباق"},
+		{sheet: "", pm: "كلور الوان", want: "كلور ألوان"},
+		{sheet: "", pm: "مطهرعام", want: "مطهر عام"},
+		{sheet: "   ", pm: "منعمات ملابس", want: "منعمات ملابس"},
+		{sheet: "", pm: "", want: ""},
+		{sheet: "كلور ومبيضات", pm: "", want: "كلور ومبيضات"},
+	}
+	for _, tc := range cases {
+		got := sheetOrProductMasterCategory(tc.sheet, tc.pm)
+		if got != tc.want {
+			t.Errorf("sheet %q pm %q = %q, want %q", tc.sheet, tc.pm, got, tc.want)
+		}
+	}
+}
+
+// Own-brand Sell-Out keeps the sheet «المجموعة» (normalized like competitors).
+// Product Master category is used only when that cell is empty. Category totals
+// are the sum of those sheet buckets, not the Product Master regrouping.
+func TestOwnBrandSellOutKeepsSheetCategory(t *testing.T) {
+	t.Setenv("TASHIL_PRODUCT_MASTER_DIR", filepath.Join(t.TempDir(), "pm"))
+	ctx := context.Background()
+	agent := gemini.NewAgent("", "gemini-3.8-flash", true)
+	bqRepo := bigquery.NewClient("test-proj", "test-dataset", true)
+	fsRepo := firestore.NewClient("test-db", true)
+	processor := NewProcessor(agent, bqRepo, fsRepo)
+
+	const tenantID = "tenant-unseeded-sheet-cat"
+	if err := processor.ClearTenantData(ctx, tenantID); err != nil {
+		t.Fatalf("ClearTenantData: %v", err)
+	}
+
+	pm := &domain.ProductMasterSummaryResponse{
+		TenantID: tenantID,
+		Items: []domain.ProductMasterItem{
+			{ItemCode: "FGDS-0001", Barcode: "6223001111001", OfficialName: "اسم كارتة ألوان", Category: "منظف ارضيات"},
+			{ItemCode: "FGDS-0002", Barcode: "6223001111002", OfficialName: "اسم كارتة عادى", Category: "منظف ارضيات"},
+			{ItemCode: "FGDS-0003", Barcode: "6223001111003", OfficialName: "اسم كارتة ارضيات", Category: "منظف ارضيات"},
+			{ItemCode: "FGDS-0004", Barcode: "6223001111004", OfficialName: "اسم كارتة مطهر", Category: "مطهرعام"},
+			{ItemCode: "FGDS-0006", Barcode: "6223001111006", OfficialName: "اسم كارتة اطباق", Category: "منظف ارضيات"},
+			{ItemCode: "FGDS-0007", Barcode: "6223001111007", OfficialName: "اسم كارتة جملة", Category: "منظف ارضيات"},
+		},
+	}
+	if _, err := bqRepo.SetProductMaster(ctx, tenantID, pm); err != nil {
+		t.Fatalf("SetProductMaster: %v", err)
+	}
+
+	header := "المجموعة,المورد,الباركود,الصنف,سموحة,ستانلى,الاجمالى,MONTH,كمية سموحة,كمية ستانلى,اجمالى كميات,YEAR\n"
+	// 2026 out26-like: sheet «المجموعة» wins over Product Master «منظف ارضيات».
+	// كلور ألوان / كلور عادى / كلور ارضيات stay separate. Competitor uses the same rule.
+	fathalla := []byte(header +
+		"كلور الوان,ادكو (1),6223001111001,ألوان,10000,0,10000,JAN,10,0,10,2026\n" +
+		"كلور عادي,ادكو (1),6223001111002,عادى,4000,0,4000,JAN,4,0,4,2026\n" +
+		"كلور ارضيات,ادكو (1),6223001111003,ارضيات,2000,0,2000,JAN,2,0,2,2026\n" +
+		",ادكو (1),6223001111004,بدون مجموعة,1000,0,1000,JAN,1,0,1,2026\n" +
+		"كلور الوان,هنكل,6223001111005,منافس ألوان,3000,0,3000,JAN,3,0,3,2026\n" +
+		"صابون سائل اطباق,ادكو (1),6223001111006,اطباق فتح الله,5000,0,5000,JAN,5,0,5,2026\n")
+	if _, err := processor.ProcessUpload(ctx, tenantID, "out26-fathalla.csv", fathalla, "fathalla"); err != nil {
+		t.Fatalf("fathalla upload: %v", err)
+	}
+	// Different wording on another chain must not merge into the Fathalla name.
+	gomla := []byte(header +
+		"صابون سائل للاطباق,ادكو (1),6223001111007,اطباق جملة,8000,0,8000,JAN,8,0,8,2026\n")
+	if _, err := processor.ProcessUpload(ctx, tenantID, "out26-gomla.csv", gomla, "gomla"); err != nil {
+		t.Fatalf("gomla upload: %v", err)
+	}
+
+	recs, total, err := bqRepo.GetSellOutRecords(ctx, tenantID, bigquery.RecordFilter{Limit: 50, Supplier: "all_market"})
+	if err != nil {
+		t.Fatalf("GetSellOutRecords: %v", err)
+	}
+	if total != 7 {
+		t.Fatalf("expected 7 facts, got %d", total)
+	}
+	byBarcode := map[string]domain.SellOutFact{}
+	for _, r := range recs {
+		byBarcode[r.Barcode] = r
+	}
+	if r := byBarcode["6223001111001"]; r.Category != "كلور ألوان" || r.SKUName != "اسم كارتة ألوان" {
+		t.Errorf("sheet spelling must win over Product Master, got category=%q name=%q", r.Category, r.SKUName)
+	}
+	if r := byBarcode["6223001111002"]; r.Category != "كلور عادى" {
+		t.Errorf("كلور عادى = %q", r.Category)
+	}
+	if r := byBarcode["6223001111003"]; r.Category != "كلور ارضيات" {
+		t.Errorf("كلور ارضيات must stay its own category, got %q", r.Category)
+	}
+	if r := byBarcode["6223001111004"]; r.Category != "مطهر عام" {
+		t.Errorf("blank sheet category must fall back to Product Master spelling, got %q", r.Category)
+	}
+	if r := byBarcode["6223001111005"]; r.Category != "كلور ألوان" || r.IsOwnBrand {
+		t.Errorf("competitor must use the same sheet rule, got category=%q own=%v", r.Category, r.IsOwnBrand)
+	}
+	if r := byBarcode["6223001111006"]; r.Category != "صابون سائل اطباق" {
+		t.Errorf("fathalla dish = %q", r.Category)
+	}
+	if r := byBarcode["6223001111007"]; r.Category != "صابون سائل للاطباق" {
+		t.Errorf("gomla dish wording must stay separate, got %q", r.Category)
+	}
+
+	kpis, err := bqRepo.GetExecutiveKPIs(ctx, tenantID, "ALL")
+	if err != nil {
+		t.Fatalf("GetExecutiveKPIs: %v", err)
+	}
+	got := map[string]domain.CategoryContribution{}
+	for _, c := range kpis.CategoryContributions {
+		got[c.Category] = c
+	}
+	if _, merged := got["منظف ارضيات"]; merged {
+		t.Errorf("Product Master category منظف ارضيات must not absorb sheet rows: %+v", got["منظف ارضيات"])
+	}
+	color := got["كلور ألوان"]
+	if color.TotalRevenue != 10000 || color.SKUCount != 1 || color.MarketTotalRevenue != 13000 {
+		t.Errorf("كلور ألوان = revenue %.2f skus %d market %.2f, want 10000 / 1 / 13000", color.TotalRevenue, color.SKUCount, color.MarketTotalRevenue)
+	}
+	regular := got["كلور عادى"]
+	if regular.TotalRevenue != 4000 || regular.SKUCount != 1 || regular.MarketTotalRevenue != 4000 {
+		t.Errorf("كلور عادى = revenue %.2f skus %d market %.2f, want 4000 / 1 / 4000", regular.TotalRevenue, regular.SKUCount, regular.MarketTotalRevenue)
+	}
+	floor := got["كلور ارضيات"]
+	if floor.TotalRevenue != 2000 || floor.SKUCount != 1 || floor.MarketTotalRevenue != 2000 {
+		t.Errorf("كلور ارضيات = revenue %.2f skus %d market %.2f, want 2000 / 1 / 2000", floor.TotalRevenue, floor.SKUCount, floor.MarketTotalRevenue)
+	}
+	soap := got["مطهر عام"]
+	if soap.TotalRevenue != 1000 || soap.SKUCount != 1 {
+		t.Errorf("blank fallback مطهر عام = %+v", soap)
+	}
+	if got["صابون سائل اطباق"].TotalRevenue != 5000 || got["صابون سائل للاطباق"].TotalRevenue != 8000 {
+		t.Errorf("cross-chain names merged: اطباق=%+v للاطباق=%+v", got["صابون سائل اطباق"], got["صابون سائل للاطباق"])
+	}
+
+	fatOnly, err := bqRepo.GetExecutiveKPIs(ctx, tenantID, "ALL", "", "", "fathalla")
+	if err != nil {
+		t.Fatalf("fathalla KPIs: %v", err)
+	}
+	for _, c := range fatOnly.CategoryContributions {
+		if c.Category == "صابون سائل للاطباق" {
+			t.Errorf("single-chain fathalla included gomla category %+v", c)
+		}
+	}
+	gomOnly, err := bqRepo.GetExecutiveKPIs(ctx, tenantID, "ALL", "", "", "gomla")
+	if err != nil {
+		t.Fatalf("gomla KPIs: %v", err)
+	}
+	if len(gomOnly.CategoryContributions) != 1 || gomOnly.CategoryContributions[0].Category != "صابون سائل للاطباق" || gomOnly.CategoryContributions[0].TotalRevenue != 8000 {
+		t.Errorf("single-chain gomla = %+v", gomOnly.CategoryContributions)
+	}
+}
