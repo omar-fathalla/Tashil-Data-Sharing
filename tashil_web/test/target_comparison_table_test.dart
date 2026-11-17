@@ -323,19 +323,29 @@ void main() {
           reason: '$key w=${para.size.width}');
     }
 
-    expect(cell('targets_achievement_t26'), '84.8%');
-    expect(cell('targets_achievement_t-q'), '90.0%');
-    expect(cell('targets_achievement_t-hi'), '110.0%');
-    expect(cell('targets_achievement_t27'), '—');
-    for (final id in ['t26', 't27', 't-mar', 't-q', 't-hi']) {
-      expect(cell('targets_achievement_$id'), isNot(contains('مستهدف')));
-    }
+    String pill(String id) => tester
+        .widgetList<Text>(find.descendant(
+          of: find.byKey(ValueKey('targets_achievement_$id')),
+          matching: find.byType(Text),
+        ))
+        .map((t) => t.data ?? '')
+        .join(' ');
+    expect(pill('t26'), startsWith('84.8%'));
+    expect(pill('t26'), contains('أقل من المستهدف'));
+    expect(pill('t-q'), startsWith('90.0%'));
+    expect(pill('t-q'), contains('قريب من المستهدف'));
+    expect(pill('t-hi'), startsWith('110.0%'));
+    expect(pill('t-hi'), contains('محقق'));
+    expect(pill('t27'), '—');
 
     final ctx = tester.element(find.byType(TargetManagementPanel));
     final scheme = Theme.of(ctx).colorScheme;
     final accents = M3StatusColors.of(ctx).accents;
     Color chipColor(String id) => tester
-        .widget<Text>(find.byKey(ValueKey('targets_achievement_$id')))
+        .widget<Text>(find.descendant(
+          of: find.byKey(ValueKey('targets_achievement_$id')),
+          matching: find.byType(Text),
+        ).first)
         .style!
         .color!;
     expect(chipColor('t26'), scheme.error);
