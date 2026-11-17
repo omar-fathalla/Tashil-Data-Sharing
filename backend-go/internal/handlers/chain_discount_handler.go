@@ -18,16 +18,30 @@ type ChainDiscountApplier interface {
 	SetChainDiscountProfiles(tenantID string, profiles []domain.ChainDiscountProfile)
 }
 
+// KnownChainLister lists chains that already have counted Sell-In / Sell-Out data.
+// Implementations must not take the analytics write lock; KnownChainsWithData on the BigQuery
+// client is the production one.
+type KnownChainLister interface {
+	KnownChainsWithData(ctx context.Context, tenantID string) ([]domain.KnownChain, error)
+}
+
 // ChainDiscountHandler serves per-tenant chain discount profiles (Product Master page).
 type ChainDiscountHandler struct {
 	repo    firestore.ChainDiscountRepository
 	audit   firestore.Repository
 	applier ChainDiscountApplier
+	chains  KnownChainLister
 }
 
 // NewChainDiscountHandler constructs the handler. audit and applier may be nil.
 func NewChainDiscountHandler(repo firestore.ChainDiscountRepository, audit firestore.Repository, applier ChainDiscountApplier) *ChainDiscountHandler {
 	return &ChainDiscountHandler{repo: repo, audit: audit, applier: applier}
+}
+
+// WithKnownChains sets the read-only source for GET /api/v1/product-master/chains.
+func (h *ChainDiscountHandler) WithKnownChains(l KnownChainLister) *ChainDiscountHandler {
+	h.chains = l
+	return h
 }
 
 var chainDiscountWriteRoles = map[domain.UserRole]bool{
@@ -55,6 +69,11 @@ func wrapChainDiscounts(d *domain.ChainDiscountProfiles) chainDiscountResponse {
 // client's 10s budget.
 var chainDiscountGetTimeout = 5 * time.Second
 
+// knownChainsGetTimeout bounds the in-memory chain scan. The scan never waits on the analytics
+// write lock; this cap only covers the case where no cached snapshot exists yet and the lock stays
+// busy for the whole wait.
+var knownChainsGetTimeout = 5 * time.Second
+
 // HandleGet serves GET /api/v1/product-master/chain-discounts.
 //
 // It is a pure read: it must not call the applier. Applying re-enriches every Sell-In row under the
@@ -78,6 +97,39 @@ func (h *ChainDiscountHandler) HandleGet(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, http.StatusOK, wrapChainDiscounts(d))
+}
+
+// HandleListChains serves GET /api/v1/product-master/chains.
+//
+// Read-only. It does not call the applier (that takes the analytics write lock and re-enriches every
+// Sell-In row). The list is chains that already have counted data; quarantined unknown customers are
+// not in that set. Each item's key/name is the normalized chain Sell-In and Sell-Out enrichment match on.
+func (h *ChainDiscountHandler) HandleListChains(w http.ResponseWriter, r *http.Request) {
+	c, ok := tmClaims(w, r)
+	if !ok {
+		return
+	}
+	if h.chains == nil {
+		writeErr(w, http.StatusServiceUnavailable, "known chains are unavailable")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), knownChainsGetTimeout)
+	defer cancel()
+	chains, err := h.chains.KnownChainsWithData(ctx, c.TenantID)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) || ctx.Err() != nil {
+			writeErr(w, http.StatusGatewayTimeout, "known chains lookup timed out")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "failed to load known chains")
+		return
+	}
+	if chains == nil {
+		chains = []domain.KnownChain{}
+	}
+	writeJSON(w, http.StatusOK, struct {
+		Chains []domain.KnownChain `json:"chains"`
+	}{Chains: chains})
 }
 
 // HandlePut serves PUT /api/v1/product-master/chain-discounts with body {"profiles":[...]}:

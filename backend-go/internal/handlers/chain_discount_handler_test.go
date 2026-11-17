@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ func cdMux(h *ChainDiscountHandler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/product-master/chain-discounts", h.HandleGet)
 	mux.HandleFunc("PUT /api/v1/product-master/chain-discounts", h.HandlePut)
+	mux.HandleFunc("GET /api/v1/product-master/chains", h.HandleListChains)
 	return mux
 }
 
@@ -235,5 +237,93 @@ func TestChainDiscountVATRateRoundTripValidationAndAudit(t *testing.T) {
 	// Any value in range is accepted ("editable to any number").
 	if code, _ := put([]map[string]interface{}{{"chain": "a", "invoice_discount_pct": 10, "vat_rate_pct": 22.5}}); code != 200 {
 		t.Fatalf("22.5%% VAT must be accepted, got %d", code)
+	}
+}
+
+type stubKnownChains struct {
+	tenant string
+	chains []domain.KnownChain
+	wait   <-chan struct{}
+}
+
+func (s *stubKnownChains) KnownChainsWithData(ctx context.Context, tenantID string) ([]domain.KnownChain, error) {
+	s.tenant = tenantID
+	if s.wait != nil {
+		select {
+		case <-s.wait:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return s.chains, nil
+}
+
+func TestListKnownChainsIsReadOnlyAndTenantScoped(t *testing.T) {
+	fs := firestore.NewClient("", true)
+	app := &blockingApplier{release: make(chan struct{})}
+	defer close(app.release)
+	lister := &stubKnownChains{chains: []domain.KnownChain{{
+		Key: "fathalla", Name: "fathalla", DisplayName: "أسواق فتح الله (Fathalla Market)",
+		RowCount: 4, SellInRows: 2, SellOutRows: 2, LastDataDate: "2026-05-01",
+	}}}
+	h := NewChainDiscountHandler(fs, fs, app).WithKnownChains(lister)
+	mux := cdMux(h)
+	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
+
+	done := make(chan struct{})
+	var rec *httptest.ResponseRecorder
+	var out map[string]interface{}
+	go func() {
+		rec, out = tmDo(t, mux, admin, "GET", "/api/v1/product-master/chains", nil)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("GET /chains blocked on the applier (analytics write lock)")
+	}
+	if rec.Code != 200 {
+		t.Fatalf("GET chains: %d %v", rec.Code, out)
+	}
+	if lister.tenant != "tenant-adeco" {
+		t.Fatalf("tenant: %s", lister.tenant)
+	}
+	rows, _ := out["chains"].([]interface{})
+	if len(rows) != 1 {
+		t.Fatalf("chains: %v", out)
+	}
+	row := rows[0].(map[string]interface{})
+	if row["key"] != "fathalla" || row["name"] != "fathalla" {
+		t.Fatalf("saved key must be the normalized match key: %v", row)
+	}
+	if row["display_name"] != "أسواق فتح الله (Fathalla Market)" || row["row_count"].(float64) != 4 || row["last_data_date"] != "2026-05-01" {
+		t.Fatalf("payload: %v", row)
+	}
+
+	if rec, _ := tmDo(t, mux, nil, "GET", "/api/v1/product-master/chains", nil); rec.Code != 401 {
+		t.Fatalf("no claims: %d", rec.Code)
+	}
+	other := &domain.UserClaims{UserID: "u2", Email: "x@pepsi.test", TenantID: "tenant-pepsi", Role: domain.RoleAdmin}
+	tmDo(t, mux, other, "GET", "/api/v1/product-master/chains", nil)
+	if lister.tenant != "tenant-pepsi" {
+		t.Fatalf("other tenant was not scoped: %s", lister.tenant)
+	}
+}
+
+func TestListKnownChainsTimesOutWithGatewayTimeout(t *testing.T) {
+	prev := knownChainsGetTimeout
+	knownChainsGetTimeout = 40 * time.Millisecond
+	defer func() { knownChainsGetTimeout = prev }()
+
+	lister := &stubKnownChains{wait: make(chan struct{})}
+	mux := cdMux(NewChainDiscountHandler(firestore.NewClient("", true), nil, nil).WithKnownChains(lister))
+	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
+	start := time.Now()
+	rec, _ := tmDo(t, mux, admin, "GET", "/api/v1/product-master/chains", nil)
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("slow lister must yield 504, got %d %s", rec.Code, rec.Body.String())
+	}
+	if time.Since(start) > time.Second {
+		t.Fatalf("GET took %v; must be bounded by knownChainsGetTimeout", time.Since(start))
 	}
 }

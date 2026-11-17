@@ -1322,6 +1322,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           canEdit:
               widget.apiClient.currentUser?.canEditChainTerms ?? true,
           onSave: _saveChainProfiles,
+          loadKnownChains: _chainDiscRepo.loadKnownChains,
         ),
       ],
     );

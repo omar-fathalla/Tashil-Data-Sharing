@@ -167,6 +167,10 @@ type Client struct {
 	// Per-chain discount profiles (chain_discounts.go) and precomputed analytics (analytics_precompute.go).
 	chainDisc  chainDiscountStore
 	precompute precomputeStore
+
+	// Known-chain dropdown cache (known_chains.go). Own lock — never taken together with c.mu.
+	knownChainsMu    sync.Mutex
+	knownChainsCache map[string]knownChainCacheEntry
 }
 
 func (c *Client) invalidateKPICache() {
