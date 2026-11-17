@@ -13,9 +13,10 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import 'chain_share_pie.dart';
+import 'pareto_category_skus.dart';
 
 /// ParetoCategorySection renders Competing Suppliers Market Share, Category Contribution bars,
-/// and Pareto 80/20 Power SKUs with interactive category drilldown.
+/// and every own-brand SKU in the selected category (share and cumulative %).
 class ParetoCategorySection extends StatefulWidget {
   final List<CategoryContributionModel> categories;
   final List<ParetoSkuItemModel> paretoSkus;
@@ -1142,55 +1143,15 @@ class _ParetoPowerSkusCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final isFiltered = selectedCategory != null && selectedCategory!.isNotEmpty;
 
-    // Filter SKUs if category selected, otherwise take top 10 for balanced vertical height
-    final List<ParetoSkuItemModel> skusToDisplay;
-    if (isFiltered) {
-      final cleanSel = selectedCategory!.trim().toLowerCase();
-      final filtered = paretoSkus.where((s) {
-        final cat = s.category.trim().toLowerCase();
-        return cat == cleanSel ||
-            cat.contains(cleanSel) ||
-            cleanSel.contains(cat);
-      }).toList();
-
-      if (filtered.isNotEmpty) {
-        final catTotalRev =
-            filtered.fold<double>(0.0, (sum, s) => sum + s.totalRevenue);
-        var runningCumulative = 0.0;
-        skusToDisplay = filtered.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final s = entry.value;
-          final share =
-              catTotalRev > 0 ? (s.totalRevenue / catTotalRev) * 100.0 : 0.0;
-          final prevCum = runningCumulative;
-          runningCumulative += share;
-          final cum = runningCumulative.clamp(0.0, 100.0);
-          final isTop80 = idx == 0 || prevCum < 80.0;
-
-          return ParetoSkuItemModel(
-            barcode: s.barcode,
-            itemCode: s.itemCode,
-            skuName: s.skuName,
-            category: s.category,
-            unitsPerCarton: s.unitsPerCarton,
-            itemType: s.itemType,
-            totalRevenue: s.totalRevenue,
-            totalUnits: s.totalUnits,
-            unitPrice: s.unitPrice,
-            factoryUnitCost: s.factoryUnitCost,
-            revenueSharePct: double.parse(share.toStringAsFixed(1)),
-            cumulativeSharePct: double.parse(cum.toStringAsFixed(1)),
-            isTop80Contributor: isTop80,
-          );
-        }).toList();
-      } else {
-        skusToDisplay = [];
-      }
-    } else {
-      // Up to 30 candidates; 10 always shown, more only when the card is
-      // stretched to the category card's height (M3FillRows).
-      skusToDisplay = paretoSkus.take(30).toList();
-    }
+    // A selected category lists every own-brand SKU (same distinct barcodes
+    // as the category card). The portfolio preview keeps a short candidate
+    // list so the card can fill the category card's height.
+    final List<ParetoSkuItemModel> skusToDisplay = isFiltered
+        ? skusForCategory(
+            paretoSkus: paretoSkus,
+            category: selectedCategory!,
+          )
+        : paretoSkus.take(30).toList();
 
     return Card.outlined(
       key: const ValueKey('pareto_80_20_card'),
@@ -1209,16 +1170,16 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const M3SectionTitle('الأصناف الأعلى مبيعًا (80/20)'),
+                      const M3SectionTitle('أصناف المبيعات'),
                       const SizedBox(height: 1.0),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           M3StatusTag(
-                            key: const ValueKey('pareto_class_a_badge'),
-                            label: countSku(paretoSkus
-                                .where((s) => s.isTop80Contributor)
-                                .length),
+                            key: const ValueKey('pareto_sku_count_badge'),
+                            label: countSku(isFiltered
+                                ? skusToDisplay.length
+                                : paretoSkus.length),
                             tone: M3StatusTone.info,
                           ),
                         ],
@@ -1226,8 +1187,9 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                       const SizedBox(height: 2.0),
                       Text(
                         isFiltered
-                            ? 'الأصناف التي تحقق 80% من مبيعات $selectedCategory'
-                            : 'الأصناف التي تحقق 80% من المبيعات',
+                            ? 'كل أصناف $selectedCategory · ${countSku(skusToDisplay.length)}'
+                            : 'مرتبة حسب المبيعات',
+                        key: const ValueKey('pareto_sku_subtitle'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -1270,7 +1232,7 @@ class _ParetoPowerSkusCard extends StatelessWidget {
                         onPressed: onClearCategory,
                         icon: const Icon(AppIcons.close, size: 18.0),
                         iconAlignment: IconAlignment.end,
-                        label: const Text('عرض كل الفئات'),
+                        label: const Text('عرض الكل'),
                       ),
                     ],
                   ),
