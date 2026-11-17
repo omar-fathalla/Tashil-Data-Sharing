@@ -45,7 +45,7 @@ type sellInEnricher interface {
 	EnrichSellInRecords(tenantID string, recs []domain.SellInRecord) []domain.SellInRecord
 }
 
-func (h *AnalyticsHandler) querySellInTotals(ctx context.Context, tenantID string, f bigquery.SellInRecordFilter) (*bqsink.SellInTotalsResult, bool) {
+func (h *AnalyticsHandler) querySellInTotals(ctx context.Context, tenantID string, f bigquery.SellInRecordFilter, profiles []bqsink.SellInChainProfile) (*bqsink.SellInTotalsResult, bool) {
 	if h.sellIn == nil || sellInFilterNeedsMemory(f) {
 		return nil, false
 	}
@@ -53,7 +53,7 @@ func (h *AnalyticsHandler) querySellInTotals(ctx context.Context, tenantID strin
 	defer cancel()
 	res, err := h.sellIn.QuerySellInTotals(c, bqsink.SellInTotalsQuery{
 		TenantID: tenantID, Chain: f.RetailerChain, Year: f.Year, Month: f.Month, Rules: sellInRules(),
-		Profiles: h.sellInChainProfiles(c, tenantID),
+		Profiles: profiles,
 		Limit:    f.Limit, Offset: f.Offset,
 	})
 	if err != nil {
@@ -117,7 +117,8 @@ func (h *AnalyticsHandler) sellInRecordsFromBigQuery(ctx context.Context, tenant
 	if !canEnrich {
 		return nil, false
 	}
-	res, ok := h.querySellInTotals(ctx, tenantID, f)
+	profiles := h.sellInChainProfiles(ctx, tenantID)
+	res, ok := h.querySellInTotals(ctx, tenantID, f, profiles)
 	if !ok {
 		return nil, false
 	}
@@ -128,14 +129,33 @@ func (h *AnalyticsHandler) sellInRecordsFromBigQuery(ctx context.Context, tenant
 	}
 	resp := buildSellInRecordsResponse(res.Totals, page, int(res.Totals.Count), f.Limit, f.Offset)
 	resp.ByChain, resp.ByBrand = sellInBreakdowns(res.Groups)
+	applySellInChainTerms(&resp, res.Groups, profiles)
 	return &resp, true
 }
 
+// sellInRowWaterfall is one row's official → expected split: invoice discount on the official value,
+// the extra discount on what remains, expected = official − invoice − extra. Same as bqsink.SellInTotalsSQL.
+func sellInRowWaterfall(rec domain.SellInRecord) (inv, extra, expected float64) {
+	list := rec.OfficialListValueExclEGP
+	inv = list * rec.InvoiceDiscountPct / 100.0
+	extra = (list - inv) * rec.ExtraDiscountPct / 100.0
+	return inv, extra, list - inv - extra
+}
+
 // sellInTotalsFromRecords sums in-memory rows with the same rules as the BigQuery query. Rows without
-// an official list price contribute 0 to the list value (no invented 10% discount).
+// an official list price contribute 0 to the list value (no invented 10% discount) and their file net
+// goes to UnpricedNet.
 func sellInTotalsFromRecords(records []domain.SellInRecord) bqsink.SellInTotals {
+	t, _ := sellInTotalsAndChainsFromRecords(records)
+	return t
+}
+
+// sellInTotalsAndChainsFromRecords also returns the per-chain waterfall sums (the in-memory
+// counterpart of the BigQuery groups query).
+func sellInTotalsAndChainsFromRecords(records []domain.SellInRecord) (bqsink.SellInTotals, []bqsink.SellInGroupRow) {
 	var t bqsink.SellInTotals
 	matched := make(map[string]bool)
+	chains := map[string]*bqsink.SellInGroupRow{}
 	for _, rec := range records {
 		t.Count++
 		t.NetValue += rec.NetValueEGP
@@ -161,9 +181,15 @@ func sellInTotalsFromRecords(records []domain.SellInRecord) bqsink.SellInTotals 
 			disc = listExcl - rec.NetValueEGP
 		}
 		t.ListExcl += listExcl
-		inv := listExcl * pctOf(rec.InvoiceDiscountPct) / 100.0
+		inv, extra, expected := sellInRowWaterfall(rec)
 		t.InvDisc += inv
-		t.ExtraDisc += (listExcl - inv) * pctOf(rec.ExtraDiscountPct) / 100.0
+		t.ExtraDisc += extra
+		t.ExpectedNet += expected
+		unpriced := 0.0
+		if listExcl == 0 {
+			unpriced = rec.NetValueEGP
+		}
+		t.UnpricedNet += unpriced
 		t.ListIncl += listExcl * (1.0 + vatRate)
 		if listExcl > 0 {
 			t.NetWithList += rec.NetValueEGP
@@ -174,18 +200,32 @@ func sellInTotalsFromRecords(records []domain.SellInRecord) bqsink.SellInTotals 
 		if rec.ItemCode != "" {
 			matched[rec.ItemName] = true
 		}
+
+		key := sellInChainKey(rec.RetailerChain)
+		g := chains[key]
+		if g == nil {
+			g = &bqsink.SellInGroupRow{Chain: key}
+			chains[key] = g
+		}
+		g.Count++
+		g.NetValue += rec.NetValueEGP
+		g.Cases += rec.NetQtyCases
+		g.ListExcl += listExcl
+		g.Discount += disc
+		g.InvDisc += inv
+		g.ExtraDisc += extra
+		g.ExpectedNet += expected
+		g.UnpricedNet += unpriced
 	}
 	t.MatchedSKUs = int64(len(matched))
-	return t
+	groups := make([]bqsink.SellInGroupRow, 0, len(chains))
+	for _, g := range chains {
+		groups = append(groups, *g)
+	}
+	return t, groups
 }
 
-// pctOf normalises a stored discount to whole-number percent (older rows hold fractions: 0.10 = 10%).
-func pctOf(v float64) float64 {
-	if v > 0 && v <= 1.0 {
-		return v * 100.0
-	}
-	return v
-}
+func sellInChainKey(chain string) string { return strings.ToLower(strings.TrimSpace(chain)) }
 
 // sellInEffectiveDiscountPct is the discount over rows that have an official list price; 0 when none.
 func sellInEffectiveDiscountPct(t bqsink.SellInTotals) float64 {
@@ -209,7 +249,34 @@ func sellInEffectiveVATPct(t bqsink.SellInTotals) float64 {
 
 func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
+// sellInCardTotals are the «من السعر الرسمي إلى الفاتورة» card amounts, rounded to piastres so the card
+// adds up exactly:
+//
+//	official − invoice − extra = expected
+//	expected − execution + unpriced = net (Excel Net V)
+//	net + VAT = invoices
+type sellInCardTotals struct {
+	official, invoice, extra, expected, execution, unpriced, net, vat, gross float64
+}
+
+func sellInCard(t bqsink.SellInTotals) sellInCardTotals {
+	c := sellInCardTotals{
+		official: round2(t.ListExcl),
+		invoice:  round2(t.InvDisc),
+		extra:    round2(t.ExtraDisc),
+		unpriced: round2(t.UnpricedNet),
+		net:      round2(t.NetValue),
+		gross:    round2(t.Gross),
+	}
+	c.expected = round2(c.official - c.invoice - c.extra)
+	// Expected net minus the file net of the priced rows; negative when rows were invoiced above it.
+	c.execution = round2(c.expected + c.unpriced - c.net)
+	c.vat = round2(c.gross - c.net)
+	return c
+}
+
 func buildSellInRecordsResponse(t bqsink.SellInTotals, page []domain.SellInRecord, total, limit, offset int) PaginatedSellInRecordsResponse {
+	card := sellInCard(t)
 	return PaginatedSellInRecordsResponse{
 		Records:                     page,
 		TotalCount:                  total,
@@ -220,18 +287,106 @@ func buildSellInRecordsResponse(t bqsink.SellInTotals, page []domain.SellInRecor
 		TotalUnitsPieces:            int(t.Units),
 		TotalWeightTons:             math.Round(t.Tons*1000) / 1000,
 		TotalExpectedEGP:            round2(t.Expected),
-		TotalOfficialListExclVATEGP: round2(t.ListExcl),
+		TotalOfficialListExclVATEGP: card.official,
 		TotalOfficialListInclVATEGP: round2(t.ListIncl),
 		TotalDiscountGrantedEGP:     round2(t.Discount),
-		TotalInvoiceDiscountEGP:     round2(t.InvDisc),
-		TotalExtraChainDiscountEGP:  round2(t.ExtraDisc),
-		TotalOtherDifferenceEGP:     round2(t.Discount - t.InvDisc - t.ExtraDisc),
+		TotalInvoiceDiscountEGP:     card.invoice,
+		TotalExtraChainDiscountEGP:  card.extra,
+		TotalExpectedNetEGP:         card.expected,
+		TotalExecutionDiffEGP:       card.execution,
+		TotalOtherDifferenceEGP:     card.execution,
+		TotalUnpricedNetEGP:         card.unpriced,
+		InvoiceDiscountPct:          sellInWeightedInvoicePct(t.ListExcl, t.InvDisc),
+		ExtraDiscountPct:            sellInWeightedExtraPct(t.ListExcl, t.InvDisc, t.ExtraDisc),
+		TermsAveraged:               true,
 		VATRatePct:                  sellInEffectiveVATPct(t),
 		EffectiveDiscountPct:        sellInEffectiveDiscountPct(t),
-		TotalNetExclVATEGP:          round2(t.NetValue),
-		TotalVAT14EGP:               round2(t.VAT),
-		TotalGrossInclVATEGP:        round2(t.Gross),
+		TotalNetExclVATEGP:          card.net,
+		TotalVAT14EGP:               card.vat,
+		TotalGrossInclVATEGP:        card.gross,
 		MatchedCatalogSKUsCount:     int(t.MatchedSKUs),
+	}
+}
+
+func sellInWeightedInvoicePct(list, inv float64) float64 {
+	if list == 0 {
+		return 0
+	}
+	return math.Round(inv/list*10000) / 100
+}
+
+func sellInWeightedExtraPct(list, inv, extra float64) float64 {
+	if list-inv == 0 {
+		return 0
+	}
+	return math.Round(extra/(list-inv)*10000) / 100
+}
+
+// SellInChainTermsItem is one chain's terms and waterfall amounts (the «متوسط» tooltip breakdown).
+type SellInChainTermsItem struct {
+	Chain                  string  `json:"chain"`
+	Saved                  bool    `json:"saved"` // false: the flat defaults apply
+	InvoiceDiscountPct     float64 `json:"invoice_discount_pct"`
+	ExtraDiscountPct       float64 `json:"extra_discount_pct"`
+	VATRatePct             float64 `json:"vat_rate_pct"`
+	OfficialListExclVATEGP float64 `json:"official_list_excl_vat_egp"`
+	InvoiceDiscountEGP     float64 `json:"invoice_discount_egp"`
+	ExtraDiscountEGP       float64 `json:"extra_discount_egp"`
+	ExpectedNetEGP         float64 `json:"expected_net_egp"`
+	UnpricedNetEGP         float64 `json:"unpriced_net_egp"`
+	NetExclVATEGP          float64 `json:"net_excl_vat_egp"`
+}
+
+// sellInTermsFor resolves a chain's terms like bigquery.sellInChainTerms: saved profile, else defaults.
+func sellInTermsFor(chain string, profiles []bqsink.SellInChainProfile) (inv, extra, vatPct float64, saved bool) {
+	for _, p := range profiles {
+		if sellInChainKey(p.Chain) != chain {
+			continue
+		}
+		vatPct = domain.DefaultChainVATRatePct
+		if p.VATRate != nil {
+			vatPct = *p.VATRate * 100
+		}
+		return p.InvoiceDiscountPct, p.ExtraDiscountPct, math.Round(vatPct*100) / 100, true
+	}
+	return domain.DefaultChainInvoiceDiscountPct, domain.DefaultChainAdditionalDiscountPct, domain.DefaultChainVATRatePct, false
+}
+
+// applySellInChainTerms adds the per-chain breakdown. With one chain in the selection the badges show
+// that chain's saved percentages exactly; with several they stay the official-weighted averages.
+func applySellInChainTerms(resp *PaginatedSellInRecordsResponse, groups []bqsink.SellInGroupRow, profiles []bqsink.SellInChainProfile) {
+	byChain := map[string]*SellInChainTermsItem{}
+	for _, g := range groups {
+		key := sellInChainKey(g.Chain)
+		it := byChain[key]
+		if it == nil {
+			it = &SellInChainTermsItem{Chain: key}
+			it.InvoiceDiscountPct, it.ExtraDiscountPct, it.VATRatePct, it.Saved = sellInTermsFor(key, profiles)
+			byChain[key] = it
+		}
+		it.OfficialListExclVATEGP += g.ListExcl
+		it.InvoiceDiscountEGP += g.InvDisc
+		it.ExtraDiscountEGP += g.ExtraDisc
+		it.ExpectedNetEGP += g.ExpectedNet
+		it.UnpricedNetEGP += g.UnpricedNet
+		it.NetExclVATEGP += g.NetValue
+	}
+	items := make([]SellInChainTermsItem, 0, len(byChain))
+	for _, it := range byChain {
+		it.OfficialListExclVATEGP, it.InvoiceDiscountEGP, it.ExtraDiscountEGP = round2(it.OfficialListExclVATEGP), round2(it.InvoiceDiscountEGP), round2(it.ExtraDiscountEGP)
+		it.ExpectedNetEGP, it.UnpricedNetEGP, it.NetExclVATEGP = round2(it.ExpectedNetEGP), round2(it.UnpricedNetEGP), round2(it.NetExclVATEGP)
+		items = append(items, *it)
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].OfficialListExclVATEGP != items[j].OfficialListExclVATEGP {
+			return items[i].OfficialListExclVATEGP > items[j].OfficialListExclVATEGP
+		}
+		return items[i].Chain < items[j].Chain
+	})
+	resp.ChainTerms = items
+	if len(items) == 1 {
+		resp.InvoiceDiscountPct, resp.ExtraDiscountPct, resp.VATRatePct = items[0].InvoiceDiscountPct, items[0].ExtraDiscountPct, items[0].VATRatePct
+		resp.TermsAveraged = false
 	}
 }
 

@@ -183,14 +183,19 @@ void main() {
     expect(strip, findsOneWidget);
     final stripRect = tester.getRect(strip);
     for (final label in [
-      '1. السعر الرسمي',
-      '2. خصم الفاتورة',
-      '3. خصم إضافي للسلسلة',
-      '4. صافي التوريد',
-      '5. الضريبة 14%',
-      '6. الفواتير',
+      'إعدادات السلسلة',
+      'السعر الرسمي',
+      'خصم الفاتورة',
+      'خصم إضافي',
+      'الصافي المتوقع',
+      'الفعلي',
+      'فروق التنفيذ',
+      'بلا سعر رسمي',
+      'صافي التوريد',
+      'الضريبة',
+      'الفواتير',
     ]) {
-      final f = find.text(label);
+      final f = find.descendant(of: strip, matching: find.text(label));
       expect(f, findsWidgets, reason: 'waterfall missing $label');
       final r = tester.getRect(f.first);
       expect(r.left + 0.5, greaterThanOrEqualTo(stripRect.left),

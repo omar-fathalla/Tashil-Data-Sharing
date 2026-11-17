@@ -120,6 +120,25 @@ type chainTerms struct {
 	ExtraDiscountPct   float64
 }
 
+// sellInChainTerms resolves the Sell-In waterfall terms for a chain: its saved profile, else the flat
+// defaults (invoice 10%, extra 0%, VAT 14%). The Product Master per-item discount and VAT columns are
+// not used, so the in-memory path and the BigQuery totals (bqsink.SellInTotalsSQL) agree.
+func sellInChainTerms(prof domain.ChainDiscountProfile, hasProf bool) chainTerms {
+	t := chainTerms{
+		VATRate:            defaultVATRate,
+		InvoiceDiscountPct: domain.DefaultChainInvoiceDiscountPct,
+		ExtraDiscountPct:   domain.DefaultChainAdditionalDiscountPct,
+	}
+	if !hasProf {
+		return t
+	}
+	t.InvoiceDiscountPct, t.ExtraDiscountPct = prof.InvoiceDiscountPct, prof.AdditionalDiscountPct
+	if v, ok := prof.VATRate(); ok {
+		t.VATRate = v
+	}
+	return t
+}
+
 // resolveFactoryUnitCostForChain applies a saved chain profile:
 // cost = master list price × (1 − invoice%) × (1 − additional%), incl. the chain's VAT.
 // Without a profile (or without a master list price) it falls back to

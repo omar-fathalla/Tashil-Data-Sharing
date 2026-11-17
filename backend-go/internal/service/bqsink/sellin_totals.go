@@ -56,6 +56,8 @@ type SellInTotals struct {
 	Discount    float64 `bigquery:"disc"`
 	InvDisc     float64 `bigquery:"inv_disc"`
 	ExtraDisc   float64 `bigquery:"extra_disc"`
+	ExpectedNet float64 `bigquery:"expected_net"` // official × (1 − invoice%) × (1 − extra%)
+	UnpricedNet float64 `bigquery:"unpriced_net"` // file net of rows with no official price
 	VAT         float64 `bigquery:"vat"`
 	Gross       float64 `bigquery:"gross"`
 	MatchedSKUs int64   `bigquery:"matched_skus"`
@@ -63,16 +65,20 @@ type SellInTotals struct {
 
 // SellInGroupRow is one (year, month, chain, brand) bucket of the same sums.
 type SellInGroupRow struct {
-	Year     int64   `bigquery:"year"`
-	Month    int64   `bigquery:"month_num"`
-	Chain    string  `bigquery:"chain"`
-	Brand    string  `bigquery:"brand"`
-	Count    int64   `bigquery:"cnt"`
-	NetValue float64 `bigquery:"net"`
-	Cases    float64 `bigquery:"cases"`
-	Units    int64   `bigquery:"units"`
-	ListExcl float64 `bigquery:"list_excl"`
-	Discount float64 `bigquery:"disc"`
+	Year        int64   `bigquery:"year"`
+	Month       int64   `bigquery:"month_num"`
+	Chain       string  `bigquery:"chain"`
+	Brand       string  `bigquery:"brand"`
+	Count       int64   `bigquery:"cnt"`
+	NetValue    float64 `bigquery:"net"`
+	Cases       float64 `bigquery:"cases"`
+	Units       int64   `bigquery:"units"`
+	ListExcl    float64 `bigquery:"list_excl"`
+	Discount    float64 `bigquery:"disc"`
+	InvDisc     float64 `bigquery:"inv_disc"`
+	ExtraDisc   float64 `bigquery:"extra_disc"`
+	ExpectedNet float64 `bigquery:"expected_net"`
+	UnpricedNet float64 `bigquery:"unpriced_net"`
 }
 
 // SellInTotalsResult carries the totals, the grouped breakdown and the per-job stats.
@@ -139,17 +145,22 @@ func SellInTotalsSQL(tableRef string, q SellInTotalsQuery) (totals, groups, page
 		" d AS (SELECT *, CAST(ROUND(q * upc) AS INT64) AS units_r," +
 		" ROUND(net0 * (1 + vr), 2) AS gross_r," +
 		" IF(carton_px > 0 AND ABS(q) > 0.001, ROUND(q * carton_px, 2), IFNULL(official_list_value_excl_egp, 0)) AS list_r," +
-		" IF(carton_px > 0 AND ABS(q) > 0.001, IF(q > 0 AND ROUND(q * carton_px - net0, 2) < 0, 0, ROUND(ROUND(q * carton_px, 2) - net0, 2))," +
+		// Not clamped at 0: a row invoiced above the list price has a negative discount.
+		" IF(carton_px > 0 AND ABS(q) > 0.001, ROUND(ROUND(q * carton_px, 2) - net0, 2)," +
 		" IFNULL(discount_granted_egp, 0)) AS disc_r FROM c)," +
 		// Handler-level fallback (no default 10%): discount = list - net when missing.
 		" e AS (SELECT *, IF(disc_r = 0 AND list_r > net0 AND net0 > 0, list_r - net0, disc_r) AS disc_f FROM d" +
 		" WHERE " + sellInWhere(q, &params) + ")"
 	// IFNULL(SUM(..), 0): an empty filter (no rows) returns zeros, not NULLs that fail the scan.
+	// Expected net = official × (1 − invoice%) × (1 − extra%), the extra discount compounded on the
+	// remainder; rows without an official price (list_r = 0) add their file net to unpriced_net.
 	sums := "COUNT(*) AS cnt, IFNULL(SUM(net0), 0) AS net, IFNULL(SUM(q), 0) AS cases, IFNULL(SUM(units_r), 0) AS units," +
-		" IFNULL(SUM(list_r), 0) AS list_excl, IFNULL(SUM(disc_f), 0) AS disc"
+		" IFNULL(SUM(list_r), 0) AS list_excl, IFNULL(SUM(disc_f), 0) AS disc," +
+		" IFNULL(SUM(list_r * ipct / 100), 0) AS inv_disc, IFNULL(SUM((list_r - list_r * ipct / 100) * epct / 100), 0) AS extra_disc," +
+		" IFNULL(SUM(list_r - list_r * ipct / 100 - (list_r - list_r * ipct / 100) * epct / 100), 0) AS expected_net," +
+		" IFNULL(SUM(IF(list_r = 0, net0, 0)), 0) AS unpriced_net"
 	totals = base + " SELECT " + sums + ", IFNULL(SUM(IFNULL(weight_tons, 0)), 0) AS tons, IFNULL(SUM(IFNULL(expected_value_egp, 0)), 0) AS expected," +
 		" IFNULL(SUM(list_r * (1 + vr)), 0) AS list_incl, IFNULL(SUM(IF(list_r > 0, net0, 0)), 0) AS net_with_list," +
-		" IFNULL(SUM(list_r * ipct / 100), 0) AS inv_disc, IFNULL(SUM((list_r - list_r * ipct / 100) * epct / 100), 0) AS extra_disc," +
 		" IFNULL(SUM(ROUND(gross_r - net0, 2)), 0) AS vat, IFNULL(SUM(gross_r), 0) AS gross," +
 		" COUNT(DISTINCT IF(IFNULL(item_code, '') != '', IFNULL(item_name, ''), NULL)) AS matched_skus FROM e"
 	groups = base + " SELECT IFNULL(year, 0) AS year, IFNULL(month_num, 0) AS month_num, chain_r AS chain, IFNULL(brand, '') AS brand, " +
@@ -160,12 +171,13 @@ func SellInTotalsSQL(tableRef string, q SellInTotalsQuery) (totals, groups, page
 }
 
 // sellInProfileSQL builds the per-row VAT / invoice-discount / extra-discount expressions. A saved chain
-// profile wins; otherwise the stored per-row value (write-time Product Master enrichment) applies, with
-// the 14% VAT default and no invented discount for unmatched rows. Mirrors enrichSellInRecordLocked.
+// profile wins; otherwise the flat defaults apply (invoice 10% on matched rows, extra 0%, VAT 14%).
+// The stored per-row rates from upload time are never read, so a change of terms applies at once.
+// Mirrors sellInChainTerms / enrichSellInRecordLocked.
 func sellInProfileSQL(profiles []SellInChainProfile) (vat, ipct, epct string, params []bigquery.QueryParameter) {
-	vat = "IF(matched AND IFNULL(vat_rate, 0) > 0, vat_rate, 0.14)"
-	ipct = "IF(matched, IF(IFNULL(invoice_discount_pct, 0) > 0 AND invoice_discount_pct <= 1, invoice_discount_pct * 100, IFNULL(invoice_discount_pct, 0)), 0)"
-	epct = "0"
+	vat = sqlFloat(domain.DefaultChainVATRatePct / 100)
+	ipct = "IF(matched, " + sqlFloat(domain.DefaultChainInvoiceDiscountPct) + ", 0)"
+	epct = sqlFloat(domain.DefaultChainAdditionalDiscountPct)
 	var vw, iw, ew strings.Builder
 	n := 0
 	for _, p := range profiles {
@@ -195,6 +207,8 @@ func sellInProfileSQL(profiles []SellInChainProfile) (vat, ipct, epct string, pa
 	}
 	return vat, ipct, epct, params
 }
+
+func sqlFloat(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
 
 func sellInWhere(q SellInTotalsQuery, params *[]bigquery.QueryParameter) string {
 	conds := []string{"TRUE"}

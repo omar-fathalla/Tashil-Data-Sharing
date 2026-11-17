@@ -13577,6 +13577,12 @@ class SellInRecordItem {
       departmentAr: json['department_ar'] as String? ?? '',
     );
   }
+
+  /// سعر الكرتونة المتوقع: list carton price × (1 − invoice%) × (1 − extra%) with this row's chain
+  /// terms; 0 when the item has no official price.
+  double get expectedCartonExclVatEgp => officialCartonExclVatEgp > 0
+      ? _round2(officialCartonExclVatEgp * (1 - invoiceDiscountPct / 100) * (1 - extraDiscountPct / 100))
+      : 0.0;
 }
 
 class SellInExplorerResponse {
@@ -13592,13 +13598,26 @@ class SellInExplorerResponse {
   final double totalDiscountGrantedEgp;
   final double effectiveDiscountPct;
 
-  /// Waterfall split of [totalDiscountGrantedEgp]: invoice discount, the chain's extra discount
-  /// (خصم إضافي للسلسلة) and the remaining list-minus-net difference.
+  /// «من السعر الرسمي إلى الفاتورة», exact to the piastre:
+  /// official − [totalInvoiceDiscountEgp] − [totalExtraChainDiscountEgp] = [totalExpectedNetEgp];
+  /// expected − [totalExecutionDifferenceEgp] + [totalUnpricedNetEgp] = net; net + VAT = invoices.
   final double totalInvoiceDiscountEgp;
   final double totalExtraChainDiscountEgp;
-  final double totalOtherDifferenceEgp;
+  final double totalExpectedNetEgp;
 
-  /// Effective VAT % over the selection (the chain's configured rate; 14 by default).
+  /// Expected net minus the file net of priced rows (فروق التنفيذ); negative when above it.
+  final double totalExecutionDifferenceEgp;
+
+  /// File net of rows with no official price (بلا سعر رسمي).
+  final double totalUnpricedNetEgp;
+
+  /// Badge percentages: one chain = its saved terms; several = weighted averages ([termsAveraged]).
+  final double invoiceDiscountPct;
+  final double extraDiscountPct;
+  final bool termsAveraged;
+  final List<SellInChainTerms> chainTerms;
+
+  /// VAT % over the selection (one chain: its saved rate; 14 by default).
   final double vatRatePct;
   final double totalNetExclVatEgp;
   final double totalVat14Egp;
@@ -13619,7 +13638,13 @@ class SellInExplorerResponse {
     this.effectiveDiscountPct = 10.0,
     this.totalInvoiceDiscountEgp = 0.0,
     this.totalExtraChainDiscountEgp = 0.0,
-    this.totalOtherDifferenceEgp = 0.0,
+    this.totalExpectedNetEgp = 0.0,
+    this.totalExecutionDifferenceEgp = 0.0,
+    this.totalUnpricedNetEgp = 0.0,
+    this.invoiceDiscountPct = 10.0,
+    this.extraDiscountPct = 0.0,
+    this.termsAveraged = false,
+    this.chainTerms = const [],
     this.vatRatePct = 14.0,
     this.totalNetExclVatEgp = 0.0,
     this.totalVat14Egp = 0.0,
@@ -13640,6 +13665,17 @@ class SellInExplorerResponse {
         double.parse((totVal * 1.14).toStringAsFixed(2));
     final totVat = (json['total_vat_14_egp'] as num?)?.toDouble() ??
         double.parse((totGrossIncl - totVal).toStringAsFixed(2));
+    final netExcl = (json['total_net_excl_vat_egp'] as num?)?.toDouble() ?? totVal;
+    final invDisc = (json['total_invoice_discount_egp'] as num?)?.toDouble() ?? 0.0;
+    final extraDisc = (json['total_extra_chain_discount_egp'] as num?)?.toDouble() ?? 0.0;
+    // Older backends: derive the new lines so the card still adds up.
+    final expectedNet = (json['total_expected_net_egp'] as num?)?.toDouble() ??
+        _round2(totListExcl - invDisc - extraDisc);
+    final execution = (json['total_execution_difference_egp'] as num?)?.toDouble() ??
+        (json['total_other_difference_egp'] as num?)?.toDouble() ??
+        ((json['total_discount_granted_egp'] as num?)?.toDouble() ?? 0.0);
+    final unpriced = (json['total_unpriced_net_egp'] as num?)?.toDouble() ??
+        _round2(netExcl - expectedNet + execution);
     return SellInExplorerResponse(
       records: list,
       totalCount: (json['total_count'] as num?)?.toInt() ?? list.length,
@@ -13655,17 +13691,73 @@ class SellInExplorerResponse {
       totalDiscountGrantedEgp: (json['total_discount_granted_egp'] as num?)?.toDouble() ??
           double.parse((totListExcl - totVal).clamp(0.0, double.infinity).toStringAsFixed(2)),
       effectiveDiscountPct: (json['effective_discount_pct'] as num?)?.toDouble() ?? 10.0,
-      totalInvoiceDiscountEgp: (json['total_invoice_discount_egp'] as num?)?.toDouble() ?? 0.0,
-      totalExtraChainDiscountEgp: (json['total_extra_chain_discount_egp'] as num?)?.toDouble() ?? 0.0,
-      totalOtherDifferenceEgp: (json['total_other_difference_egp'] as num?)?.toDouble() ??
-          ((json['total_discount_granted_egp'] as num?)?.toDouble() ?? 0.0),
+      totalInvoiceDiscountEgp: invDisc,
+      totalExtraChainDiscountEgp: extraDisc,
+      totalExpectedNetEgp: expectedNet,
+      totalExecutionDifferenceEgp: execution,
+      totalUnpricedNetEgp: unpriced,
+      invoiceDiscountPct: (json['invoice_discount_pct'] as num?)?.toDouble() ??
+          (totListExcl != 0 ? _round2(invDisc / totListExcl * 100) : 10.0),
+      extraDiscountPct: (json['extra_discount_pct'] as num?)?.toDouble() ??
+          (totListExcl - invDisc != 0 ? _round2(extraDisc / (totListExcl - invDisc) * 100) : 0.0),
+      termsAveraged: json['terms_averaged'] as bool? ?? false,
+      chainTerms: (json['chain_terms'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(SellInChainTerms.fromJson)
+          .toList(),
       vatRatePct: (json['vat_rate_pct'] as num?)?.toDouble() ?? 14.0,
-      totalNetExclVatEgp: (json['total_net_excl_vat_egp'] as num?)?.toDouble() ?? totVal,
+      totalNetExclVatEgp: netExcl,
       totalVat14Egp: totVat,
       totalGrossInclVatEgp: totGrossIncl,
       matchedCatalogSkusCount: (json['matched_catalog_skus_count'] as num?)?.toInt() ?? 0,
     );
   }
+}
+
+double _round2(double v) => (v * 100).roundToDouble() / 100;
+
+/// One chain's Sell-In terms (saved in Product Master › حاسبة الطلبيات, else the defaults) and its
+/// share of the waterfall; the breakdown behind the «متوسط» badges.
+class SellInChainTerms {
+  final String chain;
+  final bool saved;
+  final double invoiceDiscountPct;
+  final double extraDiscountPct;
+  final double vatRatePct;
+  final double officialListExclVatEgp;
+  final double invoiceDiscountEgp;
+  final double extraDiscountEgp;
+  final double expectedNetEgp;
+  final double unpricedNetEgp;
+  final double netExclVatEgp;
+
+  const SellInChainTerms({
+    required this.chain,
+    this.saved = false,
+    this.invoiceDiscountPct = 10.0,
+    this.extraDiscountPct = 0.0,
+    this.vatRatePct = 14.0,
+    this.officialListExclVatEgp = 0.0,
+    this.invoiceDiscountEgp = 0.0,
+    this.extraDiscountEgp = 0.0,
+    this.expectedNetEgp = 0.0,
+    this.unpricedNetEgp = 0.0,
+    this.netExclVatEgp = 0.0,
+  });
+
+  factory SellInChainTerms.fromJson(Map<String, dynamic> json) => SellInChainTerms(
+        chain: json['chain'] as String? ?? '',
+        saved: json['saved'] as bool? ?? false,
+        invoiceDiscountPct: (json['invoice_discount_pct'] as num?)?.toDouble() ?? 10.0,
+        extraDiscountPct: (json['extra_discount_pct'] as num?)?.toDouble() ?? 0.0,
+        vatRatePct: (json['vat_rate_pct'] as num?)?.toDouble() ?? 14.0,
+        officialListExclVatEgp: (json['official_list_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+        invoiceDiscountEgp: (json['invoice_discount_egp'] as num?)?.toDouble() ?? 0.0,
+        extraDiscountEgp: (json['extra_discount_egp'] as num?)?.toDouble() ?? 0.0,
+        expectedNetEgp: (json['expected_net_egp'] as num?)?.toDouble() ?? 0.0,
+        unpricedNetEgp: (json['unpriced_net_egp'] as num?)?.toDouble() ?? 0.0,
+        netExclVatEgp: (json['net_excl_vat_egp'] as num?)?.toDouble() ?? 0.0,
+      );
 }
 
 class TargetSKUBreakdownModel {

@@ -1287,30 +1287,22 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 		r.OfficialCartonExclVATEGP = pm.CartonPriceExclVAT
 		r.OfficialCartonInclVATEGP = pm.CartonPriceInclVAT
 		r.NetCartonInvoiceCostEGP = pm.NetCartonInvoiceCost
-		discPct := pm.InvoiceDiscountPct
-		if discPct > 0 && discPct <= 1.0 {
-			discPct = math.Round(discPct*10000) / 100
-		}
-		r.InvoiceDiscountPct = discPct
-		r.ExtraDiscountPct = additionalDiscountPct * 100 // set to zero by Mohamed
 		r.CanonicalFamilyKey = CanonicalSellInFamilyKey(&pm, r.ItemName)
 	} else {
 		if r.UnitsPerCarton <= 0 {
 			r.UnitsPerCarton = 12
 		}
-		// No price-list match: the invoice discount is unknown. Leave it at 0 (UI shows "—")
-		// instead of inventing the old hardcoded 10%.
-		r.InvoiceDiscountPct = 0
-		r.ExtraDiscountPct = 0
 		r.PricingWaveStatus = "unmatched"
 		r.CanonicalFamilyKey = CanonicalSellInFamilyKey(nil, r.ItemName)
 	}
-	// The chain's saved terms are the single source of truth for VAT and discounts:
-	// chain setting, else Product Master column, else 14%.
-	r.VATRate = chainVATRate(prof, hasProf, pm, ok)
-	if hasProf {
-		r.InvoiceDiscountPct = prof.InvoiceDiscountPct
-		r.ExtraDiscountPct = prof.AdditionalDiscountPct
+	// The chain's saved terms (else the flat 10% / 0% / 14% defaults) are the single source of truth
+	// for VAT and discounts. An unmatched row without saved terms keeps 0% discounts (UI shows "—"):
+	// it has no official price for a discount to apply to.
+	terms := sellInChainTerms(prof, hasProf)
+	r.VATRate = terms.VATRate
+	r.InvoiceDiscountPct, r.ExtraDiscountPct = terms.InvoiceDiscountPct, terms.ExtraDiscountPct
+	if !ok && !hasProf {
+		r.InvoiceDiscountPct, r.ExtraDiscountPct = 0, 0
 	}
 
 	if r.SOPNeedsPackFallback && !r.SOPQtyConverted {
@@ -1350,11 +1342,9 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 
 	if r.OfficialCartonExclVATEGP > 0 && math.Abs(r.NetQtyCases) > 0.001 {
 		r.OfficialListValueExclEGP = math.Round(r.NetQtyCases*r.OfficialCartonExclVATEGP*100) / 100
-		discGranted := math.Round((r.OfficialListValueExclEGP-r.NetValueEGP)*100) / 100
-		if r.NetQtyCases > 0 && discGranted < 0 {
-			discGranted = 0
-		}
-		r.DiscountGrantedEGP = discGranted
+		// Negative when the row was invoiced above the list price; the waterfall shows it as an
+		// execution difference instead of hiding it.
+		r.DiscountGrantedEGP = math.Round((r.OfficialListValueExclEGP-r.NetValueEGP)*100) / 100
 		if math.Abs(r.OfficialListValueExclEGP) > 0.01 {
 			effDisc := ((r.OfficialListValueExclEGP - r.NetValueEGP) / r.OfficialListValueExclEGP) * 100.0
 			if effDisc < -100 {

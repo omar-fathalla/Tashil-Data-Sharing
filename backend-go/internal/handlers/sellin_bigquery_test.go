@@ -121,10 +121,10 @@ func TestSellInTotalsWaterfallSplitsExtraChainDiscount(t *testing.T) {
 	if resp.TotalDiscountGrantedEGP != 300 || resp.TotalVAT14EGP != 35 || resp.VATRatePct != 5 {
 		t.Fatalf("totals: disc=%v vat=%v vat%%=%v", resp.TotalDiscountGrantedEGP, resp.TotalVAT14EGP, resp.VATRatePct)
 	}
-	// Legacy rows store 0.10 for 10%.
-	legacy := sellInTotalsFromRecords([]domain.SellInRecord{{ItemCode: "A", NetValueEGP: 900, OfficialListValueExclEGP: 1000, InvoiceDiscountPct: 0.10}})
-	if legacy.InvDisc != 100 || legacy.ExtraDisc != 0 {
-		t.Fatalf("legacy fraction: %+v", legacy)
+	// Enrichment always stores whole percents, so a saved 1% extra discount means 1%, not 100%.
+	one := sellInTotalsFromRecords([]domain.SellInRecord{{ItemCode: "A", NetValueEGP: 900, OfficialListValueExclEGP: 1000, InvoiceDiscountPct: 10, ExtraDiscountPct: 1}})
+	if one.InvDisc != 100 || one.ExtraDisc != 9 || one.ExpectedNet != 891 {
+		t.Fatalf("1%% extra: %+v", one)
 	}
 }
 
@@ -155,9 +155,9 @@ func TestSellInTotalsSQLCarriesChainProfiles(t *testing.T) {
 	if got["pc0"] != "fathalla" || got["pv0"] != 0.05 || got["pi0"] != 10.0 || got["pe0"] != 20.0 || got["pc1"] != "kazyon" {
 		t.Fatalf("params %+v", got)
 	}
-	// Without profiles the SQL keeps the stored per-row VAT.
+	// Without profiles the flat 14% VAT applies (not the stored upload-time rate).
 	plain, _, _, _ := bqsink.SellInTotalsSQL("`p.d.t`", bqsink.SellInTotalsQuery{TenantID: "tenant-adeco"})
-	if strings.Contains(plain, "@pc0") || !strings.Contains(plain, "IF(matched AND IFNULL(vat_rate, 0) > 0, vat_rate, 0.14) AS vr") {
+	if strings.Contains(plain, "@pc0") || !strings.Contains(plain, " 0.14 AS vr") {
 		t.Fatal("no-profile SQL changed")
 	}
 }

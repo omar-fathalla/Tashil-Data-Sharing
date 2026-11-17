@@ -40,6 +40,7 @@ import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
 import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
+import '../widgets/sell_in_price_waterfall_card.dart';
 import '../widgets/target_management_panel.dart';
 import '../widgets/sell_table_shared.dart';
 import '../utils/monthly_status_text.dart';
@@ -983,9 +984,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   static const double _sellInHeaderHeight = 56.0;
   static const double _sellInRowHeight = 132.0;
   // Scrolling columns (RTL order): period, chain/branch, cases/units, net,
-  // gross, carton price, brand/category, sales rep, weight, file.
+  // gross, carton price, expected carton price, brand/category, sales rep,
+  // weight, file. Item + the first seven stay within 1030dp.
   static const List<double> _sellInColWidths = [
-    96, 148, 128, 112, 112, 168, 160, 120, 84, 112,
+    80, 120, 116, 104, 104, 128, 120, 160, 120, 84, 112,
   ];
 
   bool _syncingRecordLists = false;
@@ -1056,7 +1058,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       const Text('كرتونة / وحدة', textAlign: TextAlign.center),
       _twoLineHeader(context, 'صافي Sell-In', 'بدون الضريبة'),
       _twoLineHeader(context, 'الإجمالي', 'شامل الضريبة'),
-      _twoLineHeader(context, 'سعر الكرتونة', 'الفعلي مقابل القائمة'),
+      _twoLineHeader(context, 'سعر الكرتونة', 'الفعلي / القائمة'),
+      const Tooltip(
+        message: 'سعر القائمة × (1 − خصم الفاتورة) × (1 − الخصم الإضافي) بإعدادات سلسلة الصف\nالفرق = الفعلي − المتوقع',
+        child: Text('سعر الكرتونة المتوقع', key: ValueKey('sellin_expected_carton_header'), maxLines: 2, textAlign: TextAlign.center),
+      ),
       const Text('العلامة التجارية / الفئة', textAlign: TextAlign.center),
       const Text('مندوب المبيعات', textAlign: TextAlign.center),
       const Text('الوزن (طن)', textAlign: TextAlign.center),
@@ -1312,17 +1318,26 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         _secondary(context, 'الضريبة: ${CurrencyFormatter.formatCompactEGP(vatAmount)}'),
       ], end: true),
       col([
-        _primary(context, 'الفعلي: ${CurrencyFormatter.formatEGP(actualCasePrice)}'),
+        _primary(
+          context,
+          CurrencyFormatter.formatEGP(actualCasePrice, showDecimals: true),
+          key: const ValueKey('sellin_record_actual_carton'),
+          tooltip: 'الفعلي: ${CurrencyFormatter.formatEGP(actualCasePrice, showDecimals: true)}',
+        ),
         if (r.officialCartonExclVatEgp > 0)
-          _secondary(
-            context,
-            r.effectiveDiscountPct > 0
-                ? 'القائمة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)} (خصم ${r.effectiveDiscountPct.toStringAsFixed(1)}%)'
-                : 'القائمة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp)}',
+          Tooltip(
+            message: r.effectiveDiscountPct != 0
+                ? 'خصم فعلي عن القائمة ${r.effectiveDiscountPct.toStringAsFixed(1)}%'
+                : 'سعر القائمة بدون ضريبة',
+            child: _secondary(
+              context,
+              'القائمة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp, showDecimals: true)}',
+            ),
           ),
         if (r.officialCartonExclVatEgp > 0 && r.effectiveDiscountPct <= 0 && wave != null)
           _secondary(context, wave),
       ], end: true),
+      _expectedCartonCell(context, colorScheme, r, actualCasePrice),
       col([
         Tooltip(
           message: '${r.brand} • ${r.subCategory}',
@@ -1343,6 +1358,49 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         child: _secondary(context, r.sourceFilename.isNotEmpty ? sheetShortName(r.sourceFilename) : '—'),
       ),
     ];
+  }
+
+  /// سعر الكرتونة المتوقع with this row's chain terms, and actual − expected below it.
+  Widget _expectedCartonCell(BuildContext context, ColorScheme colorScheme, SellInRecordItem r, double actual) {
+    final expected = r.expectedCartonExclVatEgp;
+    if (expected <= 0) {
+      return Column(mainAxisSize: MainAxisSize.min, children: [
+        _primary(context, '—', key: const ValueKey('sellin_record_expected_carton')),
+        _secondary(context, 'بلا سعر رسمي'),
+      ]);
+    }
+    final ac = M3StatusColors.of(context).accents;
+    final diff = actual > 0 ? actual - expected : 0.0;
+    final diffPct = diff / expected * 100;
+    final String diffText;
+    final Color diffColor;
+    if (actual <= 0 || diff.abs() < 0.005) {
+      diffText = 'مطابق';
+      diffColor = colorScheme.onSurfaceVariant;
+    } else {
+      final sign = diff > 0 ? '+' : '\u2212';
+      diffText = '\u2066$sign${CurrencyFormatter.formatEGP(diff.abs(), showDecimals: true)} ($sign${diffPct.abs().toStringAsFixed(1)}%)\u2069';
+      diffColor = diff < 0 ? ac.cautionStrong : ac.tealStrong;
+    }
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      _primary(
+        context,
+        CurrencyFormatter.formatEGP(expected, showDecimals: true),
+        key: const ValueKey('sellin_record_expected_carton'),
+        tooltip: '${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp, showDecimals: true)} × (1 − ${SellInPriceWaterfallCard.pct(r.invoiceDiscountPct)}) × (1 − ${SellInPriceWaterfallCard.pct(r.extraDiscountPct)})',
+      ),
+      Tooltip(
+        message: 'الفعلي − المتوقع',
+        child: Text(
+          diffText,
+          key: const ValueKey('sellin_record_expected_carton_diff'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: diffColor, fontWeight: FontWeight.w600),
+        ),
+      ),
+    ]);
   }
 
   Widget _buildSellInListFooter(ThemeData theme, ColorScheme colorScheme) {
@@ -1399,96 +1457,6 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     return chain;
   }
 
-  Widget _buildWaterfallMetricPill(
-    BuildContext context, {
-    required String labelAr,
-    required String valueText,
-    required String subText,
-    required Color accentColor,
-    required IconData icon,
-    String? labelTooltip,
-    bool expand = false,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final labelStyle = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
-          fontSize: M3FontSize.bodySmall,
-          fontWeight: FontWeight.w700,
-          color: cs.onSurfaceVariant,
-        ));
-    final valueStyle = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
-          fontSize: M3FontSize.bodyLarge,
-          fontWeight: FontWeight.w900,
-          color: accentColor,
-        ));
-    final subStyle = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
-          fontSize: M3FontSize.bodySmall,
-          fontWeight: FontWeight.w600,
-          color: cs.onSurfaceVariant,
-        ));
-    Widget label = Text(
-      labelAr,
-      maxLines: 2,
-      overflow: TextOverflow.visible,
-      style: labelStyle,
-    );
-    if (labelTooltip != null) {
-      label = Tooltip(message: labelTooltip, child: label);
-    }
-    final texts = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        label,
-        const SizedBox(height: 2.0),
-        if (_isLoading) ...[
-          const M3SkeletonBox(
-              key: ValueKey('sell_in_waterfall_skeleton'),
-              width: 96.0,
-              height: 18.0),
-          const SizedBox(height: 4.0),
-          const M3SkeletonBox(width: 140.0, height: 10.0),
-        ] else ...[
-          Text(
-            valueText,
-            maxLines: 1,
-            overflow: TextOverflow.visible,
-            style: valueStyle,
-          ),
-          Text(
-            subText,
-            maxLines: 2,
-            overflow: TextOverflow.visible,
-            style: subStyle,
-          ),
-        ],
-      ],
-    );
-    return Container(
-      width: expand ? double.infinity : null,
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 10.0),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: M3Shape.radiusMd,
-        border: Border.all(color: accentColor.withOpacity(0.35)),
-      ),
-      child: Row(
-        mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6.0),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.12),
-              borderRadius: M3Shape.radiusSm,
-            ),
-            child: Icon(icon, size: 18.0, color: accentColor),
-          ),
-          const SizedBox(width: 6.0),
-          if (expand) Expanded(child: texts) else texts,
-        ],
-      ),
-    );
-  }
-
   // ===========================================================================
   // TAB 0: SELL-IN DATA & TRANSACTIONS EXPLORER
   // ===========================================================================
@@ -1500,28 +1468,13 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     final netExclVat = _data.totalNetExclVatEgp > 0
         ? _data.totalNetExclVatEgp
         : _data.totalValueEgp;
-    final vatPct = _data.vatRatePct;
-    final vatPctLabel = vatPct == vatPct.roundToDouble()
-        ? vatPct.toStringAsFixed(0)
-        : vatPct.toStringAsFixed(1);
     final vat14 = _data.totalVat14Egp > 0
         ? _data.totalVat14Egp
-        : netExclVat * vatPct / 100.0;
+        : netExclVat * _data.vatRatePct / 100.0;
     final grossInclVat = _data.totalGrossInclVatEgp > 0
         ? _data.totalGrossInclVatEgp
         : netExclVat + vat14;
-    final officialListExcl = _data.totalOfficialListExclVatEgp > 0
-        ? _data.totalOfficialListExclVatEgp
-        : netExclVat;
-    final discountGranted = _data.totalDiscountGrantedEgp;
     final discountPct = _data.effectiveDiscountPct;
-    final invoiceDiscount = _data.totalInvoiceDiscountEgp;
-    final extraChainDiscount = _data.totalExtraChainDiscountEgp;
-    final otherDifference = _data.totalOtherDifferenceEgp;
-    final showOtherDifference = otherDifference.abs() >= 1.0;
-    String pctOfList(double v) => officialListExcl > 0
-        ? '${(v / officialListExcl * 100).toStringAsFixed(1)}%'
-        : '—';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1591,190 +1544,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
         M3Spacing.gapMD,
 
-        // 1.B Tax & Discount Waterfall Banner (Product Master Official Price vs Net Invoice vs 14% VAT)
-        Container(
-          key: const ValueKey('sellin_waterfall_strip'),
-          padding: M3Spacing.pSm,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: M3Shape.radiusLg,
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.5),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.account_tree_rounded,
-                    size: 20.0,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8.0),
-                  Expanded(
-                    child: Text(
-                      'من السعر الرسمي إلى الفاتورة',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10.0,
-                      vertical: 4.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHigh,
-                      borderRadius: M3Shape.radiusSm,
-                    ),
-                    child: Text(
-                      'اضغط على الصنف لعرض بياناته.',
-                      style: Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(                         fontSize: M3FontSize.bodySmall,                         fontWeight: FontWeight.w600,                         color: colorScheme.onSurfaceVariant,                       )),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10.0),
-              LayoutBuilder(
-                builder: (context, stripConstraints) {
-                  final fit = stripConstraints.maxWidth >= (showOtherDifference ? 1100 : 900);
-                  Widget op(IconData icon) => Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                        child: Icon(
-                          icon,
-                          size: 18.0,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      );
-                  final pills = <Widget>[
-                    _buildWaterfallMetricPill(
-                      context,
-                      labelAr: '1. السعر الرسمي',
-                      labelTooltip: '1. بالسعر الرسمي',
-                      valueText: CurrencyFormatter.formatCompactEGP(
-                          officialListExcl),
-                      subText: 'حسب قائمة الأسعار',
-                      accentColor:
-                          M3StatusColors.of(context).accents.neutral,
-                      icon: Icons.price_check_rounded,
-                      expand: fit,
-                    ),
-                    op(Icons.remove_circle_outline_rounded),
-                    _buildWaterfallMetricPill(
-                      context,
-                      labelAr: '2. خصم الفاتورة',
-                      labelTooltip: '2. خصم الفاتورة (حسب إعدادات السلسلة)',
-                      valueText:
-                          '${CurrencyFormatter.formatCompactEGP(invoiceDiscount)} (${pctOfList(invoiceDiscount)})',
-                      subText: 'نسبة خصم الفاتورة من السعر الرسمي',
-                      accentColor: M3StatusColors.of(context).accents.alert,
-                      icon: Icons.discount_rounded,
-                      expand: fit,
-                    ),
-                    op(Icons.remove_circle_outline_rounded),
-                    _buildWaterfallMetricPill(
-                      context,
-                      labelAr: '3. خصم إضافي للسلسلة',
-                      labelTooltip:
-                          '3. الخصم الإضافي للسلسلة بعد خصم الفاتورة (حسب إعدادات السلسلة)',
-                      valueText:
-                          '${CurrencyFormatter.formatCompactEGP(extraChainDiscount)} (${pctOfList(extraChainDiscount)})',
-                      subText: 'مستقل عن فروق الأسعار',
-                      accentColor: M3StatusColors.of(context).accents.alert,
-                      icon: Icons.local_offer_rounded,
-                      expand: fit,
-                    ),
-                    if (showOtherDifference) ...[
-                      op(Icons.remove_circle_outline_rounded),
-                      _buildWaterfallMetricPill(
-                        context,
-                        labelAr: '4. فروق أخرى',
-                        labelTooltip:
-                            '4. الفرق المتبقي بين السعر الرسمي وصافي الفاتورة بعد الخصمين (انحراف سعر / عروض)',
-                        valueText:
-                            CurrencyFormatter.formatCompactEGP(otherDifference),
-                        subText:
-                            'إجمالي الخصم ${CurrencyFormatter.formatCompactEGP(discountGranted)} (${discountPct.toStringAsFixed(1)}%)',
-                        accentColor:
-                            M3StatusColors.of(context).accents.neutral,
-                        icon: Icons.compare_arrows_rounded,
-                        expand: fit,
-                      ),
-                    ],
-                    op(Icons.drag_handle_rounded),
-                    _buildWaterfallMetricPill(
-                      context,
-                      labelAr: '${showOtherDifference ? 5 : 4}. صافي التوريد',
-                      labelTooltip:
-                          '${showOtherDifference ? 5 : 4}. صافي Sell-In بعد المرتجعات (بدون الضريبة)',
-                      valueText:
-                          CurrencyFormatter.formatCompactEGP(netExclVat),
-                      subText:
-                          '${CurrencyFormatter.formatNumber(_data.totalCases.round())} كرتونة • ${CurrencyFormatter.formatNumber(_data.totalUnitsPieces)} وحدة',
-                      accentColor: colorScheme.primary,
-                      icon: Icons.local_shipping_rounded,
-                      expand: fit,
-                    ),
-                    op(Icons.add_circle_outline_rounded),
-                    _buildWaterfallMetricPill(
-                      context,
-                      labelAr: '${showOtherDifference ? 6 : 5}. الضريبة $vatPctLabel%',
-                      labelTooltip:
-                          '${showOtherDifference ? 6 : 5}. ضريبة القيمة المضافة ($vatPctLabel%) حسب إعدادات السلسلة',
-                      valueText: CurrencyFormatter.formatCompactEGP(vat14),
-                      subText: '—',
-                      accentColor:
-                          M3StatusColors.of(context).accents.purple,
-                      icon: Icons.percent_rounded,
-                      expand: fit,
-                    ),
-                    op(AppIcons.arrowForward),
-                    _buildWaterfallMetricPill(
-                      context,
-                      labelAr: '${showOtherDifference ? 7 : 6}. الفواتير',
-                      labelTooltip: '${showOtherDifference ? 7 : 6}. قيمة الفواتير',
-                      valueText:
-                          CurrencyFormatter.formatCompactEGP(grossInclVat),
-                      subText: 'إجمالي المطالبة على السلسلة',
-                      accentColor:
-                          M3StatusColors.of(context).accents.tealStrong,
-                      icon: Icons.account_balance_wallet_rounded,
-                      expand: fit,
-                    ),
-                  ];
-                  if (!fit) {
-                    return Wrap(
-                      spacing: 6.0,
-                      runSpacing: 8.0,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: pills
-                          .map((w) => w is Padding
-                              ? w
-                              : SizedBox(
-                                  width: (stripConstraints.maxWidth - 12) /
-                                      (stripConstraints.maxWidth < 580
-                                          ? 1
-                                          : 2),
-                                  child: w,
-                                ))
-                          .toList(),
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      for (final w in pills)
-                        if (w is Padding) w else Expanded(child: w),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
+        SellInPriceWaterfallCard(
+          data: _data,
+          chainLabel: _chainNameAr,
+          loading: _isLoading,
         ),
 
         M3Spacing.gapMD,
