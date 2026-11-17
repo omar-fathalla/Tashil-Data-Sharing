@@ -266,4 +266,46 @@ void main() {
     expect(find.byKey(const ValueKey('chain_discount_delete_btn')), findsNothing);
     expect(tester.widget<TextField>(find.byKey(const ValueKey('chain_discount_vat_field'))).enabled, isFalse);
   });
+
+  testWidgets('while saving the add button and the table rows are disabled', (tester) async {
+    _bigView(tester);
+    var saves = 0;
+    const profiles = [
+      ChainDiscountProfileModel(chain: 'fathalla', invoiceDiscountPct: 10, additionalDiscountPct: 0, vatRatePct: 14)
+    ];
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: profiles,
+      saving: true,
+      onSave: (_) async => saves++,
+    )));
+    expect(tester.widget<FilledButton>(find.byKey(const ValueKey('chain_discount_add_btn'))).onPressed, isNull);
+    expect(tester.widget<AbsorbPointer>(find.byKey(const ValueKey('pm_chain_discount_absorb'))).absorbing, isTrue);
+    await tester.tap(find.byKey(const ValueKey('chain_terms_row_fathalla')), warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const ValueKey('chain_discount_save_btn')), findsNothing,
+        reason: 'no edit dialog opens while a save is in flight');
+    expect(saves, 0);
+
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(profiles: profiles, onSave: (_) async => saves++)));
+    expect(tester.widget<AbsorbPointer>(find.byKey(const ValueKey('pm_chain_discount_absorb'))).absorbing, isFalse);
+    expect(tester.widget<FilledButton>(find.byKey(const ValueKey('chain_discount_add_btn'))).onPressed, isNotNull);
+  });
+
+  testWidgets('a double tap on «حفظ» submits once', (tester) async {
+    _bigView(tester);
+    final saved = <List<ChainDiscountProfileModel>>[];
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: const [
+        ChainDiscountProfileModel(chain: 'fathalla', invoiceDiscountPct: 10, additionalDiscountPct: 0, vatRatePct: 14)
+      ],
+      onSave: (next) async => saved.add(next),
+    )));
+    await tester.tap(find.byKey(const ValueKey('chain_terms_row_fathalla')));
+    await tester.pumpAndSettle();
+    final save = find.byKey(const ValueKey('chain_discount_save_btn'));
+    await tester.tap(save);
+    await tester.tap(save, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(saved, hasLength(1));
+  });
 }

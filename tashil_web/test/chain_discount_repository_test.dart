@@ -11,6 +11,7 @@ import 'package:tashil_web/features/product_master/data/chain_discount_repositor
 void main() {
   tearDown(() {
     ChainDiscountRepository.loadTimeout = const Duration(seconds: 20);
+    ChainDiscountRepository.saveTimeout = const Duration(seconds: 45);
     BackendHttp.cache.clear();
   });
 
@@ -156,5 +157,184 @@ void main() {
       expect(list.single.chain, 'kazyon');
       expect(list.single.invoiceDiscountPct, 12);
     }, () => server);
+  });
+
+  group('save', () {
+    const sent = [
+      ChainDiscountProfileModel(
+          chain: 'kazyon',
+          invoiceDiscountPct: 12,
+          additionalDiscountPct: 2,
+          vatRatePct: 14),
+      ChainDiscountProfileModel(
+          chain: 'fathalla', invoiceDiscountPct: 10, additionalDiscountPct: 0),
+    ];
+
+    String body(List<Map<String, dynamic>> profiles) =>
+        jsonEncode({'profiles': profiles});
+
+    Map<String, dynamic> row(String chain, double inv, double add,
+            {double? vat}) =>
+        {
+          'chain': chain,
+          'invoice_discount_pct': inv,
+          'additional_discount_pct': add,
+          if (vat != null) 'vat_rate_pct': vat,
+          'updated_at': '2026-11-17T15:38:00Z',
+          'updated_by': 'admin@adeco.test',
+        };
+
+    final jsonHeaders = {'content-type': 'application/json; charset=utf-8'};
+
+    test('the PUT budget is 45s (the live save took 14.9s and 22.7s)', () {
+      expect(ChainDiscountRepository.saveTimeout, const Duration(seconds: 45));
+    });
+
+    test('a slow PUT inside the budget succeeds without a read-back', () async {
+      var gets = 0;
+      final server = MockClient((req) async {
+        if (req.method == 'GET') gets++;
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        return http.Response(
+            body([row('kazyon', 12, 2, vat: 14), row('fathalla', 10, 0)]), 200,
+            headers: jsonHeaders);
+      });
+      ChainDiscountRepository.saveTimeout = const Duration(seconds: 5);
+      await http.runWithClient(() async {
+        final out = await repo().save(sent);
+        expect(out.map((p) => p.chain), ['kazyon', 'fathalla']);
+      }, () => server);
+      expect(gets, 0);
+    });
+
+    test('PUT times out but the server stored it: re-GET equals sent -> saved',
+        () async {
+      ChainDiscountRepository.saveTimeout = const Duration(milliseconds: 30);
+      final methods = <String>[];
+      final server = MockClient((req) async {
+        methods.add(req.method);
+        if (req.method == 'PUT') {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          return http.Response('{}', 200);
+        }
+        return http.Response(
+            body([row('fathalla', 10, 0), row('Kazyon', 12, 2, vat: 14)]), 200,
+            headers: jsonHeaders);
+      });
+      await http.runWithClient(() async {
+        final out = await repo().save(sent);
+        expect(out.map((p) => p.chain).toSet(), {'fathalla', 'Kazyon'});
+        expect(out.first.updatedBy, 'admin@adeco.test',
+            reason: 'the table shows what the server stored');
+      }, () => server);
+      expect(methods, ['PUT', 'GET']);
+    });
+
+    test('PUT times out and the stored list differs -> unverified, not saved',
+        () async {
+      ChainDiscountRepository.saveTimeout = const Duration(milliseconds: 30);
+      final server = MockClient((req) async {
+        if (req.method == 'PUT') {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          return http.Response('{}', 200);
+        }
+        return http.Response(body([row('kazyon', 11, 2, vat: 14)]), 200,
+            headers: jsonHeaders);
+      });
+      await http.runWithClient(() async {
+        await expectLater(
+          repo().save(sent),
+          throwsA(isA<ChainDiscountSaveUnverifiedException>().having(
+              (e) => e.message,
+              'message',
+              kChainDiscountSaveUnverifiedMessage)),
+        );
+      }, () => server);
+    });
+
+    test('PUT times out and the re-GET fails too -> unverified', () async {
+      ChainDiscountRepository.saveTimeout = const Duration(milliseconds: 30);
+      final server = MockClient((req) async {
+        if (req.method == 'PUT') {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          return http.Response('{}', 200);
+        }
+        return http.Response('{}', 504);
+      });
+      await http.runWithClient(() async {
+        await expectLater(repo().save(sent),
+            throwsA(isA<ChainDiscountSaveUnverifiedException>()));
+      }, () => server);
+    });
+
+    test('the read-back is a fresh GET, not a cached copy', () async {
+      ChainDiscountRepository.saveTimeout = const Duration(milliseconds: 30);
+      var gets = 0;
+      final server = MockClient((req) async {
+        if (req.method == 'PUT') {
+          await Future<void>.delayed(const Duration(seconds: 1));
+          return http.Response('{}', 200);
+        }
+        gets++;
+        // First GET (the page load) returns the old list, the read-back the new one.
+        return http.Response(
+            gets == 1
+                ? body([])
+                : body([row('kazyon', 12, 2, vat: 14), row('fathalla', 10, 0)]),
+            200,
+            headers: jsonHeaders);
+      });
+      await http.runWithClient(() async {
+        expect(await repo().load(), isEmpty);
+        final out = await repo().save(sent);
+        expect(out, hasLength(2));
+      }, () => server);
+      expect(gets, 2);
+    });
+
+    test('a 400 from the server is surfaced, never verified', () async {
+      var gets = 0;
+      final server = MockClient((req) async {
+        if (req.method == 'GET') gets++;
+        return http.Response(jsonEncode({'error': 'invalid'}), 400);
+      });
+      await http.runWithClient(() async {
+        await expectLater(
+            repo().save(sent),
+            throwsA(isA<ChainDiscountException>()
+                .having((e) => e, 'type', isNot(isA<ChainDiscountSaveUnverifiedException>()))));
+      }, () => server);
+      expect(gets, 0);
+    });
+
+    test('sameChainProfileTerms ignores order, case and audit fields', () {
+      expect(
+          sameChainProfileTerms(sent, sent.reversed.toList()), isTrue);
+      expect(
+          sameChainProfileTerms([
+            const ChainDiscountProfileModel(
+                chain: ' Kazyon ',
+                invoiceDiscountPct: 12,
+                additionalDiscountPct: 2,
+                vatRatePct: 14,
+                updatedBy: 'x')
+          ], [
+            sent.first
+          ]),
+          isTrue);
+      expect(
+          sameChainProfileTerms(sent, [sent.first]), isFalse);
+      expect(
+          sameChainProfileTerms([
+            sent.first
+          ], [
+            const ChainDiscountProfileModel(
+                chain: 'kazyon',
+                invoiceDiscountPct: 12,
+                additionalDiscountPct: 2)
+          ]),
+          isFalse,
+          reason: 'VAT set vs unset differs');
+    });
   });
 }

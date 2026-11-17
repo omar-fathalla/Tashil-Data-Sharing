@@ -320,6 +320,7 @@ func (c *Client) indexProductMasterLocked(normTenant string, summary *domain.Pro
 	c.productMasterByBarcode[normTenant] = byBarcode
 	c.productMasterByBarcodeCandidates[normTenant] = byBarcodeCandidates
 	c.productMasterByName[normTenant] = byName
+	c.noteSellInDataChanged()
 }
 
 // ComputeProductMasterDiff compares an incoming Product Master catalog against a baseline catalog and annotates each item with price delta indicators.
@@ -1374,6 +1375,7 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 }
 
 func (c *Client) enrichAllTenantDataLocked(tenantID string) {
+	c.noteSellInDataChanged()
 	for i := range c.records {
 		if matchTenant(c.records[i].TenantID, tenantID) {
 			c.enrichSellOutFactLocked(&c.records[i])

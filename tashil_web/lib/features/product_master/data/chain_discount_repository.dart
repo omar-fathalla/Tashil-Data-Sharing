@@ -57,6 +57,26 @@ class ChainDiscountProfileModel {
   static String key(String chain) => chain.trim().toLowerCase();
 }
 
+/// True when both lists hold the same chains (by normalized key) with the same terms. Order,
+/// `updated_at` and `updated_by` are ignored.
+bool sameChainProfileTerms(List<ChainDiscountProfileModel> a, List<ChainDiscountProfileModel> b) {
+  if (a.length != b.length) return false;
+  final byKey = {for (final p in b) ChainDiscountProfileModel.key(p.chain): p};
+  if (byKey.length != b.length) return false;
+  bool near(double x, double y) => (x - y).abs() < 1e-9;
+  for (final p in a) {
+    final o = byKey[ChainDiscountProfileModel.key(p.chain)];
+    if (o == null) return false;
+    if (!near(p.invoiceDiscountPct, o.invoiceDiscountPct) ||
+        !near(p.additionalDiscountPct, o.additionalDiscountPct)) {
+      return false;
+    }
+    if ((p.vatRatePct == null) != (o.vatRatePct == null)) return false;
+    if (p.vatRatePct != null && !near(p.vatRatePct!, o.vatRatePct!)) return false;
+  }
+  return true;
+}
+
 double _toDouble(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0.0;
 
 class ChainDiscountException implements Exception {
@@ -65,6 +85,16 @@ class ChainDiscountException implements Exception {
   @override
   String toString() => message;
 }
+
+/// The save request produced no answer and a follow-up read could not confirm the list either.
+/// The server may or may not have stored it; the user can retry the save.
+class ChainDiscountSaveUnverifiedException extends ChainDiscountException {
+  const ChainDiscountSaveUnverifiedException([super.message = kChainDiscountSaveUnverifiedMessage]);
+}
+
+const String kChainDiscountSaveUnverifiedTitle = 'تعذّر التأكد من الحفظ';
+const String kChainDiscountSaveUnverifiedMessage =
+    'لم يصل تأكيد الحفظ من الخادم، وقد تكون التغييرات حُفظت. أعد المحاولة للتأكد.';
 
 const String kChainDiscountTimeoutMessage =
     'انتهت مهلة تحميل إعدادات السلاسل. تحقّق من الاتصال ثم أعد المحاولة.';
@@ -142,6 +172,10 @@ class ChainDiscountRepository {
   /// Client budget for GET; the backend bounds its own read well below this.
   static Duration loadTimeout = const Duration(seconds: 20);
 
+  /// Client budget for PUT. The server answers once Firestore has the list; this leaves room for a
+  /// cold instance or a slow store. On expiry the list is re-read to see whether it was saved.
+  static Duration saveTimeout = const Duration(seconds: 45);
+
   Future<List<ChainDiscountProfileModel>> load() async {
     try {
       final res = await BackendHttp.get(
@@ -165,13 +199,17 @@ class ChainDiscountRepository {
   }
 
   /// Replaces the full list (add / edit / delete are all a new list).
+  ///
+  /// When the PUT gets no answer in time the server may still have stored the list, so it is read
+  /// back: an identical list counts as saved; anything else throws
+  /// [ChainDiscountSaveUnverifiedException].
   Future<List<ChainDiscountProfileModel>> save(List<ChainDiscountProfileModel> profiles) async {
     try {
       final res = await BackendHttp.put(
         Uri.parse(ApiEndpoints.productMasterChainDiscounts),
         headers: api.requestHeaders,
         body: jsonEncode({'profiles': profiles.map((p) => p.toJson()).toList()}),
-      ).timeout(const Duration(seconds: 12));
+      ).timeout(saveTimeout);
       if (res.statusCode == 200) {
         return _parse(res.bodyBytes);
       }
@@ -185,15 +223,35 @@ class ChainDiscountRepository {
       }
     } on ChainDiscountException {
       rethrow;
-    } catch (e) {
+    } on TimeoutException {
+      final stored = await _readBack(profiles);
+      if (stored != null) return stored;
+      if (!api.allowMockFallback) throw const ChainDiscountSaveUnverifiedException();
+    } catch (_) {
       if (!api.allowMockFallback) {
-        throw ChainDiscountException(e is TimeoutException
-            ? 'انتهت مهلة حفظ إعدادات السلاسل. أعد المحاولة.'
-            : 'تعذّر الاتصال بالخادم لحفظ إعدادات السلاسل. أعد المحاولة.');
+        throw const ChainDiscountException(
+            'تعذّر الاتصال بالخادم لحفظ إعدادات السلاسل. أعد المحاولة.');
       }
     }
     _offline[api.tenantId] = List.of(profiles);
     return profiles;
+  }
+
+  /// Fresh GET (the read cache is dropped first so a stale copy cannot confirm or deny the save).
+  /// Returns the stored list when it equals [sent], otherwise null (different, or unreadable).
+  Future<List<ChainDiscountProfileModel>?> _readBack(List<ChainDiscountProfileModel> sent) async {
+    try {
+      BackendHttp.cache.invalidateAll();
+      final res = await BackendHttp.get(
+        Uri.parse(ApiEndpoints.productMasterChainDiscounts),
+        headers: api.requestHeaders,
+      ).timeout(loadTimeout);
+      if (res.statusCode != 200) return null;
+      final stored = _parse(res.bodyBytes);
+      return sameChainProfileTerms(sent, stored) ? stored : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Chains with counted Sell-In / Sell-Out data. Never invents a name when the call fails.

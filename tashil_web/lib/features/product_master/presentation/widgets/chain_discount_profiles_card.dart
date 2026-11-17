@@ -53,6 +53,7 @@ class ChainDiscountProfilesCard extends StatelessWidget {
 
   Future<void> _edit(BuildContext context,
       {ChainDiscountProfileModel? existing}) async {
+    if (saving) return;
     final result = await showDialog<_DialogResult>(
       context: context,
       builder: (_) => _ChainTermsDialog(
@@ -148,7 +149,12 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                       ?.copyWith(color: cs.onSurfaceVariant)),
             ),
           if (profiles.isNotEmpty)
-            Container(
+            AbsorbPointer(
+              key: const ValueKey('pm_chain_discount_absorb'),
+              absorbing: saving,
+              child: Opacity(
+                opacity: saving ? 0.6 : 1.0,
+                child: Container(
               key: const ValueKey('pm_chain_discount_tonal_surface'),
               decoration: BoxDecoration(
                 color: M3TableSurface.color(cs),
@@ -225,6 +231,8 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                 ),
               ),
             ),
+              ),
+            ),
         ],
       ),
     );
@@ -269,6 +277,9 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
   bool _chainsLoading = false;
   String? _chainsError;
   String? _selectedKey;
+
+  /// A second tap on «حفظ» / «حذف» while the dialog is closing must not pop again.
+  bool _closing = false;
 
   static String _fmt(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
@@ -346,6 +357,7 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
   }
 
   void _submit() {
+    if (_closing) return;
     final chain = _adding ? (_selectedKey ?? '') : _chain.text.trim();
     final vat = double.tryParse(_vat.text.trim());
     final inv = double.tryParse(_inv.text.trim());
@@ -372,6 +384,7 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
       setState(() => _err = err);
       return;
     }
+    _closing = true;
     Navigator.pop(
         context,
         _DialogResult.save(ChainDiscountProfileModel(
@@ -399,7 +412,8 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
         ],
       ),
     );
-    if (ok == true && mounted) {
+    if (ok == true && mounted && !_closing) {
+      _closing = true;
       Navigator.pop(context, const _DialogResult.delete());
     }
   }
