@@ -45,11 +45,16 @@ Finder _sidebarLabel(String label) => find.descendant(
       matching: find.text(label),
     );
 
-Finder _sidebarNav(String label) =>
-    find.byKey(ValueKey('sidebar_nav_$label'));
+Finder _sidebarNav(String label) => find.byKey(ValueKey('sidebar_nav_$label'));
 
 Future<void> _mouseTap(WidgetTester tester, Finder finder) async {
   expect(finder, findsOneWidget);
+  final list = find.descendant(
+    of: find.byType(DesktopSidebar),
+    matching: find.byType(Scrollable),
+  );
+  await tester.scrollUntilVisible(finder, 48.0, scrollable: list.first);
+  await tester.pump();
   final center = tester.getCenter(finder);
   final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
   await gesture.addPointer(location: center);

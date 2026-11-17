@@ -5,6 +5,7 @@ import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/navigation/presentation/app_shell.dart';
 import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
+import 'package:tashil_web/features/navigation/presentation/narrow_sidebar.dart';
 
 void main() {
   group('Navigation Destinations Tests', () {
@@ -14,7 +15,9 @@ void main() {
       apiClient = ApiClient();
     });
 
-    testWidgets('DesktopSidebar renders new destinations with Arabic labels and M3 icons', (WidgetTester tester) async {
+    testWidgets(
+        'DesktopSidebar renders new destinations with Arabic labels and M3 icons',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -50,7 +53,12 @@ void main() {
       expect(find.text('OOS Monitor'), findsOneWidget);
       expect(find.text('Store Matrix'), findsOneWidget);
       expect(find.text('Pricing & Promos'), findsOneWidget);
-      expect(find.text('Upload'), findsOneWidget);
+      expect(find.text('الرئيسية'), findsOneWidget);
+      expect(find.text('الإدخالات'), findsOneWidget);
+      expect(find.text('التسويق'), findsOneWidget);
+      expect(find.text('النظام'), findsOneWidget);
+      expect(find.text('التحليلات'), findsNothing);
+      expect(find.text('Upload'), findsNothing);
 
       // Verify store matrix icon
       expect(find.byIcon(Icons.store_mall_directory_rounded), findsWidgets);
@@ -59,45 +67,44 @@ void main() {
       // Verify Returns icon (index 3 — المرتجعات)
       expect(find.byIcon(Icons.assignment_return_rounded), findsWidgets);
 
-      // Tap on destination 2 ('Sell-In')
-      await tester.tap(find.text('Sell-In'));
+      Future<void> tapLabel(String label) async {
+        final item = find.text(label);
+        await tester.ensureVisible(item);
+        await tester.tap(item);
+      }
+
+      // Route indexes stay stable even though the menu is grouped.
+      await tapLabel('Sell-In');
       expect(selectedDestination, 2);
 
-      // Tap on destination 3 ('Returns')
-      await tester.tap(find.text('Returns'));
+      await tapLabel('Returns');
       expect(selectedDestination, 3);
 
-      // Tap on destination 5 ('Store Matrix') — shifted +1 after Returns
-      await tester.tap(find.text('Store Matrix'));
+      await tapLabel('Store Matrix');
       expect(selectedDestination, 5);
 
-      // Tap on destination 6 ('Pricing & Promos')
-      await tester.tap(find.text('Pricing & Promos'));
+      await tapLabel('Pricing & Promos');
       expect(selectedDestination, 6);
 
-      // Tap on destination 7 ('Compare', added with Competitor Intelligence)
-      await tester.tap(find.text('Compare'));
+      await tapLabel('Compare');
       expect(selectedDestination, 7);
 
-      // Tap on destination 8 ('Trade Marketing & ROI')
-      await tester.tap(find.text('Trade Marketing & ROI'));
+      await tapLabel('Trade Marketing & ROI');
       expect(selectedDestination, 8);
 
-      // Tap on destination 9 ('CPFR Replenishment')
-      await tester.tap(find.text('CPFR Replenishment'));
+      await tapLabel('CPFR Replenishment');
       expect(selectedDestination, 9);
 
-      // Tap on destination 10 ('Upload')
-      await tester.tap(find.text('Upload'));
-      expect(selectedDestination, 10);
-
-      // Tap on destination 11 ('Product Master' at the very bottom)
-      await tester.ensureVisible(find.text('Product Master'));
-      await tester.tap(find.text('Product Master'));
+      await tapLabel('Product Master');
       expect(selectedDestination, 11);
+
+      await tapLabel('Errors');
+      expect(selectedDestination, 12);
     });
 
-    testWidgets('AppShell switches screens when destinations 4 and 5 are selected', (WidgetTester tester) async {
+    testWidgets(
+        'AppShell switches screens when destinations 4 and 5 are selected',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(1440, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -137,7 +144,9 @@ void main() {
       expect(find.text('Pricing & Promos'), findsWidgets);
     });
 
-    testWidgets('AppShell Medium Tablet (NavigationRail) switches between new destinations', (WidgetTester tester) async {
+    testWidgets(
+        'AppShell Medium Tablet (NavigationRail) switches between new destinations',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(800, 1024);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -162,8 +171,25 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // NavigationRail should be visible
-      expect(find.byType(NavigationRail), findsOneWidget);
+      // Narrow sidebar (collapsed rail) should be visible.
+      final rail = find.byType(NarrowSidebar);
+      expect(rail, findsOneWidget);
+      expect(find.byType(NavigationRail), findsNothing);
+      expect(
+        find.descendant(of: rail, matching: find.text('Upload')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: rail,
+          matching: find.byKey(const ValueKey('nav_section_divider_home')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: rail, matching: find.text('الإدخالات')),
+        findsNothing,
+      );
       expect(find.text('Matrix'), findsOneWidget);
       expect(find.text('Pricing'), findsOneWidget);
 
@@ -178,7 +204,9 @@ void main() {
       expect(find.text('Pricing & Promos'), findsWidgets);
     });
 
-    testWidgets('AppShell Compact Mobile (Drawer) navigates to new destinations', (WidgetTester tester) async {
+    testWidgets(
+        'AppShell Compact Mobile (Drawer) navigates to new destinations',
+        (WidgetTester tester) async {
       tester.view.physicalSize = const Size(400, 800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
