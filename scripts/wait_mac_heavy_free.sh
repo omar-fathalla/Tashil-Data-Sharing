@@ -38,10 +38,19 @@ while (( SECONDS < deadline )); do
     if [ -n "$SELF_RUN_ID" ] && [ "$rid" = "$SELF_RUN_ID" ]; then
       continue
     fi
+    # test-flutter matrix shards are "test-flutter (N)"; exclude test-flutter-gate
+    # and the gate display name "Flutter analyze & test".
     jobs="$(gh api "repos/${REPO}/actions/runs/${rid}/jobs" --jq \
       '[.jobs[] | select(
-          (.name == "test-flutter" or .name == "smoke-run"
-           or .name == "deploy-backend" or .name == "deploy-web")
+          (
+            (
+              (.name | startswith("test-flutter"))
+              and (.name | startswith("test-flutter-gate") | not)
+              and (.name != "Flutter analyze & test")
+            )
+            or .name == "smoke-run"
+            or .name == "deploy-backend" or .name == "deploy-web"
+          )
           and (.status == "in_progress" or .status == "queued"
                or .status == "waiting" or .status == "pending"
                or .status == "requested")
