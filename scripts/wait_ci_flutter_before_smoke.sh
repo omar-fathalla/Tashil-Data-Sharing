@@ -14,8 +14,11 @@ REPO="${GITHUB_REPOSITORY:?}"
 # Prefer explicit HEAD_SHA (PR head); fall back to GITHUB_SHA (push/merge_group).
 SHA="${HEAD_SHA:-${GITHUB_SHA:?}}"
 # Default 90m: Mac Flutter can wait behind deploy (30m) + run (35m).
-DEADLINE_MIN="${WAIT_CI_FLUTTER_DEADLINE_MIN:-90}"
+# Job timeout is typically 45m — keep deadline ≤ job so we exit cleanly when possible.
+DEADLINE_MIN="${WAIT_CI_FLUTTER_DEADLINE_MIN:-40}"
 POLL_SEC="${WAIT_CI_FLUTTER_POLL_SEC:-30}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DIAG="${SCRIPT_DIR}/ci_mac_diag.sh"
 
 if [ -z "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
   echo "::error::GH_TOKEN/GITHUB_TOKEN required"
@@ -28,8 +31,18 @@ if [ -n "${GITHUB_SHA:-}" ] && [ "$SHA" != "$GITHUB_SHA" ]; then
   echo "Note: HEAD_SHA=${SHA:0:7} ≠ GITHUB_SHA=${GITHUB_SHA:0:7} (PR virtual merge) — polling head"
 fi
 deadline=$((SECONDS + DEADLINE_MIN * 60))
+poll_n=0
 
 while (( SECONDS < deadline )); do
+  poll_n=$((poll_n + 1))
+  # Heartbeat breadcrumbs: when the Mac runner drops mid-wait, logs often 404 —
+  # flushed lines from earlier polls are the only evidence we keep.
+  if [[ -f "$DIAG" ]]; then
+    bash "$DIAG" heartbeat "wait-ci-flutter-poll-${poll_n}" 2>/dev/null || true
+  else
+    echo "wait-ci-flutter poll=${poll_n} epoch=$(date +%s) runner=${RUNNER_NAME:-local}"
+  fi
+
   run_json="$(gh run list \
     --repo "$REPO" \
     --workflow ci.yml \
