@@ -119,6 +119,9 @@ void main() {
     await _check(tester, 'sell_in_sheets');
   });
 
+  // Re-recorded with the category panel copy: the header badge counts every
+  // own-brand SKU («5 أصناف»), not the old class-A subset («3 أصناف»).
+  // Category-card product counts stay the number chip plus «أصناف».
   testWidgets('Executive dashboard text/icon styles are unchanged',
       (tester) async {
     await _pump(tester, ExecutiveScreen(apiClient: ApiClient()));

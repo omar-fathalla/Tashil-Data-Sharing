@@ -180,12 +180,26 @@ void main() {
       await tester.tap(existingCat);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('زيوت طعام · '), findsOneWidget);
-      expect(find.text('عرض كل الفئات'), findsOneWidget);
-      expect(find.text('عرض الكل'), findsOneWidget);
+      expect(find.textContaining('زيوت طعام · '), findsNWidgets(2));
+      // Same clear action and label as the category card.
+      expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('pareto_80_20_card')),
+            matching: find.text('عرض الكل'),
+          ),
+          findsOneWidget);
+      expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('category_contribution_card')),
+            matching: find.text('عرض الكل'),
+          ),
+          findsOneWidget);
 
-      // Tap clear to reset back to global Pareto SKUs
-      await tester.tap(find.text('عرض كل الفئات'));
+      // Tap clear to reset back to the portfolio SKU list
+      await tester.tap(find.descendant(
+        of: find.byKey(const ValueKey('pareto_80_20_card')),
+        matching: find.text('عرض الكل'),
+      ));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('أصناف فئة:'), findsNothing);
