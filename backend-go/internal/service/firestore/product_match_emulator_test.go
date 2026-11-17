@@ -226,17 +226,26 @@ func TestEmulatorParallelEnqueueNoLostItems(t *testing.T) {
 
 func TestEmulatorRestartPersistence(t *testing.T) {
 	c1 := openProductMatchEmulatorClient(t)
-	ctx := context.Background()
+	// Each call gets its own window. A parent deadline disables the 8s StoreTimeout,
+	// which the shared CI emulator exceeds while other jobs are running.
+	op := func() (context.Context, context.CancelFunc) {
+		return context.WithTimeout(context.Background(), 20*time.Second)
+	}
 	tenant := uniqueTenant(t)
 	q1 := matcher.NewQueue(c1)
 
-	item, err := q1.EnqueueMatch(ctx, tenant, matcher.Query{SKUName: "صنف-دائم", SourceFile: "r.xlsx"}, matcher.Result{
+	enqCtx, enqCancel := op()
+	item, err := q1.EnqueueMatch(enqCtx, tenant, matcher.Query{SKUName: "صنف-دائم", SourceFile: "r.xlsx"}, matcher.Result{
 		Decision: matcher.DecisionNone, ReasonAR: "لا",
 	})
+	enqCancel()
 	if err != nil || item == nil {
 		t.Fatalf("enqueue: %v %+v", err, item)
 	}
-	if _, err := q1.Decide(ctx, tenant, item.ID, matcher.StatusRejected, "admin", "رفض", "", "", matcher.DecideOptions{}); err != nil {
+	decCtx, decCancel := op()
+	_, err = q1.Decide(decCtx, tenant, item.ID, matcher.StatusRejected, "admin", "رفض", "", "", matcher.DecideOptions{})
+	decCancel()
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -244,14 +253,18 @@ func TestEmulatorRestartPersistence(t *testing.T) {
 	c2 := openProductMatchEmulatorClient(t)
 	c2.fsClient = c1.fsClient
 	q2 := matcher.NewQueue(c2)
-	list, err := q2.List(ctx, tenant, matcher.StatusRejected)
+	listCtx, listCancel := op()
+	list, err := q2.List(listCtx, tenant, matcher.StatusRejected)
+	listCancel()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(list) != 1 || list[0].ID != item.ID {
 		t.Fatalf("decision must survive restart: %+v", list)
 	}
-	m, err := q2.Snapshot(ctx, tenant)
+	snapCtx, snapCancel := op()
+	m, err := q2.Snapshot(snapCtx, tenant)
+	snapCancel()
 	if err != nil || m.Rejected != 1 || m.Pending != 0 {
 		t.Fatalf("metrics after restart: %+v err=%v", m, err)
 	}
