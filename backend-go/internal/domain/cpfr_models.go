@@ -552,6 +552,68 @@ type TargetsSummaryResponse struct {
 	Items                     []TargetComparisonItem `json:"items"`
 }
 
+// NormalizeBrandKey lowercases and folds Arabic letter variants so
+// "فلفيتا" and "فلڤيتا" compare equal.
+func NormalizeBrandKey(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.ReplaceAll(s, "ڤ", "ف")
+	s = strings.ReplaceAll(s, "ى", "ي")
+	s = strings.ReplaceAll(s, "ة", "ه")
+	return s
+}
+
+// BrandLabelParts splits "عربي (English)" into Arabic / English / full keys.
+func BrandLabelParts(label string) (ar, en, full string) {
+	full = NormalizeBrandKey(label)
+	if full == "" {
+		return "", "", ""
+	}
+	open := strings.LastIndex(label, "(")
+	close := strings.LastIndex(label, ")")
+	if open >= 0 && close > open {
+		ar = NormalizeBrandKey(label[:open])
+		en = NormalizeBrandKey(label[open+1 : close])
+		return ar, en, full
+	}
+	return full, "", full
+}
+
+// BrandLabelMatches reports whether an inferred catalog brand matches a UI/API
+// brand filter. Accepts full labels ("ديفا (Diva)"), Arabic-only ("ديفا" /
+// "فلفيتا"), or English-only ("Diva" / "Velveta"), with ڤ/ف folding.
+func BrandLabelMatches(inferred, filter string) bool {
+	filter = strings.TrimSpace(filter)
+	if filter == "" || filter == "all" || filter == "الكل" || filter == "كل العلامات التجارية" {
+		return true
+	}
+	aAr, aEn, aFull := BrandLabelParts(inferred)
+	bAr, bEn, bFull := BrandLabelParts(filter)
+	if aFull == "" || bFull == "" {
+		return false
+	}
+	if aFull == bFull {
+		return true
+	}
+	candidates := func(ar, en, full string) []string {
+		out := []string{full}
+		if ar != "" {
+			out = append(out, ar)
+		}
+		if en != "" {
+			out = append(out, en)
+		}
+		return out
+	}
+	for _, a := range candidates(aAr, aEn, aFull) {
+		for _, b := range candidates(bAr, bEn, bFull) {
+			if a == b {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // InferBrandFromItemName uses AI-grade heuristic brand extraction across Arabic & English FMCG and retail goods.
 // It recognizes established brands and dynamically extracts novel brand tokens for any company.
 func InferBrandFromItemName(itemName, subCategory string) string {
@@ -559,6 +621,9 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 	switch {
 	case strings.Contains(s, "ماكسيل") || strings.Contains(s, "maxel"):
 		return "ماكسيل (Maxell)"
+	// Divatol is an Adeco Diva-line SKU; match the longer token before "ديفا".
+	case strings.Contains(s, "ديفاتول") || strings.Contains(s, "divatol"):
+		return "ديفا (Diva)"
 	case strings.Contains(s, "ديفا") || strings.Contains(s, "diva"):
 		return "ديفا (Diva)"
 	case strings.Contains(s, "فلفيتا") || strings.Contains(s, "فلڤيتا") || strings.Contains(s, "velveta"):
