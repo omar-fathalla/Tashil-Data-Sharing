@@ -139,12 +139,20 @@ other bots. Emulator **free-port** isolation stays on either way.
 3. **Parent-alive** every poll: if `Runner.Worker` / `$PPID` chain / GITHUB job looks
    dead, **exit without acquiring**. After acquire, if parent is gone, **release immediately**
    (stops cancelled jobs from leaving orphan `LOCK.d`)
-4. Release `if: always()` only when we own the lock (agent name in `status` / owner file)
-5. Acquire **step** `timeout-minutes` is **shorter than the job** timeout so cancel still
+4. **Stale reclaim**: if `LOCK.d` outlives `eta` + `MAC_LOCK_STALE_GRACE_MIN` (default 10),
+   the waiter removes the orphan (runner-drop often skips the `if: always` release step and
+   leaves 404 logs). Acquire also writes `acquired_epoch` / `eta_deadline_epoch`.
+5. Release `if: always()` only when we own the lock (agent name in `status` / owner file)
+6. Acquire **step** `timeout-minutes` is **shorter than the job** timeout so cancel still
    runs the release step
+
+**Multi-user runners:** `tashil-mac` (legacy) and `tashil-mac-2..4` (`tashil-ci`) may use
+different `$HOME` values. Set **`MAC_RESOURCES_DIR`** on every runner (or in the job env)
+to one shared absolute path so `LOCK.d` actually serializes across all four processes.
 
 ```bash
 export MAC_SHARED_LOCK=1   # recommended while 2+ runners share one Mac
+# export MAC_RESOURCES_DIR=/Users/Shared/mac-resources   # if runners have different $HOME
 AGENT="ci-Tashil-Data-Sharing-${GITHUB_RUN_ID}-${GITHUB_JOB}"
 bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "<task>" <eta> <wait>
 # … work …
@@ -156,7 +164,7 @@ bash scripts/mac_lock_ci.sh release "$AGENT"
 | Backend Go (+ emulator) | no (hosted by default) | yes (no-op on ubuntu) | 10m | 45m |
 | Flutter analyze & test (run) | no (native Mac queue) | yes | 8m | 45m |
 | Playwright Semantics smoke (run) | no (native Mac queue) | yes | 15m | 45m |
-| Wait CI Flutter (smoke) | no | **no** (poll only) | — | 45m (deadline 40m) |
+| Wait CI Flutter (smoke) | no | **no** (poll only; `ci_mac_diag` heartbeat each poll) | — | 45m (deadline 40m) |
 | Deploy gate | no | **no** | — | 5m |
 | Deploy backend / web | **`tashil-deploy`** | no (deploy group + workflow queue) | — | 30m / 30m |
 | Cloud Run pin / PR comment / path detect & gates | no | **no** | — | 5m (hosted via `CI_HOSTED_RUNNER`) |
@@ -200,9 +208,13 @@ and with other agents. Waits poll every 30s up to `wait_max_min`.
 | `CI_GO_TEST_P` | 2 (Darwin/self-hosted) | max packages in parallel |
 | `CI_GO_TEST_GOMAXPROCS` | same as `-p` | `GOMAXPROCS` per package |
 | `CI_GO_TEST_PKG_TIMEOUT_MIN` | 15 | per-package `-timeout` |
+| `CI_GO_TEST_WALL_MIN` | 35 | overall wall clock (leaves room for emulator under 45m job) |
+| `CI_GO_TEST_HEARTBEAT_SEC` | 60 | loadavg + package progress breadcrumbs |
 
 Each package gets its own timeout (avoids one 18m package + another blowing a shared
 20m `go test ./...` wall clock). Runs with `-json` and prints the **slowest 25 tests**.
+Heartbeats / wall kill messages help diagnose Mac **runner drops** (logs often 404; step
+left `in_progress`).
 
 Large local Downloads workbook tests (`TestRealWorkbooks…`, `TestLargeBook6…`) require
 `RUN_LARGE_LOCAL_INGEST_TESTS=1` — on the shared Mac those files exist and otherwise
