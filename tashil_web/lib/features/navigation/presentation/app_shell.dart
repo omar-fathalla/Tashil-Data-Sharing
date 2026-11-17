@@ -191,21 +191,14 @@ class _AppShellState extends State<AppShell> {
                       const SizedBox(height: 12.0),
                       const Divider(height: 1.0),
                       const SizedBox(height: 8.0),
-                      for (final group in AppNavCatalog.groupedMenu()) ...[
-                        if (group.section.labeled)
-                          NavSectionLabel(
-                            section: group.section,
-                            padding: const EdgeInsetsDirectional.fromSTEB(
-                                4.0, 10.0, 4.0, 2.0),
-                          ),
-                        for (final dest in group.items)
-                          _moduleSheetTile(
-                            sheetCtx,
-                            theme,
-                            colorScheme,
-                            dest,
-                          ),
-                      ],
+                      ...navSectionChildren(
+                        itemBuilder: (dest) => _moduleSheetTile(
+                          sheetCtx,
+                          theme,
+                          colorScheme,
+                          dest,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -658,15 +651,11 @@ class _AppShellState extends State<AppShell> {
           M3Spacing.gapXS,
           // Compact drawer: bottom bar already owns Sell-Out — only attach
           // ids for destinations missing there (notably Sell-In).
-          for (final group in AppNavCatalog.groupedMenu()) ...[
-            if (group.section.labeled)
-              NavSectionLabel(
-                section: group.section,
-                padding:
-                    const EdgeInsetsDirectional.fromSTEB(28.0, 14.0, 16.0, 2.0),
-              ),
-            for (final dest in group.items) _drawerDestination(dest),
-          ],
+          ...navSectionChildren(
+            labelPadding:
+                const EdgeInsetsDirectional.fromSTEB(16.0, 10.0, 16.0, 6.0),
+            itemBuilder: _drawerDestination,
+          ),
           const Divider(height: 1.0),
           Padding(
             padding: const EdgeInsets.all(12.0),

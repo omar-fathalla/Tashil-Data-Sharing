@@ -10,6 +10,11 @@ import 'tenant_profile_card.dart';
 /// DesktopSidebar provides a permanent Material Design 3 Navigation Drawer
 /// with an RTL layout (width: 250dp) designed for executive management portals.
 class DesktopSidebar extends StatelessWidget {
+  /// Live rows are 52dp. Variant C chips plus a divider between every section
+  /// overflow a 1280×800 sidebar at that height (the list would scroll).
+  /// 36dp is the reviewed mockup row and keeps every destination on screen.
+  static const double destinationHeight = 36.0;
+
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
   final String activeTenant;
@@ -81,22 +86,16 @@ class DesktopSidebar extends StatelessWidget {
               child: ListView(
                 padding:
                     const EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 12.0, 12.0),
-                children: [
-                  for (final group in AppNavCatalog.groupedMenu()) ...[
-                    if (group.section.labeled)
-                      NavSectionLabel(section: group.section),
-                    for (final dest in group.items)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4.0),
-                        child: _SidebarDestination(
-                          item: dest,
-                          selected: selectedIndex == dest.routeIndex,
-                          onSelected: () =>
-                              onDestinationSelected(dest.routeIndex),
-                        ),
-                      ),
-                  ],
-                ],
+                children: navSectionChildren(
+                  itemBuilder: (dest) => Padding(
+                    padding: const EdgeInsets.only(bottom: 2.0),
+                    child: _SidebarDestination(
+                      item: dest,
+                      selected: selectedIndex == dest.routeIndex,
+                      onSelected: () => onDestinationSelected(dest.routeIndex),
+                    ),
+                  ),
+                ),
               ),
             ),
 
@@ -216,7 +215,7 @@ class _SidebarDestination extends StatelessWidget {
         onTap: onSelected,
         customBorder: const StadiumBorder(),
         child: Container(
-          height: 52.0,
+          height: DesktopSidebar.destinationHeight,
           padding: const EdgeInsetsDirectional.symmetric(horizontal: 16.0),
           child: Row(
             children: [

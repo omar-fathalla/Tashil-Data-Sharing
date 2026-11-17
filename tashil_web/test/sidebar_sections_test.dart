@@ -46,60 +46,91 @@ void main() {
     final sections = AppNavCatalog.groupedMenu();
     expect(
       sections.map((group) => group.section.titleAr),
-      ['', 'الإدخالات', 'التسويق', 'التحليلات', 'النظام'],
+      ['الرئيسية', 'الإدخالات', 'التسويق', 'النظام'],
+    );
+    expect(
+      sections[0].items.map((item) => item.sidebarLabel),
+      ['Dashboard', 'OOS Monitor', 'Store Matrix'],
     );
     expect(
       sections[1].items.map((item) => item.sidebarLabel),
-      ['Sell-Out', 'Sell-In', 'Returns', 'Product Master'],
+      [
+        'Sell-Out',
+        'Sell-In',
+        'Returns',
+        'Product Master',
+        'CPFR Replenishment'
+      ],
     );
     expect(
       sections[2].items.map((item) => item.sidebarLabel),
-      ['Pricing & Promos', 'Trade Marketing & ROI'],
+      ['Pricing & Promos', 'Compare', 'Trade Marketing & ROI'],
     );
-    expect(
-      sections[3].items.map((item) => item.sidebarLabel),
-      ['OOS Monitor', 'Store Matrix', 'Compare', 'CPFR Replenishment'],
-    );
-    expect(sections[4].items.single.sidebarLabel, 'Errors');
-    expect(sections.first.items.single.sidebarLabel, 'Dashboard');
+    expect(sections[3].items.single.sidebarLabel, 'Errors');
 
     final routes = AppNavCatalog.items.map((item) => item.routeIndex).toSet();
     expect(routes, {for (var i = 0; i < AppPageRoute.pageSlugs.length; i++) i});
   });
 
-  testWidgets('wide sidebar shows thin Arabic section headers and hides Upload',
+  testWidgets(
+      'wide sidebar shows chip section labels, dividers, and hides Upload',
       (tester) async {
     await _pumpWide(tester);
 
     expect(find.text('Upload'), findsNothing);
+    expect(find.text('الرئيسية'), findsOneWidget);
     expect(find.text('الإدخالات'), findsOneWidget);
     expect(find.text('التسويق'), findsOneWidget);
-    expect(find.text('التحليلات'), findsOneWidget);
     expect(find.text('النظام'), findsOneWidget);
-    expect(
-        find.byKey(const ValueKey('nav_section_divider_inputs')), findsNothing);
+    expect(find.text('التحليلات'), findsNothing);
 
     final header = tester.widget<Text>(find.text('الإدخالات'));
-    expect(header.style?.fontWeight, FontWeight.w400);
+    expect(header.style?.fontWeight, FontWeight.w700);
     expect(header.style?.fontSize, 11.0);
 
     double top(String label) => tester.getTopLeft(find.text(label)).dy;
-    expect(top('Dashboard'), lessThan(top('الإدخالات')));
+    expect(top('الرئيسية'), lessThan(top('Dashboard')));
+    expect(top('Store Matrix'), lessThan(top('الإدخالات')));
     expect(top('الإدخالات'), lessThan(top('Sell-Out')));
-    expect(top('Product Master'), lessThan(top('التسويق')));
+    expect(top('CPFR Replenishment'), lessThan(top('التسويق')));
     expect(top('التسويق'), lessThan(top('Pricing & Promos')));
-    expect(top('Trade Marketing & ROI'), lessThan(top('التحليلات')));
-    expect(top('التحليلات'), lessThan(top('OOS Monitor')));
-    expect(top('CPFR Replenishment'), lessThan(top('النظام')));
+    expect(top('Compare'), lessThan(top('Trade Marketing & ROI')));
+    expect(top('Trade Marketing & ROI'), lessThan(top('النظام')));
     expect(top('النظام'), lessThan(top('Errors')));
+
+    for (final id in ['home', 'inputs', 'marketing']) {
+      expect(
+        find.byKey(ValueKey('nav_section_divider_$id')),
+        findsOneWidget,
+        reason: id,
+      );
+      expect(
+        tester.getSize(find.byKey(ValueKey('nav_section_rule_$id'))).height,
+        1.0,
+      );
+    }
+    expect(
+        find.byKey(const ValueKey('nav_section_divider_system')), findsNothing);
+
+    final homeDivider =
+        tester.getRect(find.byKey(const ValueKey('nav_section_divider_home')));
+    expect(homeDivider.top, greaterThan(top('Store Matrix')));
+    expect(homeDivider.bottom, lessThanOrEqualTo(top('الإدخالات')));
 
     final sidebar = tester.getRect(find.byType(DesktopSidebar));
     final inputs = tester.getRect(find.text('الإدخالات'));
-    expect(
-      inputs.right,
-      closeTo(sidebar.right - 28.0, 2.0),
-      reason: 'Arabic section header aligns to the RTL start edge',
-    );
+    expect(inputs.right, greaterThan(sidebar.center.dx),
+        reason: 'Arabic chip sits on the RTL start side');
+    expect(inputs.right, lessThan(sidebar.right - 16.0));
+
+    final scrollable = tester.state<ScrollableState>(find.descendant(
+      of: find.byType(DesktopSidebar),
+      matching: find.byType(Scrollable),
+    ));
+    expect(scrollable.position.maxScrollExtent, 0.0,
+        reason: 'Every destination stays on screen at 1280x800');
+    expect(tester.getRect(find.text('Errors')).bottom,
+        lessThanOrEqualTo(sidebar.bottom));
 
     expect(find.byKey(const ValueKey('sidebar-app-version')), findsOneWidget);
     expect(
@@ -113,7 +144,7 @@ void main() {
 
   testWidgets('collapsed sidebar turns section headers into thin dividers',
       (tester) async {
-    tester.view.physicalSize = const Size(400, 1040);
+    tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -152,28 +183,32 @@ void main() {
     expect(find.text('Master'), findsOneWidget);
     expect(find.text('Promo ROI'), findsOneWidget);
 
-    for (final id in ['inputs', 'marketing', 'analytics', 'system']) {
-      final key = find.byKey(ValueKey('nav_section_divider_$id'));
-      expect(key, findsOneWidget, reason: id);
-      final divider = tester.widget<Divider>(
-        find.descendant(of: key, matching: find.byType(Divider)),
+    for (final id in ['home', 'inputs', 'marketing']) {
+      expect(
+        find.byKey(ValueKey('nav_section_divider_$id')),
+        findsOneWidget,
+        reason: id,
       );
-      expect(divider.thickness, 1.0);
-      expect(divider.height, 1.0);
+      expect(
+        tester.getSize(find.byKey(ValueKey('nav_section_rule_$id'))).height,
+        1.0,
+      );
     }
+    expect(
+        find.byKey(const ValueKey('nav_section_divider_system')), findsNothing);
 
-    final inputsDivider = tester
-        .getRect(find.byKey(const ValueKey('nav_section_divider_inputs')));
+    final homeDivider =
+        tester.getRect(find.byKey(const ValueKey('nav_section_divider_home')));
     final sellOut = tester.getRect(find.text('Sell-Out'));
-    final pricing = tester.getRect(find.text('Pricing'));
-    expect(inputsDivider.bottom, lessThanOrEqualTo(sellOut.top));
+    expect(homeDivider.bottom, lessThanOrEqualTo(sellOut.top));
     expect(
       tester
-          .getRect(find.byKey(const ValueKey('nav_section_divider_marketing')))
+          .getRect(find.byKey(const ValueKey('nav_section_divider_inputs')))
           .top,
-      greaterThan(tester.getRect(find.text('Master')).bottom - 1),
+      greaterThan(tester.getRect(find.text('CPFR')).bottom - 1),
     );
-    expect(pricing.top, greaterThan(sellOut.bottom));
+    expect(
+        tester.getRect(find.text('Pricing')).top, greaterThan(sellOut.bottom));
 
     await _saveBoundary(
         tester, 'sidebar_shot', 'sidebar-sections-collapsed.png');
@@ -205,6 +240,7 @@ void main() {
       ),
       findsNothing,
     );
+    expect(find.text('الرئيسية'), findsOneWidget);
     expect(find.text('الإدخالات'), findsOneWidget);
   });
 
@@ -232,7 +268,18 @@ void main() {
     final drawer = find.byType(NavigationDrawer);
     expect(drawer, findsOneWidget);
     expect(
+      find.descendant(of: drawer, matching: find.text('الرئيسية')),
+      findsOneWidget,
+    );
+    expect(
       find.descendant(of: drawer, matching: find.text('الإدخالات')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: drawer,
+        matching: find.byKey(const ValueKey('nav_section_divider_home')),
+      ),
       findsOneWidget,
     );
     expect(
@@ -249,6 +296,7 @@ void main() {
 
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
+    expect(find.text('الرئيسية'), findsOneWidget);
     expect(find.text('الإدخالات'), findsOneWidget);
     expect(find.text('النظام'), findsOneWidget);
     expect(find.text('Smart Upload'), findsNothing);
@@ -273,7 +321,7 @@ Widget _app({required Widget home}) {
 }
 
 Future<void> _pumpWide(WidgetTester tester) async {
-  tester.view.physicalSize = const Size(1440, 1040);
+  tester.view.physicalSize = const Size(1280, 800);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);

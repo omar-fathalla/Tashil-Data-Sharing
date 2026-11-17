@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/m3_shape.dart';
 import '../../core/widgets/app_icons.dart';
 
 /// One labeled block in the shell navigation menu.
 ///
-/// [titleAr] is empty for the ungrouped block at the top (Dashboard).
+/// Order matches the reviewed sidebar (variant C): الرئيسية, الإدخالات,
+/// التسويق, النظام.
 class AppNavSection {
   final String id;
   final String titleAr;
@@ -13,10 +15,9 @@ class AppNavSection {
 
   bool get labeled => titleAr.isNotEmpty;
 
-  static const home = AppNavSection('home', '');
+  static const home = AppNavSection('home', 'الرئيسية');
   static const inputs = AppNavSection('inputs', 'الإدخالات');
   static const marketing = AppNavSection('marketing', 'التسويق');
-  static const analytics = AppNavSection('analytics', 'التحليلات');
   static const system = AppNavSection('system', 'النظام');
 }
 
@@ -85,6 +86,27 @@ class AppNavCatalog {
       selectedIcon: Icons.dashboard_rounded,
     ),
     AppNavItem(
+      routeIndex: 4,
+      section: AppNavSection.home,
+      sidebarLabel: 'OOS Monitor',
+      labelEn: 'OOS Monitor',
+      labelAr: 'مراقب النواقص',
+      shortLabel: 'OOS',
+      icon: Icons.warning_amber_rounded,
+      selectedIcon: Icons.warning_amber_rounded,
+      badgeCount: 3,
+    ),
+    AppNavItem(
+      routeIndex: 5,
+      section: AppNavSection.home,
+      sidebarLabel: 'Store Matrix',
+      labelEn: 'Store Matrix',
+      labelAr: 'مصفوفة الفروع',
+      shortLabel: 'Matrix',
+      icon: Icons.store_mall_directory_rounded,
+      selectedIcon: Icons.store_mall_directory_rounded,
+    ),
+    AppNavItem(
       routeIndex: 1,
       section: AppNavSection.inputs,
       sidebarLabel: 'Sell-Out',
@@ -125,6 +147,16 @@ class AppNavCatalog {
       selectedIcon: Icons.qr_code_2_rounded,
     ),
     AppNavItem(
+      routeIndex: 9,
+      section: AppNavSection.inputs,
+      sidebarLabel: 'CPFR Replenishment',
+      labelEn: 'CPFR & PO',
+      labelAr: 'التجديد وأوامر الشراء',
+      shortLabel: 'CPFR',
+      icon: Icons.inventory_2_rounded,
+      selectedIcon: Icons.inventory_2_rounded,
+    ),
+    AppNavItem(
       routeIndex: 6,
       section: AppNavSection.marketing,
       sidebarLabel: 'Pricing & Promos',
@@ -135,39 +167,8 @@ class AppNavCatalog {
       selectedIcon: Icons.price_change_rounded,
     ),
     AppNavItem(
-      routeIndex: 8,
-      section: AppNavSection.marketing,
-      sidebarLabel: 'Trade Marketing & ROI',
-      labelEn: 'Trade Marketing & ROI',
-      labelAr: 'المصروفات الترويجية وعائد التسويق',
-      shortLabel: 'Promo ROI',
-      icon: Icons.campaign_rounded,
-      selectedIcon: Icons.campaign_rounded,
-    ),
-    AppNavItem(
-      routeIndex: 4,
-      section: AppNavSection.analytics,
-      sidebarLabel: 'OOS Monitor',
-      labelEn: 'OOS Monitor',
-      labelAr: 'مراقب النواقص',
-      shortLabel: 'OOS',
-      icon: Icons.warning_amber_rounded,
-      selectedIcon: Icons.warning_amber_rounded,
-      badgeCount: 3,
-    ),
-    AppNavItem(
-      routeIndex: 5,
-      section: AppNavSection.analytics,
-      sidebarLabel: 'Store Matrix',
-      labelEn: 'Store Matrix',
-      labelAr: 'مصفوفة الفروع',
-      shortLabel: 'Matrix',
-      icon: Icons.store_mall_directory_rounded,
-      selectedIcon: Icons.store_mall_directory_rounded,
-    ),
-    AppNavItem(
       routeIndex: 7,
-      section: AppNavSection.analytics,
+      section: AppNavSection.marketing,
       sidebarLabel: 'Compare',
       labelEn: 'Compare',
       labelAr: 'مقارنة المنافسين',
@@ -176,14 +177,14 @@ class AppNavCatalog {
       selectedIcon: Icons.compare_arrows_rounded,
     ),
     AppNavItem(
-      routeIndex: 9,
-      section: AppNavSection.analytics,
-      sidebarLabel: 'CPFR Replenishment',
-      labelEn: 'CPFR & PO',
-      labelAr: 'التجديد وأوامر الشراء',
-      shortLabel: 'CPFR',
-      icon: Icons.inventory_2_rounded,
-      selectedIcon: Icons.inventory_2_rounded,
+      routeIndex: 8,
+      section: AppNavSection.marketing,
+      sidebarLabel: 'Trade Marketing & ROI',
+      labelEn: 'Trade Marketing & ROI',
+      labelAr: 'المصروفات الترويجية وعائد التسويق',
+      shortLabel: 'Promo ROI',
+      icon: Icons.campaign_rounded,
+      selectedIcon: Icons.campaign_rounded,
     ),
     AppNavItem(
       routeIndex: 12,
@@ -245,58 +246,115 @@ class AppNavCatalog {
   }
 }
 
-/// Wide menus show a small Arabic header. The narrow sidebar shows a
-/// hairline divider in the same slot.
+/// Wide sidebar, drawer, and More sheet. The narrow rail passes
+/// [collapsed] and gets a thin divider between sections instead of chips.
+List<Widget> navSectionChildren({
+  required Widget Function(AppNavItem item) itemBuilder,
+  bool collapsed = false,
+  EdgeInsetsGeometry? labelPadding,
+}) {
+  final groups = AppNavCatalog.groupedMenu();
+  return [
+    for (var i = 0; i < groups.length; i++) ...[
+      if (i > 0)
+        NavSectionDivider(
+          sectionId: groups[i - 1].section.id,
+          collapsed: collapsed,
+        ),
+      if (!collapsed)
+        NavSectionLabel(
+          section: groups[i].section,
+          padding: labelPadding,
+        ),
+      for (final item in groups[i].items) itemBuilder(item),
+    ],
+  ];
+}
+
+/// Small Arabic chip above a wide-menu section (variant C).
 class NavSectionLabel extends StatelessWidget {
   final AppNavSection section;
-  final bool collapsed;
   final EdgeInsetsGeometry? padding;
 
   const NavSectionLabel({
     super.key,
     required this.section,
-    this.collapsed = false,
     this.padding,
   });
 
-  static const EdgeInsetsDirectional headerPadding =
-      EdgeInsetsDirectional.fromSTEB(16.0, 8.0, 8.0, 0.0);
-
-  static const EdgeInsetsDirectional dividerPadding =
-      EdgeInsetsDirectional.fromSTEB(12.0, 6.0, 12.0, 6.0);
+  /// Extra space around the chip so the groups read as separate blocks.
+  /// Top is 8 rather than the mockup's 10 so twelve rows still fit at 1280×800.
+  static const EdgeInsetsDirectional chipPadding =
+      EdgeInsetsDirectional.fromSTEB(8.0, 8.0, 8.0, 6.0);
 
   @override
   Widget build(BuildContext context) {
     if (!section.labeled) return const SizedBox.shrink();
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    if (collapsed) {
-      return Semantics(
-        label: section.titleAr,
-        container: true,
-        child: Padding(
-          key: ValueKey('nav_section_divider_${section.id}'),
-          padding: padding ?? dividerPadding,
-          child: Divider(
-            height: 1.0,
-            thickness: 1.0,
-            color: colorScheme.outlineVariant,
-          ),
-        ),
-      );
-    }
     return Padding(
       key: ValueKey('nav_section_${section.id}'),
-      padding: padding ?? headerPadding,
-      child: Text(
-        section.titleAr,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w400,
-          letterSpacing: 0.2,
-          height: 16 / 11,
+      padding: padding ?? chipPadding,
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: M3Shape.radiusFull,
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Padding(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10.0, vertical: 3.0),
+            child: Text(
+              section.titleAr,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+                height: 1.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Visible rule between sections. The narrow rail uses the same line with
+/// less padding so the icon column stays compact.
+class NavSectionDivider extends StatelessWidget {
+  final String sectionId;
+  final bool collapsed;
+
+  const NavSectionDivider({
+    super.key,
+    required this.sectionId,
+    this.collapsed = false,
+  });
+
+  static const EdgeInsets widePadding = EdgeInsets.only(top: 10.0, bottom: 6.0);
+
+  static const EdgeInsetsDirectional collapsedPadding =
+      EdgeInsetsDirectional.fromSTEB(12.0, 6.0, 12.0, 6.0);
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // A ColoredBox, not Divider: Divider is a Container+BoxDecoration, and
+    // the nav list is required to keep its indicator as a Material pill.
+    return Padding(
+      key: ValueKey('nav_section_divider_$sectionId'),
+      padding: collapsed ? collapsedPadding : widePadding,
+      child: SizedBox(
+        key: ValueKey('nav_section_rule_$sectionId'),
+        height: 1.0,
+        width: double.infinity,
+        child: ColoredBox(
+          color: colorScheme.outline.withOpacity(0.65),
         ),
       ),
     );

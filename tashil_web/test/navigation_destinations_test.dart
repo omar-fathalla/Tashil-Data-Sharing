@@ -53,10 +53,11 @@ void main() {
       expect(find.text('OOS Monitor'), findsOneWidget);
       expect(find.text('Store Matrix'), findsOneWidget);
       expect(find.text('Pricing & Promos'), findsOneWidget);
+      expect(find.text('الرئيسية'), findsOneWidget);
       expect(find.text('الإدخالات'), findsOneWidget);
       expect(find.text('التسويق'), findsOneWidget);
-      expect(find.text('التحليلات'), findsOneWidget);
       expect(find.text('النظام'), findsOneWidget);
+      expect(find.text('التحليلات'), findsNothing);
       expect(find.text('Upload'), findsNothing);
 
       // Verify store matrix icon
@@ -181,7 +182,7 @@ void main() {
       expect(
         find.descendant(
           of: rail,
-          matching: find.byKey(const ValueKey('nav_section_divider_inputs')),
+          matching: find.byKey(const ValueKey('nav_section_divider_home')),
         ),
         findsOneWidget,
       );

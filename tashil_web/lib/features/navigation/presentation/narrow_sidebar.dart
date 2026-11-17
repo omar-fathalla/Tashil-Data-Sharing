@@ -96,21 +96,14 @@ class NarrowSidebar extends StatelessWidget {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                children: [
-                  for (final group in AppNavCatalog.groupedMenu()) ...[
-                    if (group.section.labeled)
-                      NavSectionLabel(
-                        section: group.section,
-                        collapsed: true,
-                      ),
-                    for (final item in group.items)
-                      _NarrowDestination(
-                        item: item,
-                        selected: selectedRouteIndex == item.routeIndex,
-                        onTap: () => onDestinationSelected(item.routeIndex),
-                      ),
-                  ],
-                ],
+                children: navSectionChildren(
+                  collapsed: true,
+                  itemBuilder: (item) => _NarrowDestination(
+                    item: item,
+                    selected: selectedRouteIndex == item.routeIndex,
+                    onTap: () => onDestinationSelected(item.routeIndex),
+                  ),
+                ),
               ),
             ),
             Padding(
