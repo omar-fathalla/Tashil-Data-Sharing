@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/config/app_version.dart';
 import '../../../core/theme/m3_shape.dart';
 import '../../../core/theme/m3_spacing.dart';
+import '../../../core/theme/m3_typography.dart';
 import '../../../core/widgets/app_icons.dart';
 import '../../../core/widgets/m3_button.dart';
 import 'tenant_logo_slot.dart';
@@ -347,7 +348,7 @@ class _GreyTitle extends StatelessWidget {
         style: theme.textTheme.labelSmall?.copyWith(
           color: colorScheme.onSurfaceVariant,
           fontWeight: FontWeight.w600,
-          fontSize: 11.0,
+          fontSize: M3FontSize.labelSmall,
           height: 1.2,
           letterSpacing: 0.2,
         ),
@@ -399,7 +400,7 @@ class _CollapsibleHeader extends StatelessWidget {
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: colorScheme.onSurface,
                           fontWeight: FontWeight.w700,
-                          fontSize: 13.0,
+                          fontSize: M3FontSize.labelMediumPlus,
                         ),
                       ),
                     ),
@@ -440,7 +441,7 @@ class _ChipTitle extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 3.0),
           decoration: BoxDecoration(
             color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(M3Shape.full),
+            borderRadius: M3Shape.radiusFull,
             border: Border.all(color: colorScheme.outlineVariant),
           ),
           child: Text(
@@ -448,7 +449,7 @@ class _ChipTitle extends StatelessWidget {
             style: theme.textTheme.labelSmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w700,
-              fontSize: 11.0,
+              fontSize: M3FontSize.labelSmall,
               letterSpacing: 0.6,
               height: 1.2,
             ),
@@ -546,7 +547,7 @@ class _NavRow extends StatelessWidget {
                             : colorScheme.onSurface,
                         fontWeight:
                             selected ? FontWeight.w700 : FontWeight.w500,
-                        fontSize: 13.0,
+                        fontSize: M3FontSize.labelMediumPlus,
                       ),
                     ),
                   ),
@@ -624,7 +625,7 @@ class _ProductionFooter extends StatelessWidget {
             style: theme.textTheme.labelSmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w300,
-              fontSize: narrow ? 8.0 : null,
+              fontSize: narrow ? M3FontSize.micro : null,
               height: narrow ? 1.3 : null,
             ),
           );
@@ -669,7 +670,7 @@ class _ProductionFooter extends StatelessWidget {
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
-                      fontSize: 8.0,
+                      fontSize: M3FontSize.micro,
                       height: 1.2,
                     ),
                   ),
@@ -729,7 +730,7 @@ class _MockupCanvas extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
               decoration: BoxDecoration(
                 color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(M3Shape.full),
+                borderRadius: M3Shape.radiusFull,
               ),
               child: Text(
                 _chip,
@@ -774,7 +775,7 @@ class _EmptySlot extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(M3Shape.lg),
+        borderRadius: M3Shape.radiusLg,
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
