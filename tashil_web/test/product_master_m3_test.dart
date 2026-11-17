@@ -86,6 +86,14 @@ class _UnverifiedOnceChainRepository extends ChainDiscountRepository {
       ];
 }
 
+/// Pumps a fixed number of frames. Unlike [WidgetTester.pumpAndSettle], this
+/// returns while an indeterminate [LinearProgressIndicator] is animating.
+Future<void> _pumpUntil(WidgetTester tester, Finder finder) async {
+  for (var i = 0; i < 40 && finder.evaluate().isEmpty; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
 Finder _header(String label) => find.descendant(
     of: find.byKey(const ValueKey('pm_catalog_header')),
     matching: find.text(label));
@@ -556,7 +564,9 @@ void main() {
       'm3-chain',
     );
     await tester.tap(find.byKey(const ValueKey('chain_discount_save_btn')));
-    await tester.pumpAndSettle();
+    // Bounded pumps: the saving state shows an indeterminate progress bar, and
+    // pumpAndSettle never returns while that animation is scheduled.
+    await _pumpUntil(tester, find.byKey(const ValueKey('chain_discount_error_banner')));
 
     expect(find.byKey(const ValueKey('chain_discount_error_banner')),
         findsOneWidget);
@@ -567,7 +577,7 @@ void main() {
         reason: 'an unconfirmed save does not touch the table');
 
     await tester.tap(find.text('إعادة المحاولة'));
-    await tester.pumpAndSettle();
+    await _pumpUntil(tester, find.byKey(const ValueKey('chain_terms_row_m3-chain')));
     expect(repo.saves, 2);
     expect(repo.sent.single.chain, 'm3-chain');
     expect(find.byKey(const ValueKey('chain_discount_error_banner')),
