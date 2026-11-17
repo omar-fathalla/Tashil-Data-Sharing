@@ -43,7 +43,7 @@ func (h *AnalyticsHandler) HandleSellInMonthly(w http.ResponseWriter, r *http.Re
 			filter.RetailerChain = strings.TrimSpace(claims.AssignedChain)
 		}
 	}
-	if res, ok := h.querySellInTotals(r.Context(), tenantID, filter); ok {
+	if res, ok := h.querySellInTotals(r.Context(), tenantID, filter, h.sellInChainProfiles(r.Context(), tenantID)); ok {
 		setRecordsSource(w, "bigquery")
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(SellInMonthlyResponse{Points: sellInMonthlyFromGroups(res.Groups)})

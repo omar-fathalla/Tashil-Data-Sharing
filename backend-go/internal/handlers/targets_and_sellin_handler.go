@@ -18,31 +18,45 @@ import (
 // PaginatedSellInRecordsResponse formats the Sell-In Explorer table payload and summary metrics,
 // including the full Tax & Discount Waterfall derived from the canonical Product Master.
 type PaginatedSellInRecordsResponse struct {
-	Records                      []domain.SellInRecord `json:"records"`
-	TotalCount                   int                   `json:"total_count"`
-	Limit                        int                   `json:"limit"`
-	Offset                       int                   `json:"offset"`
-	TotalValueEGP                float64               `json:"total_value_egp"`
-	TotalCases                   float64               `json:"total_cases"`
-	TotalUnitsPieces             int                   `json:"total_units_pieces"`
-	TotalWeightTons              float64               `json:"total_weight_tons"`
-	TotalExpectedEGP             float64               `json:"total_expected_egp"`
-	TotalOfficialListExclVATEGP  float64               `json:"total_official_list_excl_vat_egp"`
-	TotalOfficialListInclVATEGP  float64               `json:"total_official_list_incl_vat_egp"`
-	TotalDiscountGrantedEGP      float64               `json:"total_discount_granted_egp"`
-	EffectiveDiscountPct         float64               `json:"effective_discount_pct"`
-	// Waterfall split of TotalDiscountGrantedEGP: invoice discount, the chain's extra discount, and the
-	// remaining list-minus-net difference (price variance / promotions).
+	Records                     []domain.SellInRecord `json:"records"`
+	TotalCount                  int                   `json:"total_count"`
+	Limit                       int                   `json:"limit"`
+	Offset                      int                   `json:"offset"`
+	TotalValueEGP               float64               `json:"total_value_egp"`
+	TotalCases                  float64               `json:"total_cases"`
+	TotalUnitsPieces            int                   `json:"total_units_pieces"`
+	TotalWeightTons             float64               `json:"total_weight_tons"`
+	TotalExpectedEGP            float64               `json:"total_expected_egp"`
+	TotalOfficialListExclVATEGP float64               `json:"total_official_list_excl_vat_egp"`
+	TotalOfficialListInclVATEGP float64               `json:"total_official_list_incl_vat_egp"`
+	TotalDiscountGrantedEGP     float64               `json:"total_discount_granted_egp"`
+	EffectiveDiscountPct        float64               `json:"effective_discount_pct"`
+	// «من السعر الرسمي إلى الفاتورة» card, exact to the piastre:
+	//   official − invoice − extra = expected net (chain terms: saved, else invoice 10% / extra 0%)
+	//   expected − execution difference + unpriced net = TotalNetExclVATEGP (Excel Net V)
+	//   net + VAT = TotalGrossInclVATEGP
 	TotalInvoiceDiscountEGP    float64 `json:"total_invoice_discount_egp"`
 	TotalExtraChainDiscountEGP float64 `json:"total_extra_chain_discount_egp"`
-	TotalOtherDifferenceEGP    float64 `json:"total_other_difference_egp"`
-	VATRatePct                 float64 `json:"vat_rate_pct"`
-	TotalNetExclVATEGP           float64               `json:"total_net_excl_vat_egp"`
-	TotalVAT14EGP                float64               `json:"total_vat_14_egp"`
-	TotalGrossInclVATEGP         float64               `json:"total_gross_incl_vat_egp"`
-	MatchedCatalogSKUsCount      int                   `json:"matched_catalog_skus_count"`
-	ByChain                      []SellInBreakdownItem `json:"by_chain,omitempty"`
-	ByBrand                      []SellInBreakdownItem `json:"by_brand,omitempty"`
+	TotalExpectedNetEGP        float64 `json:"total_expected_net_egp"`
+	// Expected net − file net of the priced rows (promotions / price deviation); negative when above it.
+	TotalExecutionDiffEGP float64 `json:"total_execution_difference_egp"`
+	// Deprecated alias of TotalExecutionDiffEGP for older web builds.
+	TotalOtherDifferenceEGP float64 `json:"total_other_difference_egp"`
+	// File net of rows with no official price (no Product Master match).
+	TotalUnpricedNetEGP float64 `json:"total_unpriced_net_egp"`
+	// Invoice / extra discount % for the badges: one chain = its saved terms exactly; several chains =
+	// official-weighted averages (TermsAveraged), with ChainTerms as the breakdown.
+	InvoiceDiscountPct      float64                `json:"invoice_discount_pct"`
+	ExtraDiscountPct        float64                `json:"extra_discount_pct"`
+	TermsAveraged           bool                   `json:"terms_averaged"`
+	ChainTerms              []SellInChainTermsItem `json:"chain_terms,omitempty"`
+	VATRatePct              float64                `json:"vat_rate_pct"`
+	TotalNetExclVATEGP      float64                `json:"total_net_excl_vat_egp"`
+	TotalVAT14EGP           float64                `json:"total_vat_14_egp"`
+	TotalGrossInclVATEGP    float64                `json:"total_gross_incl_vat_egp"`
+	MatchedCatalogSKUsCount int                    `json:"matched_catalog_skus_count"`
+	ByChain                 []SellInBreakdownItem  `json:"by_chain,omitempty"`
+	ByBrand                 []SellInBreakdownItem  `json:"by_brand,omitempty"`
 }
 
 // HandleSellInRecords serves GET /api/v1/analytics/sell-in-records for the Sell-In Explorer page.
@@ -117,7 +131,9 @@ func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Re
 	} else {
 		pageRecords = []domain.SellInRecord{}
 	}
-	resp := buildSellInRecordsResponse(sellInTotalsFromRecords(allRecords), pageRecords, total, limit, offset)
+	totals, chainGroups := sellInTotalsAndChainsFromRecords(allRecords)
+	resp := buildSellInRecordsResponse(totals, pageRecords, total, limit, offset)
+	applySellInChainTerms(&resp, chainGroups, h.sellInChainProfiles(r.Context(), tenantID))
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
