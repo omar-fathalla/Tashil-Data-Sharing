@@ -14,6 +14,7 @@ import 'package:tashil_web/core/widgets/data_sharing_logo.dart';
 import 'package:tashil_web/features/auth/presentation/widgets/user_profile_dialog.dart';
 import 'package:tashil_web/features/navigation/presentation/app_shell.dart';
 import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
+import 'package:tashil_web/features/navigation/presentation/narrow_sidebar.dart';
 import 'package:tashil_web/features/navigation/presentation/tenant_logo_slot.dart';
 
 import 'support/product_master_m3_support.dart' show ignoreGoogleFontLoadErrors;
@@ -47,7 +48,8 @@ void main() {
     if (iconFile.existsSync()) {
       final iconBytes = iconFile.readAsBytesSync();
       final iconData = ByteData.view(Uint8List.fromList(iconBytes).buffer);
-      await (FontLoader('MaterialIcons')..addFont(Future.value(iconData))).load();
+      await (FontLoader('MaterialIcons')..addFont(Future.value(iconData)))
+          .load();
     }
   });
 
@@ -95,7 +97,8 @@ void main() {
     );
   });
 
-  testWidgets('desktop sidebar shows the tenant brand on the left and Tashil in the footer',
+  testWidgets(
+      'desktop sidebar shows the tenant brand on the left and Tashil in the footer',
       (tester) async {
     AppVersion.applyDeployedAppVersion('212');
     var profileTaps = 0;
@@ -134,16 +137,20 @@ void main() {
     expect(brand.textDirection, TextDirection.ltr);
 
     final sidebar = tester.getRect(find.byType(DesktopSidebar));
-    final logo = tester.getRect(find.byKey(const ValueKey('sidebar_tenant_logo')));
-    final name = tester.getRect(find.byKey(const ValueKey('sidebar_tenant_name')));
+    final logo =
+        tester.getRect(find.byKey(const ValueKey('sidebar_tenant_logo')));
+    final name =
+        tester.getRect(find.byKey(const ValueKey('sidebar_tenant_name')));
     expect(logo.left, lessThan(name.left),
         reason: 'English tenant name stays to the right of its logo');
     expect(logo.left, closeTo(sidebar.left + 16.0, 1.0),
         reason: 'header hugs the left edge even though the shell is RTL');
     expect(name.left, lessThan(sidebar.center.dx));
 
-    final status = tester.getRect(find.byKey(const ValueKey('sidebar_footer_status')));
-    final credit = tester.getRect(find.byKey(const ValueKey('sidebar-app-version')));
+    final status =
+        tester.getRect(find.byKey(const ValueKey('sidebar_footer_status')));
+    final credit =
+        tester.getRect(find.byKey(const ValueKey('sidebar-app-version')));
     expect(credit.top, greaterThanOrEqualTo(status.bottom - 0.5));
     expect(credit.left, greaterThanOrEqualTo(sidebar.left));
     expect(credit.right, lessThanOrEqualTo(sidebar.right + 0.5));
@@ -161,7 +168,8 @@ void main() {
     expect(find.textContaining('v212'), findsNothing);
   });
 
-  testWidgets('uploaded logo replaces the letter and still leaves a single mark',
+  testWidgets(
+      'uploaded logo replaces the letter and still leaves a single mark',
       (tester) async {
     final logo = MemoryImage(_logoPng);
     await _pumpSidebar(
@@ -234,14 +242,17 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NarrowSidebar), findsOneWidget);
+    expect(find.byType(NavigationRail), findsNothing);
     expect(find.byType(DesktopSidebar), findsNothing);
     expect(find.byType(DataSharingLogo), findsNothing);
     expect(find.byType(TenantLogoSlot), findsOneWidget);
-    final rail = find.byType(NavigationRail);
-    expect(find.descendant(of: rail, matching: find.text('Adeco')), findsOneWidget);
+    final rail = find.byType(NarrowSidebar);
+    expect(find.descendant(of: rail, matching: find.text('Adeco')),
+        findsOneWidget);
     expect(
-      find.descendant(of: rail, matching: find.byIcon(Icons.manage_accounts_rounded)),
+      find.descendant(
+          of: rail, matching: find.byIcon(Icons.manage_accounts_rounded)),
       findsOneWidget,
     );
     expect(

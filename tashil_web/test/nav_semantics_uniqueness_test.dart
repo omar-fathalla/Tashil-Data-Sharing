@@ -8,6 +8,7 @@ import 'package:tashil_web/core/testing/test_semantics.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/navigation/presentation/app_shell.dart';
 import 'package:tashil_web/features/navigation/presentation/desktop_sidebar.dart';
+import 'package:tashil_web/features/navigation/presentation/narrow_sidebar.dart';
 
 /// Counts deepest Semantics nodes that expose [id] (no descendant with the
 /// same id). Material parents may copy an identifier upward; deepest nodes are
@@ -133,9 +134,8 @@ void main() {
   });
 
   testWidgets(
-      'NavigationRail has exactly one interactive target per nav id '
-      '(including when Sell-Out is selected)',
-      (tester) async {
+      'Narrow sidebar has exactly one interactive target per nav id '
+      '(including when Sell-Out is selected)', (tester) async {
     final handle = tester.ensureSemantics();
     ignoreRenderFlexOverflows();
     try {
@@ -147,7 +147,7 @@ void main() {
       await tester.pumpWidget(_shellApp(apiClient));
       await tester.pumpAndSettle();
 
-      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(find.byType(NarrowSidebar), findsOneWidget);
       expect(countInteractiveTargets(tester, TestIds.navSellOut), 1);
       expect(countInteractiveTargets(tester, TestIds.navSellIn), 1);
 
@@ -188,8 +188,7 @@ void main() {
     }
   });
 
-  testWidgets(
-      'Drawer exposes exactly one interactive nav-sell-in',
+  testWidgets('Drawer exposes exactly one interactive nav-sell-in',
       (tester) async {
     final handle = tester.ensureSemantics();
     ignoreRenderFlexOverflows();
@@ -217,8 +216,7 @@ void main() {
     }
   });
 
-  testWidgets(
-      'Compact More sheet has exactly one interactive nav-sell-in',
+  testWidgets('Compact More sheet has exactly one interactive nav-sell-in',
       (tester) async {
     final handle = tester.ensureSemantics();
     ignoreRenderFlexOverflows();

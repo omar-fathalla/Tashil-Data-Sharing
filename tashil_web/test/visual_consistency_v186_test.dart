@@ -53,7 +53,6 @@ final _sidebarDestinations = <({String label, Type screen})>[
   (label: 'Compare', screen: CompetitorComparisonScreen),
   (label: 'Trade Marketing & ROI', screen: TradeMarketingRoiScreen),
   (label: 'CPFR Replenishment', screen: CPFRDashboardScreen),
-  (label: 'Upload', screen: UploadPortalScreen),
   (label: 'Product Master', screen: ProductMasterScreen),
   (label: 'Errors', screen: DataQualityScreen),
 ];
@@ -145,8 +144,7 @@ void main() {
     expect(find.byType(M3SummaryKpiCard), findsWidgets);
   });
 
-  testWidgets(
-      'Pricing & CPFR Arabic headlines stay one line at 880 content',
+  testWidgets('Pricing & CPFR Arabic headlines stay one line at 880 content',
       (tester) async {
     await pricing_support.pumpPricing(
       tester,
@@ -175,9 +173,12 @@ void main() {
       'sidebar page titles one-line Arabic at 880 content (all destinations)',
       (tester) async {
     final pages = <(String, Widget)>[
-      ('الأسعار والعروض', PricingComplianceScreen(
-        apiClient: pricing_support.PricingShotApiClient(),
-      )),
+      (
+        'الأسعار والعروض',
+        PricingComplianceScreen(
+          apiClient: pricing_support.PricingShotApiClient(),
+        )
+      ),
       (
         'التخطيط المشترك وأوامر التوريد',
         CPFRDashboardScreen(apiClient: RichCPFRApiClient()),
@@ -231,8 +232,7 @@ void main() {
     }
   });
 
-  testWidgets(
-      'AppShell: tap each sidebar item from each page navigates',
+  testWidgets('AppShell: tap each sidebar item from each page navigates',
       (tester) async {
     tester.view.physicalSize = const Size(1280, 1400);
     tester.view.devicePixelRatio = 1.0;

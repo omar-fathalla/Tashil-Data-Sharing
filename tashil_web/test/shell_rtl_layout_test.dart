@@ -14,7 +14,8 @@ void main() {
     expect(shellTextDirectionFor(const Locale('en')), TextDirection.rtl);
   });
 
-  testWidgets('RTL: sidebar sits on the right, labels are Arabic+English, '
+  testWidgets(
+      'RTL: sidebar sits on the right, labels are Arabic+English, '
       'footer does not overlap the last destination', (tester) async {
     tester.view.physicalSize = const Size(1280, 640); // short viewport
     tester.view.devicePixelRatio = 1.0;
@@ -54,18 +55,18 @@ void main() {
 
     expect(find.text('لوحة القيادة'), findsNothing);
     expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('الإدخالات'), findsOneWidget);
+    expect(find.text('Upload'), findsNothing);
 
-    // Scroll the nav list to the end; 'Product Master' must be fully above the footer.
+    // Scroll the nav list to the end; the last item must sit fully above the footer.
     final list = find.descendant(
         of: find.byType(DesktopSidebar), matching: find.byType(Scrollable));
-    await tester.scrollUntilVisible(find.text('Product Master'), 50.0,
+    await tester.scrollUntilVisible(find.text('Errors'), 50.0,
         scrollable: list.first);
     await tester.pumpAndSettle();
     final footerTop =
         tester.getRect(find.byKey(const ValueKey('sidebar_footer_status'))).top;
-    final lastBottom = tester.getRect(find.text('Product Master')).bottom;
+    final lastBottom = tester.getRect(find.text('Errors')).bottom;
     expect(lastBottom, lessThanOrEqualTo(footerTop));
-    final uploadBottom = tester.getRect(find.text('Upload')).bottom;
-    expect(uploadBottom, lessThanOrEqualTo(footerTop));
   });
 }

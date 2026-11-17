@@ -1,10 +1,10 @@
-import '../../../core/widgets/app_icons.dart';
 import 'package:flutter/material.dart';
 import '../../../core/config/app_version.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/testing/test_semantics.dart';
 import '../../../core/theme/m3_motion.dart';
 import '../../../core/theme/m3_spacing.dart';
+import '../nav_catalog.dart';
 import 'tenant_profile_card.dart';
 
 /// DesktopSidebar provides a permanent Material Design 3 Navigation Drawer
@@ -45,93 +45,6 @@ class DesktopSidebar extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final destinations = [
-      _NavDestination(
-        icon: Icons.dashboard_rounded,
-        selectedIcon: Icons.dashboard_rounded,
-        label: 'Dashboard',
-        labelAr: 'لوحة القيادة',
-      ),
-      _NavDestination(
-        icon: Icons.analytics_rounded,
-        selectedIcon: Icons.analytics_rounded,
-        label: 'Sell-Out',
-        labelAr: 'المبيعات (Sell-Out)',
-        semanticsIdentifier: TestIds.navSellOut,
-      ),
-      _NavDestination(
-        icon: Icons.local_shipping_rounded,
-        selectedIcon: Icons.local_shipping_rounded,
-        label: 'Sell-In',
-        labelAr: 'التوريد (Sell-In)',
-        semanticsIdentifier: TestIds.navSellIn,
-      ),
-      _NavDestination(
-        icon: Icons.assignment_return_rounded,
-        selectedIcon: Icons.assignment_return_rounded,
-        label: 'Returns',
-        labelAr: 'المرتجعات',
-        semanticsIdentifier: TestIds.navReturns,
-      ),
-      _NavDestination(
-        icon: Icons.warning_amber_rounded,
-        selectedIcon: Icons.warning_amber_rounded,
-        label: 'OOS Monitor',
-        labelAr: 'مراقب النواقص',
-        badgeCount: 3,
-      ),
-      _NavDestination(
-        icon: Icons.store_mall_directory_rounded,
-        selectedIcon: Icons.store_mall_directory_rounded,
-        label: 'Store Matrix',
-        labelAr: 'مصفوفة الفروع',
-      ),
-      _NavDestination(
-        icon: Icons.price_change_rounded,
-        selectedIcon: Icons.price_change_rounded,
-        label: 'Pricing & Promos',
-        labelAr: 'التسعير والعروض',
-        semanticsIdentifier: TestIds.navPricing,
-      ),
-      _NavDestination(
-        icon: Icons.compare_arrows_rounded,
-        selectedIcon: Icons.compare_arrows_rounded,
-        label: 'Compare',
-        labelAr: 'مقارنة المنافسين',
-        semanticsIdentifier: TestIds.navCompare,
-      ),
-      _NavDestination(
-        icon: Icons.campaign_rounded,
-        selectedIcon: Icons.campaign_rounded,
-        label: 'Trade Marketing & ROI',
-        labelAr: 'التسويق التجاري والعائد',
-      ),
-      _NavDestination(
-        icon: Icons.inventory_2_rounded,
-        selectedIcon: Icons.inventory_2_rounded,
-        label: 'CPFR Replenishment',
-        labelAr: 'التجديد وأوامر الشراء',
-      ),
-      _NavDestination(
-        icon: Icons.auto_awesome_rounded,
-        selectedIcon: Icons.auto_awesome_rounded,
-        label: 'Upload',
-        labelAr: 'رفع البيانات الذكي',
-      ),
-      _NavDestination(
-        icon: Icons.qr_code_2_rounded,
-        selectedIcon: Icons.qr_code_2_rounded,
-        label: 'Product Master',
-        labelAr: 'كارتة الأصناف',
-      ),
-      _NavDestination(
-        icon: AppIcons.dataQuality,
-        selectedIcon: AppIcons.dataQuality,
-        label: 'Errors',
-        labelAr: 'الأخطاء',
-      ),
-    ];
-
     // Elevation keeps sidebar (and its flt-semantics nodes) above page
     // content when ensureSemantics() is on for web automation.
     return Material(
@@ -165,96 +78,25 @@ class DesktopSidebar extends StatelessWidget {
 
             // Navigation Items
             Expanded(
-              child: ListView.separated(
+              child: ListView(
                 padding:
                     const EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 12.0, 12.0),
-                itemCount: destinations.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 4.0),
-                itemBuilder: (context, index) {
-                  final dest = destinations[index];
-                  final isSelected = selectedIndex == index;
-
-                  // M3 nav indicator: a pill-shaped Material (no BoxDecoration).
-                  // Own the web flt-semantics tap (onTap) so page overlays /
-                  // mis-sized content semantics cannot swallow sidebar clicks
-                  // (live: Pricing → Compare stayed put while OOS still worked).
-                  void select() => onDestinationSelected(index);
-                  Widget item = Material(
-                    key: ValueKey('sidebar_nav_${dest.label}'),
-                    color: isSelected
-                        ? colorScheme.secondaryContainer
-                        : Colors.transparent,
-                    shape: const StadiumBorder(),
-                    clipBehavior: Clip.antiAlias,
-                    animationDuration: M3Motion.short4,
-                    child: InkWell(
-                      onTap: select,
-                      customBorder: const StadiumBorder(),
-                      child: Container(
-                        height: 52.0,
-                        padding: const EdgeInsetsDirectional.symmetric(
-                            horizontal: 16.0),
-                        child: Row(
-                          children: [
-                            AnimatedSwitcher(
-                              duration: M3Motion.short3,
-                              transitionBuilder: (child, anim) =>
-                                  ScaleTransition(
-                                scale: Tween<double>(begin: 0.85, end: 1.0)
-                                    .animate(anim),
-                                child:
-                                    FadeTransition(opacity: anim, child: child),
-                              ),
-                              child: Icon(
-                                isSelected ? dest.selectedIcon : dest.icon,
-                                key: ValueKey('${index}_$isSelected'),
-                                size: 22.0,
-                                color: isSelected
-                                    ? colorScheme.onSecondaryContainer
-                                    : colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            M3Spacing.gapSM,
-                            Expanded(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    dest.label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.labelLarge?.copyWith(
-                                      color: isSelected
-                                          ? colorScheme.onSecondaryContainer
-                                          : colorScheme.onSurface,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (dest.badgeCount != null && dest.badgeCount! > 0)
-                              Badge.count(count: dest.badgeCount!),
-                          ],
+                children: [
+                  for (final group in AppNavCatalog.groupedMenu()) ...[
+                    if (group.section.labeled)
+                      NavSectionLabel(section: group.section),
+                    for (final dest in group.items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4.0),
+                        child: _SidebarDestination(
+                          item: dest,
+                          selected: selectedIndex == dest.routeIndex,
+                          onSelected: () =>
+                              onDestinationSelected(dest.routeIndex),
                         ),
                       ),
-                    ),
-                  );
-                  final id = dest.semanticsIdentifier;
-                  item = Semantics(
-                    identifier: id,
-                    label: dest.label,
-                    button: true,
-                    container: true,
-                    excludeSemantics: true,
-                    onTap: select,
-                    child: item,
-                  );
-                  return item;
-                },
+                  ],
+                ],
               ),
             ),
 
@@ -345,20 +187,83 @@ class DesktopSidebar extends StatelessWidget {
   }
 }
 
-class _NavDestination {
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final String labelAr;
-  final int? badgeCount;
-  final String? semanticsIdentifier;
+class _SidebarDestination extends StatelessWidget {
+  final AppNavItem item;
+  final bool selected;
+  final VoidCallback onSelected;
 
-  _NavDestination({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.labelAr,
-    this.badgeCount,
-    this.semanticsIdentifier,
+  const _SidebarDestination({
+    required this.item,
+    required this.selected,
+    required this.onSelected,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    // M3 nav indicator: a pill-shaped Material (no BoxDecoration).
+    // Own the web flt-semantics tap (onTap) so page overlays /
+    // mis-sized content semantics cannot swallow sidebar clicks
+    // (live: Pricing → Compare stayed put while OOS still worked).
+    Widget tile = Material(
+      key: ValueKey('sidebar_nav_${item.sidebarLabel}'),
+      color: selected ? colorScheme.secondaryContainer : Colors.transparent,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      animationDuration: M3Motion.short4,
+      child: InkWell(
+        onTap: onSelected,
+        customBorder: const StadiumBorder(),
+        child: Container(
+          height: 52.0,
+          padding: const EdgeInsetsDirectional.symmetric(horizontal: 16.0),
+          child: Row(
+            children: [
+              AnimatedSwitcher(
+                duration: M3Motion.short3,
+                transitionBuilder: (child, anim) => ScaleTransition(
+                  scale: Tween<double>(begin: 0.85, end: 1.0).animate(anim),
+                  child: FadeTransition(opacity: anim, child: child),
+                ),
+                child: Icon(
+                  selected ? item.selectedIcon : item.icon,
+                  key: ValueKey('${item.routeIndex}_$selected'),
+                  size: 22.0,
+                  color: selected
+                      ? colorScheme.onSecondaryContainer
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+              M3Spacing.gapSM,
+              Expanded(
+                child: Text(
+                  item.sidebarLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: selected
+                        ? colorScheme.onSecondaryContainer
+                        : colorScheme.onSurface,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (item.badgeCount != null && item.badgeCount! > 0)
+                Badge.count(count: item.badgeCount!),
+            ],
+          ),
+        ),
+      ),
+    );
+    return Semantics(
+      identifier: TestIds.navIdForIndex(item.routeIndex),
+      label: item.sidebarLabel,
+      button: true,
+      container: true,
+      excludeSemantics: true,
+      onTap: onSelected,
+      child: tile,
+    );
+  }
 }
