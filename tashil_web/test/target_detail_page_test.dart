@@ -225,43 +225,45 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final handle = tester.ensureSemantics();
-    addTearDown(handle.dispose);
+    try {
+      final repo = _FakeRepo([
+        _item('t26', 2026,
+            target: 150000000,
+            actual: 127135120,
+            hasActuals: true,
+            units: 250000,
+            actualUnits: 1532854),
+      ], {
+        't26': _breakdownJson(),
+      });
+      await tester.pumpWidget(_host(TargetManagementPanel(
+        apiClient: ApiClient(tenantId: 'tenant-detail', allowMockFallback: false),
+        targetType: 'sell_out',
+        repository: repo,
+      )));
+      await tester.pumpAndSettle();
 
-    final repo = _FakeRepo([
-      _item('t26', 2026,
-          target: 150000000,
-          actual: 127135120,
-          hasActuals: true,
-          units: 250000,
-          actualUnits: 1532854),
-    ], {
-      't26': _breakdownJson(),
-    });
-    await tester.pumpWidget(_host(TargetManagementPanel(
-      apiClient: ApiClient(tenantId: 'tenant-detail', allowMockFallback: false),
-      targetType: 'sell_out',
-      repository: repo,
-    )));
-    await tester.pumpAndSettle();
+      expect(find.text('إضافة مستهدف'), findsWidgets);
+      expect(find.text('تصدير'), findsOneWidget);
+      expect(find.text('رفع ملف المستهدفات'), findsNothing);
+      expect(find.text('تنزيل القالب'), findsNothing);
 
-    expect(find.text('إضافة مستهدف'), findsWidgets);
-    expect(find.text('تصدير'), findsOneWidget);
-    expect(find.text('رفع ملف المستهدفات'), findsNothing);
-    expect(find.text('تنزيل القالب'), findsNothing);
-
-    // Stable Playwright ids for the redesigned Sell-Out Targets toolbar.
-    expect(_countSemanticsId(tester, TestIds.selloutTargetsAdd), 1);
-    expect(_countSemanticsId(tester, TestIds.selloutTargetsExport), 1);
-    expect(_countSemanticsId(tester, TestIds.selloutUploadButton), 0);
-    final addNode = _findNodeById(tester, TestIds.selloutTargetsAdd);
-    expect(addNode, isNotNull);
-    expect(addNode!.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-    final exportNode = _findNodeById(tester, TestIds.selloutTargetsExport);
-    expect(exportNode, isNotNull);
-    expect(
-      exportNode!.getSemanticsData().hasAction(SemanticsAction.tap),
-      isTrue,
-    );
+      // Stable Playwright ids for the redesigned Sell-Out Targets toolbar.
+      expect(_countSemanticsId(tester, TestIds.selloutTargetsAdd), 1);
+      expect(_countSemanticsId(tester, TestIds.selloutTargetsExport), 1);
+      expect(_countSemanticsId(tester, TestIds.selloutUploadButton), 0);
+      final addNode = _findNodeById(tester, TestIds.selloutTargetsAdd);
+      expect(addNode, isNotNull);
+      expect(addNode!.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+      final exportNode = _findNodeById(tester, TestIds.selloutTargetsExport);
+      expect(exportNode, isNotNull);
+      expect(
+        exportNode!.getSemanticsData().hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+    } finally {
+      handle.dispose();
+    }
   });
 
   testWidgets('detail page: breadcrumbs, monthly cards, month→branches',
@@ -272,80 +274,82 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final handle = tester.ensureSemantics();
-    addTearDown(handle.dispose);
+    try {
+      final target = TargetComparisonModel.fromJson(_item('t26', 2026,
+          target: 150000000,
+          actual: 127135120,
+          hasActuals: true,
+          units: 250000,
+          actualUnits: 1532854));
+      final repo = _FakeRepo(const [], {'t26': _breakdownJson()});
 
-    final target = TargetComparisonModel.fromJson(_item('t26', 2026,
-        target: 150000000,
-        actual: 127135120,
-        hasActuals: true,
-        units: 250000,
-        actualUnits: 1532854));
-    final repo = _FakeRepo(const [], {'t26': _breakdownJson()});
+      await tester.pumpWidget(_host(TargetDetailPage(
+        repository: repo,
+        target: target,
+        onBack: () {},
+      )));
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(_host(TargetDetailPage(
-      repository: repo,
-      target: target,
-      onBack: () {},
-    )));
-    await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('target_detail_page')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target_detail_back')), findsOneWidget);
+      expect(_countSemanticsId(tester, TestIds.selloutTargetDetailBack), 1);
+      final backNode = _findNodeById(tester, TestIds.selloutTargetDetailBack);
+      expect(backNode, isNotNull);
+      expect(backNode!.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+      expect(find.byKey(const ValueKey('target_detail_crumb_root')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target_detail_kpi_year')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target_detail_cumulative_chart')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target_detail_month_card_1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target_detail_month_card_12')), findsOneWidget);
 
-    expect(find.byKey(const ValueKey('target_detail_page')), findsOneWidget);
-    expect(find.byKey(const ValueKey('target_detail_back')), findsOneWidget);
-    expect(_countSemanticsId(tester, TestIds.selloutTargetDetailBack), 1);
-    final backNode = _findNodeById(tester, TestIds.selloutTargetDetailBack);
-    expect(backNode, isNotNull);
-    expect(backNode!.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-    expect(find.byKey(const ValueKey('target_detail_crumb_root')), findsOneWidget);
-    expect(find.byKey(const ValueKey('target_detail_kpi_year')), findsOneWidget);
-    expect(find.byKey(const ValueKey('target_detail_cumulative_chart')), findsOneWidget);
-    expect(find.byKey(const ValueKey('target_detail_month_card_1')), findsOneWidget);
-    expect(find.byKey(const ValueKey('target_detail_month_card_12')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target_detail_chart_x_axis')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target_detail_chart_y_axis')), findsOneWidget);
+      // X = short Arabic months; Y = compact M ج.م values.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('target_detail_chart_x_axis')),
+          matching: find.text('ينا'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('target_detail_chart_x_axis')),
+          matching: find.text('ديس'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('target_detail_chart_y_axis')),
+          matching: find.textContaining('M'),
+        ),
+        findsWidgets,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('target_detail_chart_y_axis')),
+          matching: find.textContaining('ج.م'),
+        ),
+        findsWidgets,
+      );
 
-    expect(find.byKey(const ValueKey('target_detail_chart_x_axis')), findsOneWidget);
-    expect(find.byKey(const ValueKey('target_detail_chart_y_axis')), findsOneWidget);
-    // X = short Arabic months; Y = compact M ج.م values.
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('target_detail_chart_x_axis')),
-        matching: find.text('ينا'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('target_detail_chart_x_axis')),
-        matching: find.text('ديس'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('target_detail_chart_y_axis')),
-        matching: find.textContaining('M'),
-      ),
-      findsWidgets,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('target_detail_chart_y_axis')),
-        matching: find.textContaining('ج.م'),
-      ),
-      findsWidgets,
-    );
+      await tester.tap(find.byKey(const ValueKey('target_detail_month_card_2')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('target_detail_branches_tab')), findsOneWidget);
+      expect(find.byKey(const ValueKey('target_detail_unlock_month')), findsOneWidget);
+      // Lowest achievement first (فرع الزمالك 50% before فرع المعادي 107.9%).
+      final zamalek = tester.getTopLeft(
+          find.byKey(const ValueKey('target_detail_branch_row_B')));
+      final maadi = tester.getTopLeft(
+          find.byKey(const ValueKey('target_detail_branch_row_A')));
+      expect(zamalek.dy, lessThan(maadi.dy));
 
-    await tester.tap(find.byKey(const ValueKey('target_detail_month_card_2')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('target_detail_branches_tab')), findsOneWidget);
-    expect(find.byKey(const ValueKey('target_detail_unlock_month')), findsOneWidget);
-    // Lowest achievement first (فرع الزمالك 50% before فرع المعادي 107.9%).
-    final zamalek = tester.getTopLeft(
-        find.byKey(const ValueKey('target_detail_branch_row_B')));
-    final maadi = tester.getTopLeft(
-        find.byKey(const ValueKey('target_detail_branch_row_A')));
-    expect(zamalek.dy, lessThan(maadi.dy));
-
-    // SKU barcode under name is LTR-isolated in the branch panel.
-    expect(find.textContaining('6224000000001'), findsWidgets);
+      // SKU barcode under name is LTR-isolated in the branch panel.
+      expect(find.textContaining('6224000000001'), findsWidgets);
+    } finally {
+      handle.dispose();
+    }
   });
 
   testWidgets('branches SKU panel fits 1280 without h-scroll; الصنف header readable',
