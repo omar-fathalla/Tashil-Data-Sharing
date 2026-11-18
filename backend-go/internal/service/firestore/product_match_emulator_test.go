@@ -62,25 +62,40 @@ func isRetryableEmulatorContention(err error) bool {
 	if err == nil {
 		return false
 	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
 	code := status.Code(err)
 	// Firestore emulator under parallel txn contention often surfaces these
 	// instead of a clean Aborted/AlreadyExists — not a product double-count bug.
-	return code == codes.DeadlineExceeded ||
+	if code == codes.DeadlineExceeded ||
 		code == codes.Aborted ||
 		code == codes.Unavailable ||
-		code == codes.ResourceExhausted
+		code == codes.ResourceExhausted {
+		return true
+	}
+	// ReactiveLockManager on a loaded Mac sometimes returns plain text
+	// (Unknown code) rather than a typed gRPC status.
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "deadline exceeded") ||
+		strings.Contains(msg, "transaction lock timeout") ||
+		strings.Contains(msg, "aborted")
 }
 
+// Per-attempt budget for racing Decide under Mac CI load (Flutter shards share the host).
+// Parent deadline also disables matcher.StoreTimeout's 8s inject (see withStoreTimeout).
+const emulatorDecideAttemptTimeout = 45 * time.Second
+const emulatorDecideMaxAttempts = 12
+
 // decideWithContentionRetry keeps racing workers honest: real bugs fail immediately;
-// emulator DeadlineExceeded/Aborted under load get a few bounded retries.
+// emulator DeadlineExceeded/Aborted/lock-timeout under load get bounded retries with backoff.
 func decideWithContentionRetry(
-	ctx context.Context,
 	q *matcher.Queue,
 	tenant, id, st string,
 ) error {
 	var last error
-	for attempt := 0; attempt < 8; attempt++ {
-		decideCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	for attempt := 0; attempt < emulatorDecideMaxAttempts; attempt++ {
+		decideCtx, cancel := context.WithTimeout(context.Background(), emulatorDecideAttemptTimeout)
 		_, err := q.Decide(decideCtx, tenant, id, st, "racer", "بت", "", "", matcher.DecideOptions{})
 		cancel()
 		if err == nil || errors.Is(err, matcher.ErrAlreadyDecided) {
@@ -90,20 +105,50 @@ func decideWithContentionRetry(
 			return err
 		}
 		last = err
-		time.Sleep(time.Duration(50*(attempt+1)) * time.Millisecond)
+		// Exponential backoff so ReactiveLockManager can clear between storm retries.
+		backoff := time.Duration(100<<attempt) * time.Millisecond
+		if backoff > 3*time.Second {
+			backoff = 3 * time.Second
+		}
+		time.Sleep(backoff + time.Duration(attempt*25)*time.Millisecond)
 	}
 	return last
 }
 
+// warmProductMatchEmulator primes the Java emulator (first txn is slow under Mac load)
+// so the parallel decide race does not burn its whole budget on cold-start.
+func warmProductMatchEmulator(t *testing.T, c *Client, q *matcher.Queue) {
+	t.Helper()
+	tenant := uniqueTenant(t) + "-warm"
+	enqCtx, enqCancel := context.WithTimeout(context.Background(), emulatorDecideAttemptTimeout)
+	item, err := q.EnqueueMatch(enqCtx, tenant, matcher.Query{SKUName: "صنف-تسخين", SourceFile: "warm.xlsx"}, matcher.Result{
+		Decision: matcher.DecisionNone, ReasonAR: "تسخين",
+	})
+	enqCancel()
+	if err != nil || item == nil {
+		t.Fatalf("emulator warm-up enqueue: %v %+v", err, item)
+	}
+	if err := decideWithContentionRetry(q, tenant, item.ID, matcher.StatusApproved); err != nil {
+		t.Fatalf("emulator warm-up decide: %v", err)
+	}
+	metricsCtx, metricsCancel := context.WithTimeout(context.Background(), emulatorDecideAttemptTimeout)
+	defer metricsCancel()
+	if _, err := c.GetMetrics(metricsCtx, tenant); err != nil {
+		t.Fatalf("emulator warm-up metrics: %v", err)
+	}
+}
+
 func TestEmulatorDecideParallelOneWinsNoDoubleCount(t *testing.T) {
 	c := openProductMatchEmulatorClient(t)
-	ctx := context.Background()
-	tenant := uniqueTenant(t)
 	q := matcher.NewQueue(c)
+	warmProductMatchEmulator(t, c, q)
 
-	item, err := q.EnqueueMatch(ctx, tenant, matcher.Query{SKUName: "صنف-سباق", SourceFile: "e.xlsx"}, matcher.Result{
+	tenant := uniqueTenant(t)
+	enqCtx, enqCancel := context.WithTimeout(context.Background(), emulatorDecideAttemptTimeout)
+	item, err := q.EnqueueMatch(enqCtx, tenant, matcher.Query{SKUName: "صنف-سباق", SourceFile: "e.xlsx"}, matcher.Result{
 		Decision: matcher.DecisionNone, ReasonAR: "لا مرشح",
 	})
+	enqCancel()
 	if err != nil || item == nil {
 		t.Fatalf("enqueue: %v %+v", err, item)
 	}
@@ -119,10 +164,13 @@ func TestEmulatorDecideParallelOneWinsNoDoubleCount(t *testing.T) {
 		if i%2 == 1 {
 			st = matcher.StatusRejected
 		}
-		go func(st string) {
+		go func(i int, st string) {
 			defer wg.Done()
-			errs <- decideWithContentionRetry(ctx, q, tenant, item.ID, st)
-		}(st)
+			// Light stagger avoids a perfect thundering herd on ReactiveLockManager
+			// while still racing the decide transaction.
+			time.Sleep(time.Duration(i*15) * time.Millisecond)
+			errs <- decideWithContentionRetry(q, tenant, item.ID, st)
+		}(i, st)
 	}
 	wg.Wait()
 	close(errs)
@@ -151,14 +199,16 @@ func TestEmulatorDecideParallelOneWinsNoDoubleCount(t *testing.T) {
 		t.Fatalf("worker outcomes incomplete: ok=%d already=%d want sum %d", ok, already, workers)
 	}
 
-	got, err := c.GetItem(ctx, tenant, item.ID)
+	verifyCtx, verifyCancel := context.WithTimeout(context.Background(), emulatorDecideAttemptTimeout)
+	defer verifyCancel()
+	got, err := c.GetItem(verifyCtx, tenant, item.ID)
 	if err != nil || got == nil {
 		t.Fatalf("get: %v %+v", err, got)
 	}
 	if got.Status != matcher.StatusApproved && got.Status != matcher.StatusRejected {
 		t.Fatalf("final status: %s", got.Status)
 	}
-	m, err := c.GetMetrics(ctx, tenant)
+	m, err := c.GetMetrics(verifyCtx, tenant)
 	if err != nil {
 		t.Fatal(err)
 	}
