@@ -55,6 +55,9 @@ void main() {
     expect(k.noDataCount, 1);
     expect(k.noDataTargetRevenue, 180000000);
     expect(k.includesNoData, isTrue);
+    // UI year-scope: Target card should prefer comparableTargetRevenue so
+    // Target / Achievement / Gap share the same 150M denominator.
+    expect(k.comparableTargetRevenue, k.comparableActualRevenue + (-k.gapRevenue!));
   });
 
   test('only a future year: nothing is comparable, % and gap are null (shown as —)', () {

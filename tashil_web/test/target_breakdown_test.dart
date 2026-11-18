@@ -509,14 +509,14 @@ void main() {
       return texts[index];
     }
 
-    testWidgets('all years: achievement and gap only compare periods with sales',
+    testWidgets('all years: Target/Ach/Gap share the comparable year total',
         (tester) async {
       await pumpPanel(tester);
-      // Target card keeps both years (330M) and says so.
-      expect(textIn(tester, 'targets_kpi_card_مستهدف المبيعات', index: 1), contains('330'));
-      expect(find.text('يشمل مستهدفات سنوات قادمة'), findsOneWidget);
-      // 84.8% (not 38.5%) and −22.86M (not −202.86M).
-      // The comparison table repeats 84.8% without the status phrase.
+      // Year-scoped: Target card uses the has-sales total (150M), not 330M.
+      expect(textIn(tester, 'targets_kpi_card_مستهدف المبيعات', index: 1), contains('150'));
+      expect(textIn(tester, 'targets_kpi_card_مستهدف المبيعات', index: 1), isNot(contains('330')));
+      expect(find.textContaining('لفترات بها مبيعات'), findsOneWidget);
+      // 84.8% (not 38.5%) and −22.86M (not −202.86M) vs the same 150M.
       expect(textIn(tester, 'targets_kpi_card_نسبة التحقيق', index: 1), '84.8%');
       expect(find.text('84.8%'), findsWidgets);
       expect(find.textContaining('38.5'), findsNothing);
@@ -538,8 +538,7 @@ void main() {
           .map((t) => t.data ?? '')
           .join(' ');
       expect(pillText('t27'), '—');
-      expect(pillText('t26'), startsWith('84.8%'));
-      expect(pillText('t26'), contains('أقل من المستهدف'));
+      expect(pillText('t26'), '84.8% · أقل');
     });
 
     testWidgets('only a future year selected: achieved / % / gap cards are «—»', (tester) async {

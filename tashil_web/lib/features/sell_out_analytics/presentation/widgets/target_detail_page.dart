@@ -480,12 +480,14 @@ class _TargetDetailPageState extends State<TargetDetailPage> {
     }
     selected ??= branches.isEmpty ? null : branches.first;
 
+    // At 1280 (content ≈ 982) give the SKU panel enough width that its
+    // 5 columns fit without horizontal scroll; branch list stays readable.
     return Row(
       key: const ValueKey('target_detail_branches_tab'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          flex: 5,
+          flex: 3,
           child: Container(
             decoration: BoxDecoration(
               color: M3TableSurface.color(Theme.of(context).colorScheme),
@@ -508,6 +510,7 @@ class _TargetDetailPageState extends State<TargetDetailPage> {
                 return ListTile(
                   key: ValueKey('target_detail_branch_row_${b.branchKey}'),
                   selected: selectedRow,
+                  dense: true,
                   onTap: () => setState(() => _selectedBranchKey = b.branchKey),
                   title: Text(
                     _displayBranch(b.branchName),
@@ -528,10 +531,10 @@ class _TargetDetailPageState extends State<TargetDetailPage> {
         ),
         const SizedBox(width: M3Spacing.sm),
         Expanded(
-          flex: 6,
+          flex: 8,
           child: Container(
             key: const ValueKey('target_detail_branch_skus_panel'),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(4, 8, 4, 4),
             decoration: BoxDecoration(
               color: M3TableSurface.color(Theme.of(context).colorScheme),
               borderRadius: M3Shape.radiusLg,
@@ -551,7 +554,13 @@ class _TargetDetailPageState extends State<TargetDetailPage> {
                             ),
                       ),
                       M3Spacing.gapSM,
-                      Expanded(child: _SkuTable(skus: selected.skus, metric: _metric)),
+                      Expanded(
+                        child: _SkuTable(
+                          skus: selected.skus,
+                          metric: _metric,
+                          compact: true,
+                        ),
+                      ),
                     ],
                   ),
           ),
@@ -683,19 +692,36 @@ class _CumulativeChart extends StatelessWidget {
 
   final List<TargetCumulativePoint> points;
 
+  static String _yTick(double v) {
+    // Axis labels as compact M ج.م (e.g. 150.00M ج.م).
+    return CurrencyFormatter.formatCompactEGP(v, decimals: 0);
+  }
+
+  static String _xTick(TargetCumulativePoint p) {
+    // Short Arabic month for the X axis (يناير → ينا).
+    final label = p.labelAr.trim();
+    if (label.length <= 3) return label;
+    return label.substring(0, 3);
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final accents = M3StatusColors.of(context).accents;
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: cs.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        );
     var maxY = 1.0;
     for (final p in points) {
       if (p.cumulativeTarget > maxY) maxY = p.cumulativeTarget;
       if (p.cumulativeActual > maxY) maxY = p.cumulativeActual;
     }
+    final yTicks = <double>[maxY, maxY * 0.75, maxY * 0.5, maxY * 0.25, 0];
 
     return Container(
-      height: 220,
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+      height: 260,
+      padding: const EdgeInsets.fromLTRB(8, 16, 12, 8),
       decoration: BoxDecoration(
         color: M3TableSurface.color(cs),
         borderRadius: M3Shape.radiusLg,
@@ -712,14 +738,63 @@ class _CumulativeChart extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: CustomPaint(
-              painter: _CumulativePainter(
-                points: points,
-                maxY: maxY,
-                targetColor: cs.primary,
-                actualColor: accents.teal,
-                gridColor: cs.outlineVariant.withOpacity(0.4),
-              ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  key: const ValueKey('target_detail_chart_y_axis'),
+                  width: 56,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (final v in yTicks)
+                        Text(
+                          _yTick(v),
+                          maxLines: 1,
+                          softWrap: false,
+                          style: labelStyle,
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: CustomPaint(
+                          painter: _CumulativePainter(
+                            points: points,
+                            maxY: maxY,
+                            targetColor: cs.primary,
+                            actualColor: accents.teal,
+                            gridColor: cs.outlineVariant.withOpacity(0.4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        key: const ValueKey('target_detail_chart_x_axis'),
+                        children: [
+                          for (final p in points)
+                            Expanded(
+                              child: Text(
+                                _xTick(p),
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.clip,
+                                style: labelStyle,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 4),
@@ -765,10 +840,10 @@ class _CumulativePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (points.isEmpty || size.width <= 0 || size.height <= 0) return;
-    const padL = 8.0;
-    const padR = 8.0;
-    const padT = 8.0;
-    const padB = 18.0;
+    const padL = 4.0;
+    const padR = 4.0;
+    const padT = 4.0;
+    const padB = 4.0;
     final w = size.width - padL - padR;
     final h = size.height - padT - padB;
 
@@ -820,14 +895,23 @@ class _CumulativePainter extends CustomPainter {
 }
 
 class _SkuTable extends StatelessWidget {
-  const _SkuTable({required this.skus, required this.metric});
+  const _SkuTable({
+    required this.skus,
+    required this.metric,
+    this.compact = false,
+  });
 
   final List<TargetBreakdownSkuModel> skus;
   final TargetMetricMode metric;
+  /// Branch-panel layout: flex columns that fit ~1280 without h-scroll.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    if (compact) return _buildCompact(context);
     return TableScrollContainer(
+      key: const ValueKey('target_detail_sku_table'),
+      columnFlex: const [2.4, 1.2, 1.2, 1.3, 1.1],
       child: DataTable(
         headingRowHeight: 40,
         dataRowMinHeight: 44,
@@ -840,52 +924,167 @@ class _SkuTable extends StatelessWidget {
           DataColumn(label: Text('الفرق')),
         ],
         rows: [
-          for (final s in skus)
-            DataRow(
-              key: ValueKey('target_detail_sku_${s.skuKey}'),
-              cells: [
-                DataCell(
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        s.skuName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      Text(
-                        ltrIsolate(s.skuKey),
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                DataCell(Text(
-                  metric == TargetMetricMode.value
-                      ? ltrIsolate(CurrencyFormatter.formatCompactEGP(s.allocatedTargetEgp))
-                      : '${s.allocatedUnits ?? '—'}',
-                )),
-                DataCell(Text(
-                  metric == TargetMetricMode.value
-                      ? ltrIsolate(CurrencyFormatter.formatCompactEGP(s.actualRevenueEgp))
-                      : '${s.actualUnits}',
-                )),
-                DataCell(Text(
-                  s.achievementPct == null
-                      ? '—'
-                      : '${s.achievementPct!.toStringAsFixed(1)}%',
-                )),
-                DataCell(Text(
-                  ltrIsolate(CurrencyFormatter.formatCompactEGP(s.gapEgp)),
-                )),
-              ],
-            ),
+          for (final s in skus) _dataRow(context, s),
         ],
       ),
     );
   }
+
+  DataRow _dataRow(BuildContext context, TargetBreakdownSkuModel s) {
+    return DataRow(
+      key: ValueKey('target_detail_sku_${s.skuKey}'),
+      cells: [
+        DataCell(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                s.skuName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              Text(
+                ltrIsolate(s.skuKey),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ),
+        DataCell(Text(_targetText(s))),
+        DataCell(Text(_actualText(s))),
+        DataCell(Text(_achText(s))),
+        DataCell(Text(_gapText(s))),
+      ],
+    );
+  }
+
+  Widget _buildCompact(BuildContext context) {
+    final theme = Theme.of(context);
+    final headerStyle = theme.textTheme.labelSmall?.copyWith(
+      fontWeight: FontWeight.w700,
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final cs = theme.colorScheme;
+    return Container(
+      key: const ValueKey('target_detail_branch_sku_table'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    'الصنف',
+                    key: const ValueKey('target_detail_sku_header_name'),
+                    maxLines: 1,
+                    softWrap: false,
+                    style: headerStyle,
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text('المستهدف', maxLines: 1, softWrap: false, style: headerStyle),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text('المحقق', maxLines: 1, softWrap: false, style: headerStyle),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text('التحقيق %', maxLines: 1, softWrap: false, style: headerStyle),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text('الفرق', maxLines: 1, softWrap: false, style: headerStyle),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: cs.outlineVariant.withOpacity(0.5)),
+          Expanded(
+            child: ListView.separated(
+              itemCount: skus.length,
+              separatorBuilder: (_, __) => Divider(
+                height: 1,
+                color: cs.outlineVariant.withOpacity(0.35),
+              ),
+              itemBuilder: (context, i) {
+                final s = skus[i];
+                return Padding(
+                  key: ValueKey('target_detail_sku_${s.skuKey}'),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              s.skuName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            Text(
+                              ltrIsolate(s.skuKey),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(_targetText(s), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(_actualText(s), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(_achText(s), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(_gapText(s), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _targetText(TargetBreakdownSkuModel s) => metric == TargetMetricMode.value
+      ? ltrIsolate(CurrencyFormatter.formatCompactEGP(s.allocatedTargetEgp))
+      : '${s.allocatedUnits ?? '—'}';
+
+  String _actualText(TargetBreakdownSkuModel s) => metric == TargetMetricMode.value
+      ? ltrIsolate(CurrencyFormatter.formatCompactEGP(s.actualRevenueEgp))
+      : '${s.actualUnits}';
+
+  String _achText(TargetBreakdownSkuModel s) => s.achievementPct == null
+      ? '—'
+      : '${s.achievementPct!.toStringAsFixed(1)}%';
+
+  String _gapText(TargetBreakdownSkuModel s) =>
+      ltrIsolate(CurrencyFormatter.formatCompactEGP(s.gapEgp));
 }
+
