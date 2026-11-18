@@ -266,4 +266,76 @@ void main() {
     expect(find.byKey(const ValueKey('chain_discount_delete_btn')), findsNothing);
     expect(tester.widget<TextField>(find.byKey(const ValueKey('chain_discount_vat_field'))).enabled, isFalse);
   });
+
+  test('آخر تحديث is date only — never email or clock time', () {
+    expect(
+      formatChainDiscountUpdatedAt(DateTime.utc(2026, 11, 17, 19, 45)),
+      '2026-11-17',
+    );
+    expect(formatChainDiscountUpdatedAt(null), isEmpty);
+  });
+
+  testWidgets('آخر تحديث column shows yyyy-MM-dd only, not email or time',
+      (tester) async {
+    _bigView(tester);
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: [
+        ChainDiscountProfileModel(
+          chain: 'fathalla',
+          invoiceDiscountPct: 10,
+          additionalDiscountPct: 10,
+          vatRatePct: 14,
+          updatedAt: DateTime.utc(2026, 11, 17, 19, 45),
+          updatedBy: 'admin@adeco.test',
+        ),
+      ],
+      onSave: (_) async {},
+    )));
+    expect(find.text('2026-11-17'), findsOneWidget);
+    expect(find.textContaining('admin@adeco.test'), findsNothing);
+    expect(find.textContaining('19:45'), findsNothing);
+    expect(find.textContaining('21:45'), findsNothing);
+  });
+
+  testWidgets('while saving the add button and the table rows are disabled', (tester) async {
+    _bigView(tester);
+    var saves = 0;
+    const profiles = [
+      ChainDiscountProfileModel(chain: 'fathalla', invoiceDiscountPct: 10, additionalDiscountPct: 0, vatRatePct: 14)
+    ];
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: profiles,
+      saving: true,
+      onSave: (_) async => saves++,
+    )));
+    expect(tester.widget<FilledButton>(find.byKey(const ValueKey('chain_discount_add_btn'))).onPressed, isNull);
+    expect(tester.widget<AbsorbPointer>(find.byKey(const ValueKey('pm_chain_discount_absorb'))).absorbing, isTrue);
+    await tester.tap(find.byKey(const ValueKey('chain_terms_row_fathalla')), warnIfMissed: false);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const ValueKey('chain_discount_save_btn')), findsNothing,
+        reason: 'no edit dialog opens while a save is in flight');
+    expect(saves, 0);
+
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(profiles: profiles, onSave: (_) async => saves++)));
+    expect(tester.widget<AbsorbPointer>(find.byKey(const ValueKey('pm_chain_discount_absorb'))).absorbing, isFalse);
+    expect(tester.widget<FilledButton>(find.byKey(const ValueKey('chain_discount_add_btn'))).onPressed, isNotNull);
+  });
+
+  testWidgets('a double tap on «حفظ» submits once', (tester) async {
+    _bigView(tester);
+    final saved = <List<ChainDiscountProfileModel>>[];
+    await tester.pumpWidget(_host(ChainDiscountProfilesCard(
+      profiles: const [
+        ChainDiscountProfileModel(chain: 'fathalla', invoiceDiscountPct: 10, additionalDiscountPct: 0, vatRatePct: 14)
+      ],
+      onSave: (next) async => saved.add(next),
+    )));
+    await tester.tap(find.byKey(const ValueKey('chain_terms_row_fathalla')));
+    await tester.pumpAndSettle();
+    final save = find.byKey(const ValueKey('chain_discount_save_btn'));
+    await tester.tap(save);
+    await tester.tap(save, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(saved, hasLength(1));
+  });
 }

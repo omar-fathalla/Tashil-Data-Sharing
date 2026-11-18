@@ -62,6 +62,75 @@ class _TimeoutOnceChainRepository extends ChainDiscountRepository {
       profiles;
 }
 
+/// The first save gets no answer and cannot be verified; the retry succeeds.
+class _UnverifiedOnceChainRepository extends ChainDiscountRepository {
+  _UnverifiedOnceChainRepository(super.api);
+  int saves = 0;
+  List<ChainDiscountProfileModel> sent = const [];
+
+  @override
+  Future<List<ChainDiscountProfileModel>> load() async => const [];
+
+  @override
+  Future<List<ChainDiscountProfileModel>> save(
+      List<ChainDiscountProfileModel> profiles) async {
+    saves++;
+    sent = profiles;
+    if (saves == 1) throw const ChainDiscountSaveUnverifiedException();
+    return profiles;
+  }
+
+  @override
+  Future<List<KnownChain>> loadKnownChains() async => const [
+        KnownChain(key: 'm3-chain', displayName: 'm3-chain'),
+      ];
+}
+
+/// Slow PUT that still succeeds (server had the list). Must never paint the
+/// live v218 red «انتهت مهلة حفظ» banner.
+class _SlowSuccessfulSaveChainRepository extends ChainDiscountRepository {
+  _SlowSuccessfulSaveChainRepository(super.api);
+
+  @override
+  Future<List<ChainDiscountProfileModel>> load() async => const [
+        ChainDiscountProfileModel(
+            chain: 'fathalla',
+            invoiceDiscountPct: 10,
+            additionalDiscountPct: 0,
+            vatRatePct: 14),
+      ];
+
+  @override
+  Future<List<ChainDiscountProfileModel>> save(
+      List<ChainDiscountProfileModel> profiles) async {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    return [
+      for (final p in profiles)
+        ChainDiscountProfileModel(
+          chain: p.chain,
+          invoiceDiscountPct: p.invoiceDiscountPct,
+          additionalDiscountPct: p.additionalDiscountPct,
+          vatRatePct: p.vatRatePct,
+          updatedAt: DateTime.utc(2026, 11, 17, 19, 45),
+          updatedBy: 'admin@adeco.test',
+        ),
+    ];
+  }
+
+  @override
+  Future<List<KnownChain>> loadKnownChains() async => const [
+        KnownChain(key: 'fathalla', displayName: 'fathalla'),
+      ];
+}
+
+/// Pumps a fixed number of frames. Unlike [WidgetTester.pumpAndSettle], this
+/// returns while an indeterminate [LinearProgressIndicator] is animating.
+Future<void> _pumpUntil(WidgetTester tester, Finder finder) async {
+  for (var i = 0; i < 40 && finder.evaluate().isEmpty; i++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
 Finder _header(String label) => find.descendant(
     of: find.byKey(const ValueKey('pm_catalog_header')),
     matching: find.text(label));
@@ -506,6 +575,85 @@ void main() {
         findsNothing);
     expect(
         find.byKey(const ValueKey('chain_terms_row_kazyon')), findsOneWidget);
+  });
+
+  testWidgets(
+      'slow-but-successful chain save: soft «تم الحفظ — جاري تحديث…», never the timeout error',
+      (tester) async {
+    final api = liveScaleProductMasterClient();
+    final repo = _SlowSuccessfulSaveChainRepository(api);
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 3600,
+      withSidebar: true,
+      apiClient: api,
+      page: ProductMasterScreen(apiClient: api, chainRepository: repo),
+    );
+    await tester.tap(find.text('حاسبة الطلبيات'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('chain_terms_row_fathalla')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('chain_discount_additional_field')), '10');
+    await tester.tap(find.byKey(const ValueKey('chain_discount_save_btn')));
+    await _pumpUntil(tester, find.text(kChainDiscountSavedUpdatingMessage));
+
+    expect(find.byKey(const ValueKey('chain_discount_error_banner')),
+        findsNothing);
+    expect(find.textContaining('انتهت مهلة حفظ'), findsNothing);
+    expect(find.text('تعذّر حفظ إعدادات السلاسل'), findsNothing);
+    expect(find.text(kChainDiscountSavedUpdatingMessage), findsOneWidget);
+    expect(find.text('10%'), findsWidgets);
+    expect(find.text('2026-11-17'), findsOneWidget);
+    expect(find.textContaining('admin@adeco.test'), findsNothing);
+  });
+
+  testWidgets(
+      'chain terms save that cannot be confirmed: «تعذّر التأكد من الحفظ» + retry re-sends the same list',
+      (tester) async {
+    final api = liveScaleProductMasterClient();
+    final repo = _UnverifiedOnceChainRepository(api);
+    await pumpProductMaster(
+      tester,
+      width: kLiveViewportWidth,
+      height: 3600,
+      withSidebar: true,
+      apiClient: api,
+      page: ProductMasterScreen(apiClient: api, chainRepository: repo),
+    );
+    await tester.tap(find.text('حاسبة الطلبيات'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('chain_discount_add_btn')));
+    await tester.pumpAndSettle();
+    await selectM3Option(
+      tester,
+      find.byKey(const ValueKey('chain_discount_chain_dropdown')),
+      'm3-chain',
+    );
+    await tester.tap(find.byKey(const ValueKey('chain_discount_save_btn')));
+    // Bounded pumps: the saving state shows an indeterminate progress bar, and
+    // pumpAndSettle never returns while that animation is scheduled.
+    await _pumpUntil(tester, find.byKey(const ValueKey('chain_discount_error_banner')));
+
+    expect(find.byKey(const ValueKey('chain_discount_error_banner')),
+        findsOneWidget);
+    expect(find.text(kChainDiscountSaveUnverifiedTitle), findsOneWidget);
+    expect(find.text('تعذّر حفظ إعدادات السلاسل'), findsNothing);
+    expect(find.text(kChainDiscountSaveUnverifiedMessage), findsOneWidget);
+    expect(find.byKey(const ValueKey('chain_terms_row_m3-chain')), findsNothing,
+        reason: 'an unconfirmed save does not touch the table');
+
+    await tester.tap(find.text('إعادة المحاولة'));
+    await _pumpUntil(tester, find.byKey(const ValueKey('chain_terms_row_m3-chain')));
+    expect(repo.saves, 2);
+    expect(repo.sent.single.chain, 'm3-chain');
+    expect(find.byKey(const ValueKey('chain_discount_error_banner')),
+        findsNothing);
+    expect(find.byKey(const ValueKey('chain_terms_row_m3-chain')),
+        findsOneWidget);
   });
 
   testWidgets('selected tab persists in the ?tab= URL query', (tester) async {
