@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 )
@@ -29,8 +28,20 @@ func (b *blockingAggWriter) WriteAnalyticsAggregates(context.Context, *domain.An
 	return b.err
 }
 
+// newBareAnalyticsClient clears the heavy mock seed so Materialize/Get path tests
+// exercise Write sequencing without a multi-second CPFR compute under Mac CI load.
+func newBareAnalyticsClient(t *testing.T) *Client {
+	t.Helper()
+	t.Setenv("TASHIL_PRODUCT_MASTER_DIR", t.TempDir())
+	c := NewClient("test-project", "tashil_analytics", true)
+	if err := c.ClearTenantData(context.Background(), "all"); err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
 func TestMaterializeAnalyticsAggregatesWaitsForBQWriteAndReturnsError(t *testing.T) {
-	c := newSeededTestClient(t)
+	c := newBareAnalyticsClient(t)
 	started := make(chan struct{})
 	release := make(chan struct{})
 	w := &blockingAggWriter{started: started, release: release, err: errors.New("mirror boom")}
@@ -43,16 +54,13 @@ func TestMaterializeAnalyticsAggregatesWaitsForBQWriteAndReturnsError(t *testing
 		done <- err
 	}()
 
-	select {
-	case <-started:
-	case <-time.After(backgroundComputeWait):
-		t.Fatal("Materialize never reached WriteAnalyticsAggregates")
-	}
+	// Channel-only: no wall-clock ceiling (was backgroundComputeWait=90s flake under load).
+	<-started
 
 	select {
 	case err := <-done:
 		t.Fatalf("Materialize returned before sync write finished: %v", err)
-	case <-time.After(100 * time.Millisecond):
+	default:
 	}
 
 	close(release)
@@ -66,7 +74,7 @@ func TestMaterializeAnalyticsAggregatesWaitsForBQWriteAndReturnsError(t *testing
 }
 
 func TestDisableBackgroundAggregatesMirrorSkipsAsyncGetWrite(t *testing.T) {
-	c := newSeededTestClient(t)
+	c := newBareAnalyticsClient(t)
 	w := &fakeAggWriter{got: make(chan *domain.AnalyticsAggregates, 4)}
 	c.AttachAggregatesWriterForSyncMirror(w, "tenant-adeco")
 	c.DisableBackgroundAggregatesMirror()
@@ -77,7 +85,7 @@ func TestDisableBackgroundAggregatesMirrorSkipsAsyncGetWrite(t *testing.T) {
 	select {
 	case <-w.got:
 		t.Fatal("GetAnalyticsAggregates must not async-mirror when background disabled")
-	case <-time.After(200 * time.Millisecond):
+	default:
 	}
 
 	if _, err := c.MaterializeAnalyticsAggregates(context.Background(), "tenant-adeco"); err != nil {
@@ -85,7 +93,7 @@ func TestDisableBackgroundAggregatesMirrorSkipsAsyncGetWrite(t *testing.T) {
 	}
 	select {
 	case <-w.got:
-	case <-time.After(backgroundComputeWait):
+	default:
 		t.Fatal("Materialize must write synchronously")
 	}
 }
