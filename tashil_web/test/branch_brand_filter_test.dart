@@ -37,6 +37,34 @@ void main() {
       expect(brandLabelMatches('فلڤيتا (Velveta)', 'Velveta'), isTrue);
       expect(brandLabelMatches('ديفا (Diva)', 'Velveta'), isFalse);
     });
+
+    test('all-brands filter matches every label (record filter semantics)', () {
+      expect(isAllBrandsFilter('all'), isTrue);
+      expect(isAllBrandsFilter('كل العلامات التجارية'), isTrue);
+      expect(brandLabelMatches('ديفا (Diva)', 'all'), isTrue);
+    });
+  });
+
+  group('resolvePerfBrandDropdownValue', () {
+    test('all filter stays all — never picks first catalog brand', () {
+      const brands = ['ديفا (Diva)', 'فلڤيتا (Velveta)', 'كلوريل (Clorel)'];
+      expect(resolvePerfBrandDropdownValue('all', brands), 'all');
+      expect(resolvePerfBrandDropdownValue('كل العلامات التجارية', brands), 'all');
+      // Regression: brandLabelMatches(brand, 'all') is true for every brand;
+      // firstWhere would have "restored" ديفا after hard refresh.
+      expect(
+        brands.any((b) => brandLabelMatches(b, 'all')),
+        isTrue,
+        reason: 'documents why dropdown must not use brandLabelMatches for value',
+      );
+    });
+
+    test('resolves concrete filter to catalog label', () {
+      const brands = ['ديفا (Diva)', 'فلڤيتا (Velveta)', 'كلوريل (Clorel)'];
+      expect(resolvePerfBrandDropdownValue('Diva', brands), 'ديفا (Diva)');
+      expect(resolvePerfBrandDropdownValue('فلفيتا', brands), 'فلڤيتا (Velveta)');
+      expect(resolvePerfBrandDropdownValue('unknown', brands), 'all');
+    });
   });
 
   group('SmartBrandExtractor Divatol → Diva', () {

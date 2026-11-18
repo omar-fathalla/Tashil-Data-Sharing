@@ -26,20 +26,41 @@ String normalizeBrandKey(String s) {
   return (ar: full, en: '', full: full);
 }
 
+/// True when the UI filter means "every brand" (no brand scope).
+bool isAllBrandsFilter(String filter) {
+  final f = filter.trim();
+  return f.isEmpty || f == 'all' || f == 'الكل' || f == 'كل العلامات التجارية';
+}
+
 /// Whether an inferred catalog brand matches a UI brand filter value.
 /// Accepts full labels, Arabic-only, or English-only ("Diva" / "Velveta").
+/// An "all brands" filter matches every label (used for record filtering).
 bool brandLabelMatches(String inferred, String filter) {
-  final f = filter.trim();
-  if (f.isEmpty || f == 'all' || f == 'الكل' || f == 'كل العلامات التجارية') {
-    return true;
-  }
+  if (isAllBrandsFilter(filter)) return true;
   final a = brandLabelParts(inferred);
-  final b = brandLabelParts(f);
+  final b = brandLabelParts(filter);
   if (a.full.isEmpty || b.full.isEmpty) return false;
   if (a.full == b.full) return true;
   final aParts = <String>{a.full, if (a.ar.isNotEmpty) a.ar, if (a.en.isNotEmpty) a.en};
   final bParts = <String>{b.full, if (b.ar.isNotEmpty) b.ar, if (b.en.isNotEmpty) b.en};
   return aParts.intersection(bParts).isNotEmpty;
+}
+
+/// Dropdown selection for أداء الفروع brand filter.
+///
+/// Important: [brandLabelMatches] treats `all` as matching every brand, so it
+/// must not be used to pick the dropdown value — that incorrectly "restores"
+/// the first catalog brand (e.g. ديفا) after a hard refresh while KPIs stay
+/// all-brands.
+String resolvePerfBrandDropdownValue(
+  String perfBrand,
+  Iterable<String> availableBrands,
+) {
+  if (isAllBrandsFilter(perfBrand)) return 'all';
+  for (final b in availableBrands) {
+    if (brandLabelMatches(b, perfBrand)) return b;
+  }
+  return 'all';
 }
 
 /// Infers the catalog brand for a sell-out record (SKU name + category + item code).
@@ -56,11 +77,12 @@ List<SellOutRecordModel> filterRecordsByBrand(
   Iterable<SellOutRecordModel> records,
   String brandFilter,
 ) {
-  final f = brandFilter.trim();
-  if (f.isEmpty || f == 'all' || f == 'الكل' || f == 'كل العلامات التجارية') {
+  if (isAllBrandsFilter(brandFilter)) {
     return List<SellOutRecordModel>.from(records);
   }
-  return records.where((r) => brandLabelMatches(inferSellOutBrand(r), f)).toList();
+  return records
+      .where((r) => brandLabelMatches(inferSellOutBrand(r), brandFilter))
+      .toList();
 }
 
 bool _isGenericBrandLabel(String brand) {
