@@ -693,7 +693,7 @@ func (c *Client) seedMetadata() {
 	// Seed Tenants (Legacy & Core metadata)
 	c.tenants["tenant-adeco"] = domain.Tenant{
 		ID:           "tenant-adeco",
-		Name:         "أديكو للصناعات الغذائية (Adeco)",
+		Name:         "ادكو للصناعات الغذائية (Adeco)",
 		Code:         "adeco",
 		SeedColorHex: "#35A211", // ADCO logo green
 		Currency:     "EGP",
@@ -719,7 +719,7 @@ func (c *Client) seedMetadata() {
 	// Seed Rich Tenant Profiles
 	c.tenantProfiles["adeco"] = domain.TenantProfile{
 		TenantID:       "adeco",
-		DisplayName:    "شركة أديكو للصناعات الغذائية (Adeco)",
+		DisplayName:    "شركة ادكو للصناعات الغذائية (Adeco)",
 		Slug:           "adeco",
 		PortalURL:      "http://localhost:3000/portal/adeco",
 		BrandSeedColor: "#35A211",
@@ -1111,7 +1111,7 @@ func (c *Client) seedMetadata() {
 			UserRole:  string(domain.RoleVendorAdmin),
 			Action:    "AUTH_LOGIN",
 			Resource:  "portal/adeco",
-			Details:   "تسجيل دخول ناجح إلى بوابة شركة أديكو للصناعات الغذائية",
+			Details:   "تسجيل دخول ناجح إلى بوابة شركة ادكو للصناعات الغذائية",
 			IPAddress: "197.55.128.14",
 			Status:    "SUCCESS",
 			CreatedAt: now.Add(-15 * time.Minute),

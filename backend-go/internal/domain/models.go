@@ -237,7 +237,7 @@ func InferDepartmentArFromPrefix(prefix string) string {
 		if strings.HasPrefix(p, "PR") {
 			return "عروض ترويجية مجمعة"
 		}
-		return "أصناف أدكو"
+		return "أصناف ادكو"
 	}
 }
 

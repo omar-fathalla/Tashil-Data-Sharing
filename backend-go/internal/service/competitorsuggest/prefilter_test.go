@@ -62,7 +62,7 @@ func TestSizeIsSoftBonusNotHardFilter(t *testing.T) {
 }
 
 func TestCategoryExactMatchWithoutEquivalence(t *testing.T) {
-	own := SkuCandidate{Barcode: "O", SKUName: "جيل أديكو", Category: "مساحيق جيل اتوماتيك", IsOwnBrand: true}
+	own := SkuCandidate{Barcode: "O", SKUName: "جيل ادكو", Category: "مساحيق جيل اتوماتيك", IsOwnBrand: true}
 	pool := []SkuCandidate{
 		{Barcode: "A", SKUName: "منافس", Category: "مسحوق جيل اتوماتيك"},
 		{Barcode: "B", SKUName: "نفس الفئة", Category: "مساحيق جيل اتوماتيك"},

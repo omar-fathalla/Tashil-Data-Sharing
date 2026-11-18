@@ -450,7 +450,7 @@ func TestPricingCompliancePaginationAndCategoryNormalization(t *testing.T) {
 		items = append(items, domain.PricingComplianceItem{
 			TenantID:         "tenant-adeco",
 			Barcode:          "622300139000" + string(rune('0'+(i%10))),
-			SKUName:          "منتج أدكو " + string(rune('A'+(i%26))),
+			SKUName:          "منتج ادكو " + string(rune('A'+(i%26))),
 			Category:         rawCategories[i%len(rawCategories)],
 			RetailerChain:    "fathalla",
 			StoreName:        "فتح الله سموحة",

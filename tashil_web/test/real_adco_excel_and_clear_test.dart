@@ -18,7 +18,7 @@ void main() {
       expect(initialKpis.tenantMarketSharePct, closeTo(18.44, 0.1));
       expect(initialKpis.competitorsCount, greaterThanOrEqualTo(81));
       expect(initialKpis.supplierShares, isNotEmpty);
-      expect(initialKpis.supplierShares.first.supplierName, contains('ديكو'));
+      expect(initialKpis.supplierShares.first.supplierName, contains('ادكو'));
 
       // 1. Wipe all data
       await apiClient.clearTenantData();

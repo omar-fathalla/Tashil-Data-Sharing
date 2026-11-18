@@ -108,7 +108,7 @@ func (r *GeminiRanker) Rank(ctx context.Context, own SkuCandidate, candidates []
 			c.SizeSimilar, c.VariantBonus,
 		))
 	}
-	prompt := fmt.Sprintf(`أنت مساعد لترتيب منافسي أصناف شركة أديكو من قائمة مرشحين فقط.
+	prompt := fmt.Sprintf(`أنت مساعد لترتيب منافسي أصناف شركة ادكو من قائمة مرشحين فقط.
 أرجع JSON فقط:
 {"suggestions":[{"competitor_barcode":"...","reason_ar":"...","confidence":0.0,"rank":1}]}
 

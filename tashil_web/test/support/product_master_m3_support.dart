@@ -89,7 +89,7 @@ class FakeProductMasterApiClient extends ApiClient {
     if (emptyCatalog) {
       return const ProductMasterSummaryModel(
         tenantId: 'tenant-adeco',
-        companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+        companyName: 'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
         sheetDateLabel: 'تحديث فارغ',
         sourceFilename: 'empty_product_master.xlsx',
         totalSkus: 0,
@@ -197,7 +197,7 @@ class FakeProductMasterApiClient extends ApiClient {
     }
     return ProductMasterSummaryModel(
       tenantId: 'tenant-adeco',
-      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: 'تحديث 01-09-2026',
       sourceFilename: 'adeco_product_master_2026_09_01.xlsx',
       totalSkus: 389,
