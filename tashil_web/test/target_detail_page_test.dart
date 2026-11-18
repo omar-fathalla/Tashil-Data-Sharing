@@ -301,6 +301,38 @@ void main() {
     expect(find.byKey(const ValueKey('target_detail_month_card_1')), findsOneWidget);
     expect(find.byKey(const ValueKey('target_detail_month_card_12')), findsOneWidget);
 
+    expect(find.byKey(const ValueKey('target_detail_chart_x_axis')), findsOneWidget);
+    expect(find.byKey(const ValueKey('target_detail_chart_y_axis')), findsOneWidget);
+    // X = short Arabic months; Y = compact M ج.م values.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('target_detail_chart_x_axis')),
+        matching: find.text('ينا'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('target_detail_chart_x_axis')),
+        matching: find.text('ديس'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('target_detail_chart_y_axis')),
+        matching: find.textContaining('M'),
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('target_detail_chart_y_axis')),
+        matching: find.textContaining('ج.م'),
+      ),
+      findsWidgets,
+    );
+
     await tester.tap(find.byKey(const ValueKey('target_detail_month_card_2')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('target_detail_branches_tab')), findsOneWidget);
@@ -314,5 +346,67 @@ void main() {
 
     // SKU barcode under name is LTR-isolated in the branch panel.
     expect(find.textContaining('6224000000001'), findsWidgets);
+  });
+
+  testWidgets('branches SKU panel fits 1280 without h-scroll; الصنف header readable',
+      (tester) async {
+    // Live content width: 1280 − 250 sidebar − 48 page padding.
+    const contentW = 1280.0 - 250.0 - 48.0;
+    tester.view.physicalSize = const Size(contentW, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final target = TargetComparisonModel.fromJson(_item('t26', 2026,
+        target: 150000000,
+        actual: 127135120,
+        hasActuals: true,
+        units: 250000,
+        actualUnits: 1532854));
+    final repo = _FakeRepo(const [], {'t26': _breakdownJson()});
+
+    await tester.pumpWidget(_host(TargetDetailPage(
+      repository: repo,
+      target: target,
+      onBack: () {},
+      initialTab: TargetDetailTab.branches,
+    )));
+    await tester.pumpAndSettle();
+
+    final panel = find.byKey(const ValueKey('target_detail_branch_skus_panel'));
+    expect(panel, findsOneWidget);
+    final skuTable = find.byKey(const ValueKey('target_detail_branch_sku_table'));
+    expect(skuTable, findsOneWidget);
+
+    double hScroll() {
+      var maxExtent = 0.0;
+      for (final e in find
+          .descendant(of: panel, matching: find.byType(Scrollable))
+          .evaluate()) {
+        final state = tester.state<ScrollableState>(
+            find.byElementPredicate((x) => x == e));
+        if (state.position.axis == Axis.horizontal &&
+            state.position.hasContentDimensions &&
+            state.position.maxScrollExtent > maxExtent) {
+          maxExtent = state.position.maxScrollExtent;
+        }
+      }
+      return maxExtent;
+    }
+
+    expect(hScroll(), lessThanOrEqualTo(2.0),
+        reason: 'branch SKU panel must fit at ~1280 without h-scroll');
+    // Compact layout is a flex Column (no TableScrollContainer h-scroll).
+    expect(
+      find.descendant(of: skuTable, matching: find.byType(SingleChildScrollView)),
+      findsNothing,
+    );
+
+    final header = find.byKey(const ValueKey('target_detail_sku_header_name'));
+    expect(header, findsOneWidget);
+    expect(tester.widget<Text>(header).data, 'الصنف');
+    final para = tester.renderObject<RenderParagraph>(header);
+    expect(para.didExceedMaxLines, isFalse);
+    expect(find.text('ال…'), findsNothing);
   });
 }

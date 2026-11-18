@@ -101,17 +101,18 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   /// Caps so the 9-column Sell-Out table fits the live 1280 shell
   /// (250dp sidebar + 24dp page padding each side ≈ 982dp) without
   /// horizontal scrolling. Sum of caps stays under that width minus
-  /// the 4dp margins and column gaps.
+  /// the 4dp margins and column gaps. Chain + achievement get enough
+  /// room for «أسواق فتح الله» and compact «63.6% · أقل».
   static const _sellOutColMax = <double>[
-    72, // السلسلة
-    100, // الفترة (Period)
-    80, // النطاق
-    88, // المستهدف
-    116, // المحقق
-    96, // الفرق
-    168, // الكمية
-    84, // نسبة التحقيق
-    88, // إجراءات
+    124, // السلسلة — «أسواق فتح الله»
+    78, // الفترة (Period)
+    96, // النطاق — «فرع المعادي»
+    74, // المستهدف
+    90, // المحقق
+    74, // الفرق
+    136, // الكمية
+    116, // نسبة التحقيق — «63.6% · أقل»
+    70, // إجراءات
   ];
 
   Widget _sellOutCap(int column, Widget child) {
@@ -1199,8 +1200,11 @@ onChanged: m3Legacy<int>((v) {
             const noTargets = 'لا توجد مستهدفات بعد';
             const noSalesYet = 'لا توجد مبيعات بعد';
             final neutral = colorScheme.onSurfaceVariant;
-            // Sell-Out compares only periods that have sales: a 2027 target
-            // must not turn "كل السنوات" into 38% / −202M.
+            // Sell-Out KPIs share one year-scoped total: the year filter
+            // already limits summary.items; when "كل السنوات" still mixes
+            // future years without sales, Target/Ach/Gap all use the
+            // comparable (has-sales) basis so 390M never sits next to a
+            // 200M achievement denominator.
             final kpis = TargetKpis.fromSummary(summary);
             final onlyNoData = !_isSellIn && kpis.onlyNoData;
             final includesNoData = !_isSellIn && kpis.includesNoData;
@@ -1210,8 +1214,14 @@ onChanged: m3Legacy<int>((v) {
             final double? variance = _isSellIn
                 ? summary.totalVarianceEgp
                 : (hasTargets ? kpis.gapRevenue : summary.totalVarianceEgp);
+            final sellOutTargetRevenue = includesNoData
+                ? kpis.comparableTargetRevenue
+                : summary.totalTargetRevenueEgp;
+            final sellOutTargetUnits = includesNoData
+                ? kpis.comparableTargetUnits
+                : summary.totalTargetUnits;
             final targetUnitsText =
-                '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} $_unitLabelAr مستهدفة';
+                '${CurrencyFormatter.formatNumber((_isSellIn ? summary.totalTargetUnits : sellOutTargetUnits).round())} $_unitLabelAr مستهدفة';
             final card1 = _buildKpiCard(
               context,
               titleAr: _isSellIn ? 'مستهدف التوريد' : 'مستهدف المبيعات',
@@ -1220,16 +1230,19 @@ onChanged: m3Legacy<int>((v) {
                   ? 'Sell-In Target'
                   : 'Sell-Out Target',
               value: CurrencyFormatter.formatCompactEGP(
-                summary.totalTargetRevenueEgp,
+                _isSellIn
+                    ? summary.totalTargetRevenueEgp
+                    : sellOutTargetRevenue,
               ),
               subtitleAr: _isSellIn
                   ? '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} كرتونة • ${summary.totalTargetWeightTons.toStringAsFixed(1)} طن'
                   : includesNoData
-                      ? 'يشمل مستهدفات سنوات قادمة'
+                      ? 'لفترات بها مبيعات • مستهدفات قادمة مستبعدة'
                       : targetUnitsText,
               subtitleTooltip: includesNoData
-                  ? 'يشمل مستهدفات سنوات قادمة بدون مبيعات '
-                      '(${CurrencyFormatter.formatCompactEGP(kpis.noDataTargetRevenue)}) • $targetUnitsText'
+                  ? 'نفس أساس نسبة التحقيق والفرق (فترات بها مبيعات). '
+                      'مستهدفات بدون مبيعات مستبعدة '
+                      '(${CurrencyFormatter.formatCompactEGP(kpis.noDataTargetRevenue)})'
                   : null,
               subtitleEn: _isSellIn
                   ? '+ returns: ${CurrencyFormatter.formatNumber(summary.totalGrossTargetUnits.round())} cases'
@@ -1607,9 +1620,14 @@ onChanged: m3Legacy<String>((v) {
                                       : _sellOutCap(
                                           i,
                                           M3TableText(
-                                            // Sell-Out drops the English
-                                            // "(Chain)" so the header is one line.
-                                            i == 0 ? 'السلسلة' : h,
+                                            // Sell-Out: short one-line headers so
+                                            // chain + achievement stay readable.
+                                            switch (i) {
+                                              0 => 'السلسلة',
+                                              6 => 'الكمية',
+                                              7 => 'التحقيق %',
+                                              _ => h,
+                                            },
                                             maxLines: 1,
                                           ),
                                         ),
@@ -1687,6 +1705,9 @@ onChanged: m3Legacy<String>((v) {
                                           : _sellOutLine(
                                               item.chainDisplayName,
                                               column: 0,
+                                              key: ValueKey(
+                                                'targets_chain_${item.id}',
+                                              ),
                                               tooltip: item.chainDisplayName,
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.w800,

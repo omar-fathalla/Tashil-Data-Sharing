@@ -63,6 +63,9 @@ type Repository interface {
 		months []sharetarget.MonthWeight,
 		err error,
 	)
+	// BuildShareTargetCascadesBatch scans sell-out facts once for many categories (preview latency).
+	// skuFor limits SKU-mix collection; nil/empty = collect SKUs for every requested category.
+	BuildShareTargetCascadesBatch(ctx context.Context, tenantID, chain string, year int, categories []string, branchFilter map[string]bool, skuFor map[string]bool) (map[string]ShareTargetCascadeInputs, error)
 	TargetBreakdownSource(tenantID, chain string) targetalloc.Source
 	GetProductMaster(ctx context.Context, tenantID string, filter ProductMasterFilter) (*domain.ProductMasterSummaryResponse, error)
 	SetProductMaster(ctx context.Context, tenantID string, summary *domain.ProductMasterSummaryResponse) (*domain.ProductMasterSummaryResponse, error)
