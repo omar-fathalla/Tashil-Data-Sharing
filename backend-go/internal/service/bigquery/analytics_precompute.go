@@ -46,6 +46,13 @@ const maxCachedPayloads = 64
 // recomputeDelay debounces bursts of source changes (e.g. multi-file uploads).
 var recomputeDelay = 3 * time.Second
 
+// aggregatesNow stamps AnalyticsAggregates.UpdatedAt. Tests inject a fixed clock.
+var aggregatesNow = func() time.Time { return time.Now().UTC() }
+
+// scheduleAfter runs the debounced background recompute. Tests replace it to
+// avoid wall-clock AfterFunc races under Mac CI load.
+var scheduleAfter = time.AfterFunc
+
 // bumpSourceVersion marks every precomputed result stale and schedules a debounced
 // background recompute (+ BigQuery mirror). Safe to call while holding c.mu.
 func (c *Client) bumpSourceVersion() {
@@ -122,7 +129,7 @@ func (c *Client) scheduleRecompute() {
 	if p.timer != nil {
 		p.timer.Stop()
 	}
-	p.timer = time.AfterFunc(recomputeDelay, func() {
+	p.timer = scheduleAfter(recomputeDelay, func() {
 		p.mu.Lock()
 		set := map[string]string{}
 		for _, t := range p.tenants {
@@ -290,7 +297,7 @@ func (c *Client) loadOrComputeAnalyticsAggregates(ctx context.Context, tenantID 
 	}
 	p.mu.Unlock()
 
-	at := time.Now().UTC()
+	at := aggregatesNow()
 	agg = &domain.AnalyticsAggregates{TenantID: norm, Version: v, UpdatedAt: at,
 		ChainProfitMonthly: []domain.AggChainProfitMonthly{}, SkuCostMargin: []domain.AggSkuCostMargin{}, SellThrough: []domain.AggSellThrough{}}
 	chains := append([]string{"all"}, c.tenantChains(tenantID)...)

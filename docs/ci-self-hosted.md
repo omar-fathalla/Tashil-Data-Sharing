@@ -192,8 +192,11 @@ required checks run in the queue. `deploy.yml` does **not** — production deplo
 via `workflow_run` after **CI tests** succeeds on `main` (`deploy-gate` →
 deploy → livez/health). No runner busy-wait.
 
-Self-hosted Flutter: prefer `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`);
-**fail fast** if missing — never download via `flutter-action` on Mac. `PUB_CACHE` is
+Self-hosted Flutter: on Apple Silicon prefer `$HOME/toolchains/flutter-arm64`
+(native), then `$HOME/toolchains/flutter` (`scripts/ci_detect_flutter.sh`);
+**fail fast** if missing — never download via `flutter-action` on Mac. On arm64
+hosts, CI also **requires** a native arm64 SDK (`scripts/ci_assert_flutter_arm64.sh`)
+so Rosetta `darwin-x64` `flutter_tester` cannot run under load. `PUB_CACHE` is
 forced to `$RUNNER_TEMP/pub-cache` per job.
 
 **Tradeoff when enabled:** one global `LOCK.d` serializes our heavy jobs with each other
@@ -280,7 +283,7 @@ Flutter **web** + Go + Playwright Chromium only.
 | Go modules | Local `~/go/pkg/mod` on self-hosted (remote setup-go cache disabled — was ~880MB / stalled); `cache: true` only on github-hosted |
 | Go build | Local `~/Library/Caches/go-build` on self-hosted; actions/cache only on github-hosted |
 | Pub | Per-job `$RUNNER_TEMP/pub-cache` via `PUB_CACHE` (`ci_runner_env.sh`); never shared `~/.pub-cache`. Remote `actions/cache` only on github-hosted |
-| Flutter SDK | **Required** preinstalled 3.41.2 at `$HOME/toolchains/flutter` on self-hosted (`ci_detect_flutter.sh`); missing → fail fast. `flutter-action` only on github-hosted fallback |
+| Flutter SDK | **Required** preinstalled 3.41.2 — prefer `$HOME/toolchains/flutter-arm64` (native Apple Silicon), else `$HOME/toolchains/flutter` (`ci_detect_flutter.sh`); missing → fail fast. Arm64 hosts must not use Rosetta x64 engines (`ci_assert_flutter_arm64.sh`). `flutter-action` only on github-hosted fallback |
 | Firebase emulator JARs | `~/.cache/firebase/emulators` (shared read; per-job config elsewhere) |
 | npm (e2e) | `setup-node` cache |
 | Playwright browsers | `~/.cache/ms-playwright` + `~/Library/Caches/ms-playwright` |
@@ -394,6 +397,57 @@ du -sh ~/.cache/firebase ~/Library/Caches/ms-playwright 2>/dev/null
 ```
 
 Preinstalled: Go 1.26, Flutter 3.41.2, Node 25, Java 21, `gh`, `git`. No Docker.
+
+## Flutter SDK (arm64)
+
+`tashil-mac` runners are Apple Silicon (`ARM64` label). A **darwin-x64** Flutter
+SDK (Rosetta) at `$HOME/toolchains/flutter` works but burns CPU under parallel
+`test-flutter` + smoke (observed loadavg ~23). Use a **native arm64** SDK.
+
+### How CI resolves the toolchain
+
+1. `scripts/ci_runner_env.sh` and `scripts/ci_detect_flutter.sh` share
+   `scripts/ci_flutter_arch.sh` candidate order on Apple Silicon:
+   `$HOME/toolchains/flutter-arm64/bin` → `$HOME/toolchains/flutter/bin` →
+   `~/flutter` / FVM → `$HOME/toolchains/bin`.
+2. First existing `flutter` binary wins (prepended to `PATH` / `GITHUB_PATH`).
+3. Self-hosted jobs **refuse** `flutter-action` downloads (`use_action=true` → error).
+4. After a successful detect, `scripts/ci_assert_flutter_arm64.sh` requires the
+   selected SDK’s Dart / `flutter_tester` to be **arm64** (not x86_64/Rosetta).
+   Arch is sniffed with `lipo`/`file` on those binaries — **not** from engine
+   folder names. Official arm64 zips often still keep host artifacts under
+   `bin/cache/artifacts/engine/darwin-x64/`.
+
+### Install / promote (ops, as `tashil-ci`)
+
+Run once on the Mac (idle preferred). Does **not** require a workflow merge to
+take effect for path preference once `flutter-arm64` exists; the assert step
+needs this PR’s workflow on the job SHA.
+
+```bash
+# Default: install Flutter 3.41.2 into $HOME/toolchains/flutter-arm64
+bash scripts/ci_install_flutter_macos_arm64.sh
+
+# Optional: point $HOME/toolchains/flutter → flutter-arm64
+# (moves a prior x64 tree to flutter-x64 when needed)
+bash scripts/ci_install_flutter_macos_arm64.sh --promote
+
+# Dry-run / pin version
+FLUTTER_VERSION=3.41.2 bash scripts/ci_install_flutter_macos_arm64.sh --dry-run
+```
+
+Verify:
+
+```bash
+export PATH="$HOME/toolchains/flutter-arm64/bin:$PATH"
+# shellcheck source=scripts/ci_flutter_arch.sh
+source scripts/ci_flutter_arch.sh
+file "$(ci_flutter_tester_path)"
+# expect: Mach-O 64-bit executable arm64
+bash scripts/ci_assert_flutter_arm64.sh
+```
+
+Emergency bypass (not for normal CI): `CI_ASSERT_FLUTTER_ARM64=0`.
 
 ## What CI covers
 
