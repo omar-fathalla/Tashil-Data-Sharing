@@ -33,6 +33,7 @@ import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_table_text.dart';
+import '../../../../core/testing/test_semantics.dart';
 
 /// TargetManagementPanel provides a unified Target entry, Excel upload, and
 /// real-time Actual vs. Target achievement comparison experience for both
@@ -1439,12 +1440,25 @@ onChanged: m3Legacy<String>((v) {
                 runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  FilledButton.icon(
-                    onPressed: _openAddTargetEntry,
-                    icon: const Icon(Icons.add_task_rounded, size: M3ToolbarButton.iconSize),
-                    label: const Text('إضافة مستهدف'),
-                    style: M3ToolbarButton.style,
-                  ),
+                  if (_isSellIn)
+                    FilledButton.icon(
+                      onPressed: _openAddTargetEntry,
+                      icon: const Icon(Icons.add_task_rounded, size: M3ToolbarButton.iconSize),
+                      label: const Text('إضافة مستهدف'),
+                      style: M3ToolbarButton.style,
+                    )
+                  else
+                    TestSemantics.button(
+                      identifier: TestIds.selloutTargetsAdd,
+                      label: 'إضافة مستهدف',
+                      onPressed: _openAddTargetEntry,
+                      child: FilledButton.icon(
+                        onPressed: _openAddTargetEntry,
+                        icon: const Icon(Icons.add_task_rounded, size: M3ToolbarButton.iconSize),
+                        label: const Text('إضافة مستهدف'),
+                        style: M3ToolbarButton.style,
+                      ),
+                    ),
                   if (_isSellIn) ...[
                     FilledButton.tonalIcon(
                       onPressed: _isUploading ? null : _pickAndUploadTargetExcel,
@@ -1465,12 +1479,25 @@ onChanged: m3Legacy<String>((v) {
                       style: M3ToolbarButton.style,
                     ),
                   ],
-                  OutlinedButton.icon(
-                    onPressed: _exportTargetsComparisonCsv,
-                    icon: const Icon(Icons.table_view_rounded, size: M3ToolbarButton.iconSize),
-                    label: const Text('تصدير'),
-                    style: M3ToolbarButton.style,
-                  ),
+                  if (_isSellIn)
+                    OutlinedButton.icon(
+                      onPressed: _exportTargetsComparisonCsv,
+                      icon: const Icon(Icons.table_view_rounded, size: M3ToolbarButton.iconSize),
+                      label: const Text('تصدير'),
+                      style: M3ToolbarButton.style,
+                    )
+                  else
+                    TestSemantics.button(
+                      identifier: TestIds.selloutTargetsExport,
+                      label: 'تصدير',
+                      onPressed: _exportTargetsComparisonCsv,
+                      child: OutlinedButton.icon(
+                        onPressed: _exportTargetsComparisonCsv,
+                        icon: const Icon(Icons.table_view_rounded, size: M3ToolbarButton.iconSize),
+                        label: const Text('تصدير'),
+                        style: M3ToolbarButton.style,
+                      ),
+                    ),
                 ],
               ),
             ],
