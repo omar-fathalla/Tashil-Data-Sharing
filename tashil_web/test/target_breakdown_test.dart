@@ -530,10 +530,16 @@ void main() {
       expect(find.byKey(const ValueKey('targets_actual_dash_t27')), findsOneWidget);
       expect(find.byKey(const ValueKey('targets_actual_dash_t26')), findsNothing);
       expect(find.text('لا توجد مبيعات بعد'), findsOneWidget);
-      final chip = tester.widget<Text>(find.byKey(const ValueKey('targets_achievement_t27')));
-      expect(chip.data, '—');
-      final chip26 = tester.widget<Text>(find.byKey(const ValueKey('targets_achievement_t26')));
-      expect(chip26.data, startsWith('84.8%'));
+      String pillText(String id) => tester
+          .widgetList<Text>(find.descendant(
+            of: find.byKey(ValueKey('targets_achievement_$id')),
+            matching: find.byType(Text),
+          ))
+          .map((t) => t.data ?? '')
+          .join(' ');
+      expect(pillText('t27'), '—');
+      expect(pillText('t26'), startsWith('84.8%'));
+      expect(pillText('t26'), contains('أقل من المستهدف'));
     });
 
     testWidgets('only a future year selected: achieved / % / gap cards are «—»', (tester) async {
@@ -549,17 +555,20 @@ void main() {
       expect(textIn(tester, 'targets_kpi_card_الفرق', index: 1), '—');
     });
 
-    testWidgets('tapping a row opens the breakdown; the back button closes it',
+    testWidgets('tapping a row opens the full-page detail; back closes it',
         (tester) async {
       final repo = await pumpPanel(tester);
       await tester.tap(find.byKey(const ValueKey('targets_period_t26')));
       await tester.pumpAndSettle();
       expect(repo.breakdownRequests, ['t26']);
-      expect(find.byKey(const ValueKey('target_breakdown_dialog')), findsOneWidget);
-      expect(find.byKey(const ValueKey('target_breakdown_export')), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey('target_breakdown_back')));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('target_detail_page')), findsOneWidget);
       expect(find.byKey(const ValueKey('target_breakdown_dialog')), findsNothing);
+      expect(find.text('رفع ملف المستهدفات'), findsNothing);
+      expect(find.text('تنزيل القالب'), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('target_detail_back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('target_detail_page')), findsNothing);
+      expect(find.byKey(const ValueKey('targets_main_table')), findsOneWidget);
     });
 
     testWidgets('the add form saves a target for a future year', (tester) async {

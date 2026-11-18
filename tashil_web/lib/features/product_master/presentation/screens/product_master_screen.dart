@@ -1306,7 +1306,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         if (p.startsWith('PR')) {
           return 'عروض ترويجية';
         }
-        return 'أصناف أدكو';
+        return 'أصناف ادكو';
     }
   }
 

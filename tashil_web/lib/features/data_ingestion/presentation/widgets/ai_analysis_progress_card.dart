@@ -347,7 +347,7 @@ class AiAnalysisProgressCard extends StatelessWidget {
                           '${result!.competitorsDetected} مورد',
                           colorScheme.tertiary),
                     if (marketShareStatValue(result!) != null)
-                      _buildStatCol('حصة أديكو السوقية',
+                      _buildStatCol('حصة ادكو السوقية',
                           marketShareStatValue(result!)!, status.success),
                     _buildStatCol('الشذوذ المكتشف',
                         '${result!.anomalyRows} ملاحظة', status.warning),

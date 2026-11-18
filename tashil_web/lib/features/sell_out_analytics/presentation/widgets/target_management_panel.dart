@@ -14,7 +14,10 @@ import '../../data/target_repository.dart';
 import '../../domain/target_kpi.dart';
 import '../../domain/target_table_format.dart';
 import 'target_breakdown_dialog.dart';
+import 'target_detail_page.dart';
+import 'target_status_pill.dart';
 import 'share_target_wizard.dart';
+import '../../domain/target_achievement_status.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/shared_display_prefix.dart';
@@ -47,11 +50,16 @@ class TargetManagementPanel extends StatefulWidget {
   /// Optional injected repository (tests); defaults to one wrapping [apiClient].
   final TargetRepository? repository;
 
+  /// Fired when Sell-Out full-page detail opens/closes so the explorer can
+  /// hide its tab bar (sidebar stays).
+  final ValueChanged<bool>? onDetailOpenChanged;
+
   const TargetManagementPanel({
     super.key,
     required this.apiClient,
     required this.targetType,
     this.repository,
+    this.onDetailOpenChanged,
   });
 
   @override
@@ -64,6 +72,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   String _selectedChain = 'all';
   int _selectedYear = 0; // 0 = All Years
   TargetsSummaryModel? _summary;
+  TargetComparisonModel? _detailTarget;
 
   Map<String, String> get _branchDisplay {
     final names = <String>{};
@@ -1154,12 +1163,27 @@ onChanged: m3Legacy<int>((v) {
     );
   }
 
+  void _setDetailTarget(TargetComparisonModel? target) {
+    setState(() => _detailTarget = target);
+    widget.onDetailOpenChanged?.call(target != null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final summary = _summary ?? TargetsSummaryModel.empty(widget.targetType);
     final activeTarget = _activeTargetItem;
+
+    if (!_isSellIn && _detailTarget != null) {
+      return TargetDetailPage(
+        key: ValueKey('target_detail_${_detailTarget!.id}'),
+        repository: _repo,
+        target: _detailTarget!,
+        siblings: summary.items,
+        onBack: () => _setDetailTarget(null),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1252,18 +1276,29 @@ onChanged: m3Legacy<int>((v) {
                   : achPct == null
                       ? noSalesYet
                       : achPct >= 100
-                          ? 'فوق المستهدف'
-                          : (achPct >= 85 ? 'قريب من المستهدف' : 'أقل من المستهدف'),
+                          ? (_isSellIn ? 'فوق المستهدف' : 'محقق')
+                          : (achPct >=
+                                  (_isSellIn
+                                      ? 85
+                                      : TargetAchievementStatus.nearFloor)
+                              ? 'قريب من المستهدف'
+                              : 'أقل من المستهدف'),
               subtitleTooltip: achBasisTooltip,
               subtitleEn: (achPct ?? 0) >= 100
                   ? 'Above target'
-                  : ((achPct ?? 0) >= 85 ? 'Near target' : 'Below target'),
+                  : ((achPct ?? 0) >=
+                          (_isSellIn ? 85 : TargetAchievementStatus.nearFloor)
+                      ? 'Near target'
+                      : 'Below target'),
               icon: Icons.pie_chart_rounded,
               color: !hasTargets || achPct == null
                   ? neutral
                   : achPct >= 100
                       ? M3StatusColors.of(context).accents.positive
-                      : (achPct >= 85
+                      : (achPct >=
+                              (_isSellIn
+                                  ? 85
+                                  : TargetAchievementStatus.nearFloor)
                           ? M3StatusColors.of(context).accents.caution
                           : colorScheme.error),
               progressPct: hasTargets ? achPct : null,
@@ -1385,7 +1420,7 @@ onChanged: m3Legacy<String>((v) {
                 ],
               ),
 
-              // Action Buttons
+              // Action Buttons — Sell-Out keeps only Add + Export (upload/template stay in code).
               Wrap(
                 spacing: M3Spacing.xs,
                 runSpacing: M3Spacing.xs,
@@ -1394,37 +1429,33 @@ onChanged: m3Legacy<String>((v) {
                   FilledButton.icon(
                     onPressed: _openAddTargetEntry,
                     icon: const Icon(Icons.add_task_rounded, size: M3ToolbarButton.iconSize),
-                    label: Text(
-                      _isSellIn
-                          ? 'إضافة مستهدف'
-                          : 'إضافة مستهدف',
+                    label: const Text('إضافة مستهدف'),
+                    style: M3ToolbarButton.style,
+                  ),
+                  if (_isSellIn) ...[
+                    FilledButton.tonalIcon(
+                      onPressed: _isUploading ? null : _pickAndUploadTargetExcel,
+                      icon: _isUploading
+                          ? const SizedBox(
+                              width: 18.0,
+                              height: 18.0,
+                              child: CircularProgressIndicator(strokeWidth: 2.0),
+                            )
+                          : const Icon(Icons.upload_file_rounded, size: M3ToolbarButton.iconSize),
+                      label: const Text('رفع ملف المستهدفات'),
+                      style: M3ToolbarButton.style,
                     ),
-                    style: M3ToolbarButton.style,
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: _isUploading ? null : _pickAndUploadTargetExcel,
-                    icon: _isUploading
-                        ? const SizedBox(
-                            width: 18.0,
-                            height: 18.0,
-                            child: CircularProgressIndicator(strokeWidth: 2.0),
-                          )
-                        : const Icon(Icons.upload_file_rounded, size: M3ToolbarButton.iconSize),
-                    label: const Text('رفع ملف المستهدفات'),
-                    style: M3ToolbarButton.style,
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _downloadTargetTemplate,
-                    icon: const Icon(Icons.download_rounded, size: M3ToolbarButton.iconSize),
-                    label: const Text('تنزيل القالب'),
-                    style: M3ToolbarButton.style,
-                  ),
+                    OutlinedButton.icon(
+                      onPressed: _downloadTargetTemplate,
+                      icon: const Icon(Icons.download_rounded, size: M3ToolbarButton.iconSize),
+                      label: const Text('تنزيل القالب'),
+                      style: M3ToolbarButton.style,
+                    ),
+                  ],
                   OutlinedButton.icon(
                     onPressed: _exportTargetsComparisonCsv,
                     icon: const Icon(Icons.table_view_rounded, size: M3ToolbarButton.iconSize),
-                    label: Text(
-                      _isSellIn ? 'تصدير' : 'تصدير',
-                    ),
+                    label: const Text('تصدير'),
                     style: M3ToolbarButton.style,
                   ),
                 ],
@@ -1562,11 +1593,18 @@ onChanged: m3Legacy<String>((v) {
                               // Future periods have no sales yet: «—», never 0.
                               final noSales = !_isSellIn && !item.hasActuals;
                               final isPositive = item.varianceRevenueEgp >= 0;
+                              final sellOutStatus = TargetAchievementStatus.fromPct(
+                                noSales ? null : item.achievementRevPct,
+                                hasActuals: !noSales,
+                              );
                               final badgeColor = noSales
                                   ? colorScheme.onSurfaceVariant
                                   : item.achievementRevPct >= 100
                                       ? M3StatusColors.of(context).accents.positive
-                                      : (item.achievementRevPct >= 85
+                                      : (item.achievementRevPct >=
+                                              (_isSellIn
+                                                  ? 85
+                                                  : TargetAchievementStatus.nearFloor)
                                           ? M3StatusColors.of(context).accents.caution
                                           : colorScheme.error);
                               final periodLabel = TargetTableFormat.period(
@@ -1859,22 +1897,33 @@ onChanged: m3Legacy<String>((v) {
                                     centered(
                                       _maybeSellOutCap(
                                         7,
-                                        M3ChipSurface(
-                                          color: badgeColor.withOpacity(0.12),
-                                          child: Text(
-                                            _isSellIn
-                                                ? '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})'
-                                                : TargetTableFormat.achievement(
-                                                    pct: item.achievementRevPct,
-                                                    hasActuals: !noSales,
-                                                  ),
-                                            key: ValueKey('targets_achievement_${item.id}'),
-                                            maxLines: 1,
-                                            softWrap: false,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: badgeColor),
-                                          ),
-                                        ),
+                                        _isSellIn
+                                            ? M3ChipSurface(
+                                                color: badgeColor.withOpacity(0.12),
+                                                child: Text(
+                                                  '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
+                                                  key: ValueKey(
+                                                      'targets_achievement_${item.id}'),
+                                                  maxLines: 1,
+                                                  softWrap: false,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .labelMedium
+                                                      ?.copyWith(
+                                                        fontWeight: FontWeight.w600,
+                                                        color: badgeColor,
+                                                      ),
+                                                ),
+                                              )
+                                            : KeyedSubtree(
+                                                key: ValueKey(
+                                                    'targets_achievement_${item.id}'),
+                                                child: TargetStatusPill(
+                                                  status: sellOutStatus,
+                                                  compact: true,
+                                                ),
+                                              ),
                                       ),
                                     ),
                                   ),
@@ -2009,7 +2058,7 @@ onChanged: m3Legacy<String>((v) {
             child: Text(
               _isSellIn
                   ? 'أضف مستهدفًا للسلسلة وسنوزّعه تلقائيًا على الفروع والأصناف.'
-                  : 'أضف مستهدفًا أو ارفع ملف المستهدفات لمقارنته بالمحقق.',
+                  : 'أضف مستهدفًا لمقارنته بالمحقق على مستوى الشهور والفروع والأصناف.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 height: 1.5,
@@ -3638,7 +3687,13 @@ onChanged: m3Legacy<String>((v) {
     );
   }
 
-  Future<void> _openBreakdown(TargetComparisonModel item) {
+  Future<void> _openBreakdown(TargetComparisonModel item) async {
+    // Sell-Out option B: full-page detail inside the content area (not the
+    // modal breakdown dialog). Sell-In keeps the existing workspace flow.
+    if (!_isSellIn) {
+      _setDetailTarget(item);
+      return;
+    }
     return showTargetBreakdownDialog(
       context,
       repository: _repo,

@@ -265,7 +265,7 @@ Widget _dashboardBody({bool yoy = false}) => SingleChildScrollView(
               paretoSkus: _liveKpis(yoyAvailable: yoy).paretoSkus,
               supplierShares: const [
                 SupplierShareModel(
-                  supplierName: 'أديكو للصناعات الغذائية (Adeco)',
+                  supplierName: 'ادكو للصناعات الغذائية (Adeco)',
                   totalRevenue: 128400000,
                   totalUnits: 214000,
                   marketSharePct: 48.0,

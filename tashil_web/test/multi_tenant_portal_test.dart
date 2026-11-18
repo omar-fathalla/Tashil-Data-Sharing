@@ -49,7 +49,7 @@ void main() {
       expect(find.text('Super Admin Executive Portal'), findsOneWidget);
       expect(find.text('إجمالي الشركات المفعلة'), findsOneWidget);
       expect(find.text('New Company'), findsWidgets);
-      expect(find.text('شركة أديكو للصناعات الغذائية (Adeco)'), findsOneWidget);
+      expect(find.text('شركة ادكو للصناعات الغذائية (Adeco)'), findsOneWidget);
       expect(find.text('شركة يونيليفر مشرق (Unilever)'), findsOneWidget);
       expect(find.text('شركة بيبسي كولا مصر (PepsiCo)'), findsOneWidget);
     });

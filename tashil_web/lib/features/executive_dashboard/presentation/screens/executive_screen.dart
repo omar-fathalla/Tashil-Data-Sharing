@@ -476,7 +476,7 @@ class _ExecutiveScreenState extends State<ExecutiveScreen>
     );
   }
 
-  /// Arabic tenant name for the header subtitle ("أديكو (Adeco)" → "أديكو").
+  /// Arabic tenant name for the header subtitle ("ادكو (Adeco)" → "ادكو").
   String _tenantNameAr() => ChainSharePie.splitBilingualLabel(
           ApiClient.getDisplayNameForTenant(widget.apiClient.tenantId))
       .ar;

@@ -315,7 +315,7 @@ type CPFRDashboardPayload struct {
 	MatchedSellOutValueWithCostEGP  float64 `json:"matched_sell_out_value_with_cost_egp"` // مبيعات الكاشير التي لها تكلفة حقيقية (أساس الربح)
 	MatchedMissingCostSellOutEGP    float64 `json:"matched_missing_cost_sell_out_egp"`    // مبيعات مستبعدة من الربح لعدم وجود تكلفة حقيقية
 	MatchedMissingCostSellOutUnits  int     `json:"matched_missing_cost_sell_out_units"`
-	MissingCostItems                []MissingCostItem `json:"missing_cost_items"`    // أصناف بدون سعر/تكلفة حقيقية مطلوبة من أدكو
+	MissingCostItems                []MissingCostItem `json:"missing_cost_items"`    // أصناف بدون سعر/تكلفة حقيقية مطلوبة من ادكو
 	MatchedYoYUnitsGrowthPct        float64 `json:"matched_yoy_units_growth_pct"`         // نمو مبيعات القطع 2026 مقابل 2025 لنفس الأشهر %
 	MatchedYoYValueGrowthPct        float64 `json:"matched_yoy_value_growth_pct"`         // نمو مبيعات القيمة 2026 مقابل 2025 لنفس الأشهر %
 	MatchedYoYAvailable             bool    `json:"matched_yoy_available"`                // false = no matched month has last-year Sell-Out (show "—")

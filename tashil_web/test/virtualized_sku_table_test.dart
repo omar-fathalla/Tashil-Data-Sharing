@@ -13,7 +13,7 @@ void main() {
       storeId: 'CRF_01',
       storeName: 'كارفور المعادي',
       barcode: '6221001122334',
-      skuName: 'زيت أديكو ممتاز 1 لتر',
+      skuName: 'زيت ادكو ممتاز 1 لتر',
       category: 'زيوت وسمن',
       quantitySold: 450,
       unitPrice: 65.0,
@@ -26,7 +26,7 @@ void main() {
       storeId: 'FAT_05',
       storeName: 'فتح الله سموحة',
       barcode: '6221001998877',
-      skuName: 'سمن أديكو نقي 750 جم',
+      skuName: 'سمن ادكو نقي 750 جم',
       category: 'زيوت وسمن',
       quantitySold: 320,
       unitPrice: 95.0,
@@ -61,9 +61,9 @@ void main() {
 
       // Verify Pinned Column Data
       expect(find.text('6221001122334'), findsOneWidget);
-      expect(find.text('زيت أديكو ممتاز 1 لتر'), findsOneWidget);
+      expect(find.text('زيت ادكو ممتاز 1 لتر'), findsOneWidget);
       expect(find.text('6221001998877'), findsOneWidget);
-      expect(find.text('سمن أديكو نقي 750 جم'), findsOneWidget);
+      expect(find.text('سمن ادكو نقي 750 جم'), findsOneWidget);
 
       // Verify Scrollable Metrics Headers
       expect(find.text('السلسلة'), findsOneWidget);
