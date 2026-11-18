@@ -210,6 +210,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   // 3: Uploaded Sheets (Archive)
   int _activeTab = 0;
 
+  /// When true, the Sell-Out tab bar is replaced by the target detail page.
+  bool _targetsDetailOpen = false;
+
   // Tab 0 Filter & Transaction State
   String? selectedChain;
   String? selectedStoreId;
@@ -982,52 +985,56 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
 
             M3Spacing.gapSM,
 
-            // Top Tab Switcher: 100% Responsive Full-Width MD3 Large Tab Bar (4 Symmetrical Tabs)
-            M3ResponsiveTabBar<int>(
-              textDirection: TextDirection.ltr,
-              selectedValue: _activeTab,
-              items: [
-                const M3ResponsiveTabItem<int>(
-                  value: 0,
-                  icon: Icons.point_of_sale_rounded,
-                  selectedIcon: Icons.point_of_sale_rounded,
-                  label: 'بيانات المبيعات',
-                ),
-                const M3ResponsiveTabItem<int>(
-                  value: 1,
-                  icon: Icons.insights_rounded,
-                  selectedIcon: Icons.insights_rounded,
-                  label: 'أداء الفروع',
-                ),
-                const M3ResponsiveTabItem<int>(
-                  value: 2,
-                  icon: Icons.track_changes_rounded,
-                  selectedIcon: Icons.track_changes_rounded,
-                  label: 'المستهدفات',
-                ),
-                M3ResponsiveTabItem<int>(
-                  value: 3,
-                  icon: Icons.folder_copy_rounded,
-                  selectedIcon: Icons.folder_copy_rounded,
-                  label: 'الملفات المرفوعة (${_archivedSellOutFiles.length})',
-                  semanticsIdentifier: TestIds.selloutUploadedFiles,
-                ),
-              ],
-              onChanged: (next) {
-                setState(() => _activeTab = next);
-                if (next == 3) {
-                  _loadSellOutArchive(forceRefresh: true);
-                }
-              },
-            ),
+            // Top Tab Switcher — hidden while a Sell-Out target detail page is open.
+            if (!_targetsDetailOpen)
+              M3ResponsiveTabBar<int>(
+                textDirection: TextDirection.ltr,
+                selectedValue: _activeTab,
+                items: [
+                  const M3ResponsiveTabItem<int>(
+                    value: 0,
+                    icon: Icons.point_of_sale_rounded,
+                    selectedIcon: Icons.point_of_sale_rounded,
+                    label: 'بيانات المبيعات',
+                  ),
+                  const M3ResponsiveTabItem<int>(
+                    value: 1,
+                    icon: Icons.insights_rounded,
+                    selectedIcon: Icons.insights_rounded,
+                    label: 'أداء الفروع',
+                  ),
+                  const M3ResponsiveTabItem<int>(
+                    value: 2,
+                    icon: Icons.track_changes_rounded,
+                    selectedIcon: Icons.track_changes_rounded,
+                    label: 'المستهدفات',
+                  ),
+                  M3ResponsiveTabItem<int>(
+                    value: 3,
+                    icon: Icons.folder_copy_rounded,
+                    selectedIcon: Icons.folder_copy_rounded,
+                    label: 'الملفات المرفوعة (${_archivedSellOutFiles.length})',
+                    semanticsIdentifier: TestIds.selloutUploadedFiles,
+                  ),
+                ],
+                onChanged: (next) {
+                  setState(() => _activeTab = next);
+                  if (next == 3) {
+                    _loadSellOutArchive(forceRefresh: true);
+                  }
+                },
+              ),
 
-            M3Spacing.gapMD,
+            if (!_targetsDetailOpen) M3Spacing.gapMD,
 
             if (_activeTab == 2)
               TargetManagementPanel(
                 key: ValueKey('sell_out_targets_${widget.apiClient.tenantId}'),
                 apiClient: widget.apiClient,
                 targetType: 'sell_out',
+                onDetailOpenChanged: (open) {
+                  setState(() => _targetsDetailOpen = open);
+                },
               )
             else if ((_activeTab == 0 || _activeTab == 1) &&
                 !isLoading &&

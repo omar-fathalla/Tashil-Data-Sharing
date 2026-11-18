@@ -670,7 +670,7 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 			ChainSKUTotals:      []domain.TargetSKUBreakdown{},
 			Brands:              []domain.TargetBrandBreakdown{},
 			SalesRepQuotas:      []domain.TargetSalesRepQuota{},
-			MonthlyPhasing:      []domain.TargetMonthBreakdown{},
+			MonthlyPhasing:      c.buildSellOutMonthlyPhasingLocked(normTenant, t, targetRev, targetUnits),
 		}
 	}
 
@@ -1611,6 +1611,60 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		SalesRepQuotas:          repQuotas,
 		MonthlyPhasing:          monthlyPhasing,
 	}
+}
+
+// buildSellOutMonthlyPhasingLocked splits a yearly Sell-Out target into 12 equal
+// months and fills each month's actuals with the same own-brand SUM used by
+// computeActualForTargetLocked. Month-scoped targets keep a single entry.
+func (c *Client) buildSellOutMonthlyPhasingLocked(normTenant string, t domain.TargetRecord, yearTargetRev, yearTargetUnits float64) []domain.TargetMonthBreakdown {
+	arabicMonths := []string{
+		"يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+		"يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+	}
+	englishMonths := []string{
+		"January", "February", "March", "April", "May", "June",
+		"July", "August", "September", "October", "November", "December",
+	}
+
+	buildOne := func(month int, targetRev, targetUnits float64) domain.TargetMonthBreakdown {
+		mt := t
+		mt.Month = month
+		actualRev, actualUnits, rows := c.computeActualForTargetLocked(normTenant, mt)
+		ach := 0.0
+		if targetRev > 0 && rows > 0 {
+			ach = math.Round((actualRev/targetRev)*1000) / 10
+		} else if targetUnits > 0 && rows > 0 {
+			ach = math.Round((actualUnits/targetUnits)*1000) / 10
+		}
+		if rows == 0 {
+			actualRev, actualUnits, ach = 0, 0, 0
+		}
+		return domain.TargetMonthBreakdown{
+			Year:               t.Year,
+			Month:              month,
+			MonthLabelAr:       arabicMonths[month-1],
+			MonthLabelEn:       englishMonths[month-1],
+			SeasonalitySharePct: round2(100.0 / 12.0),
+			TargetRevenueEGP:   round2(targetRev),
+			TargetUnits:        round2(targetUnits),
+			ActualRevenueEGP:   round2(actualRev),
+			ActualUnits:        round2(actualUnits),
+			VarianceRevenueEGP: round2(actualRev - targetRev),
+			AchievementPct:     ach,
+		}
+	}
+
+	if t.Month >= 1 && t.Month <= 12 {
+		return []domain.TargetMonthBreakdown{buildOne(t.Month, yearTargetRev, yearTargetUnits)}
+	}
+
+	monthRev := yearTargetRev / 12.0
+	monthUnits := yearTargetUnits / 12.0
+	out := make([]domain.TargetMonthBreakdown, 0, 12)
+	for m := 1; m <= 12; m++ {
+		out = append(out, buildOne(m, monthRev, monthUnits))
+	}
+	return out
 }
 
 // computeActualForTargetLocked returns the actual revenue, units and the number of matching rows
