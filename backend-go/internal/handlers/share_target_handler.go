@@ -131,12 +131,29 @@ func (h *AnalyticsHandler) HandleShareTargetPreview(w http.ResponseWriter, r *ht
 		}
 	}
 
+	catNames := make([]string, 0, len(plan.Categories))
+	for _, catPlan := range plan.Categories {
+		catNames = append(catNames, catPlan.Category)
+	}
+	// Wizard step-3 only renders SKU samples from the first category; skip SKU
+	// mix collection for the rest to cut preview latency/payload.
+	skuFor := map[string]bool{}
+	if len(catNames) > 0 {
+		skuFor[catNames[0]] = true
+	}
+	batch, _ := h.bqRepo.BuildShareTargetCascadesBatch(
+		r.Context(), tenantID, chain, year, catNames, branchFilter, skuFor,
+	)
+
 	cascades := make([]sharetarget.CategoryCascade, 0, len(plan.Categories))
 	for _, catPlan := range plan.Categories {
-		br, skus, monthsW, _ := h.bqRepo.BuildShareTargetCascadeInputs(
-			r.Context(), tenantID, chain, catPlan.Category, year, branchFilter,
-		)
-		cascades = append(cascades, sharetarget.CascadeCategory(catPlan, br, skus, monthsW))
+		in := batch[catPlan.Category]
+		if in.SKUsByBranch == nil {
+			in.SKUsByBranch = map[string][]sharetarget.SKUWeight{}
+		}
+		cascades = append(cascades, sharetarget.CascadeCategory(
+			catPlan, in.Branches, in.SKUsByBranch, in.Months,
+		))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
