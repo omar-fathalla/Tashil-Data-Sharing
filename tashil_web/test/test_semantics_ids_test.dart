@@ -68,6 +68,10 @@ void main() {
       expect(TestIds.navPricing, 'nav-pricing');
       expect(TestIds.navCompare, 'nav-compare');
       expect(TestIds.selloutUploadButton, 'sellout-upload-button');
+      expect(TestIds.selloutTargetsTab, 'sellout-targets-tab');
+      expect(TestIds.selloutTargetsAdd, 'sellout-targets-add');
+      expect(TestIds.selloutTargetsExport, 'sellout-targets-export');
+      expect(TestIds.selloutTargetDetailBack, 'sellout-target-detail-back');
       expect(TestIds.fileInput, 'tashil-file-input');
       expect(TestIds.uploadCommitConfirm, 'upload-commit-confirm');
       expect(TestIds.uploadCommitCancel, 'upload-commit-cancel');

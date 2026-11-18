@@ -1008,6 +1008,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                     icon: Icons.track_changes_rounded,
                     selectedIcon: Icons.track_changes_rounded,
                     label: 'المستهدفات',
+                    semanticsIdentifier: TestIds.selloutTargetsTab,
                   ),
                   M3ResponsiveTabItem<int>(
                     value: 3,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/data/result.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/testing/test_semantics.dart';
 import '../../../../core/theme/m3_shape.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/theme/m3_status_colors.dart';
@@ -200,11 +201,16 @@ class _TargetDetailPageState extends State<TargetDetailPage> {
     final theme = Theme.of(context);
     return Row(
       children: [
-        TextButton.icon(
-          key: const ValueKey('target_detail_back'),
+        TestSemantics.button(
+          identifier: TestIds.selloutTargetDetailBack,
+          label: 'رجوع',
           onPressed: widget.onBack,
-          icon: const Icon(Icons.arrow_back_rounded),
-          label: const Text('رجوع'),
+          child: TextButton.icon(
+            key: const ValueKey('target_detail_back'),
+            onPressed: widget.onBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+            label: const Text('رجوع'),
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(

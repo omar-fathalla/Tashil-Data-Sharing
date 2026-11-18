@@ -1,12 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/data/result.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/testing/test_semantics.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/target_breakdown_models.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/target_repository.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/widgets/target_detail_page.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/widgets/target_management_panel.dart';
+
+SemanticsNode? _findNodeById(WidgetTester tester, String id) {
+  final root = tester.binding.pipelineOwner.semanticsOwner?.rootSemanticsNode;
+  if (root == null) return null;
+  SemanticsNode? found;
+  void walk(SemanticsNode node) {
+    if (found != null) return;
+    if (node.getSemanticsData().identifier == id) {
+      found = node;
+      return;
+    }
+    node.visitChildren((child) {
+      walk(child);
+      return found == null;
+    });
+  }
+
+  walk(root);
+  return found;
+}
+
+int _countSemanticsId(WidgetTester tester, String id) {
+  final root = tester.binding.pipelineOwner.semanticsOwner?.rootSemanticsNode;
+  if (root == null) return 0;
+  var count = 0;
+  void walk(SemanticsNode node) {
+    if (node.getSemanticsData().identifier == id) count += 1;
+    node.visitChildren((child) {
+      walk(child);
+      return true;
+    });
+  }
+
+  walk(root);
+  return count;
+}
 
 Map<String, dynamic> _item(
   String id,
@@ -186,6 +224,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
+    final handle = tester.ensureSemantics();
+    addTearDown(handle.dispose);
+
     final repo = _FakeRepo([
       _item('t26', 2026,
           target: 150000000,
@@ -207,6 +248,20 @@ void main() {
     expect(find.text('تصدير'), findsOneWidget);
     expect(find.text('رفع ملف المستهدفات'), findsNothing);
     expect(find.text('تنزيل القالب'), findsNothing);
+
+    // Stable Playwright ids for the redesigned Sell-Out Targets toolbar.
+    expect(_countSemanticsId(tester, TestIds.selloutTargetsAdd), 1);
+    expect(_countSemanticsId(tester, TestIds.selloutTargetsExport), 1);
+    expect(_countSemanticsId(tester, TestIds.selloutUploadButton), 0);
+    final addNode = _findNodeById(tester, TestIds.selloutTargetsAdd);
+    expect(addNode, isNotNull);
+    expect(addNode!.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+    final exportNode = _findNodeById(tester, TestIds.selloutTargetsExport);
+    expect(exportNode, isNotNull);
+    expect(
+      exportNode!.getSemanticsData().hasAction(SemanticsAction.tap),
+      isTrue,
+    );
   });
 
   testWidgets('detail page: breadcrumbs, monthly cards, month→branches',
@@ -215,6 +270,9 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+
+    final handle = tester.ensureSemantics();
+    addTearDown(handle.dispose);
 
     final target = TargetComparisonModel.fromJson(_item('t26', 2026,
         target: 150000000,
@@ -233,6 +291,10 @@ void main() {
 
     expect(find.byKey(const ValueKey('target_detail_page')), findsOneWidget);
     expect(find.byKey(const ValueKey('target_detail_back')), findsOneWidget);
+    expect(_countSemanticsId(tester, TestIds.selloutTargetDetailBack), 1);
+    final backNode = _findNodeById(tester, TestIds.selloutTargetDetailBack);
+    expect(backNode, isNotNull);
+    expect(backNode!.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
     expect(find.byKey(const ValueKey('target_detail_crumb_root')), findsOneWidget);
     expect(find.byKey(const ValueKey('target_detail_kpi_year')), findsOneWidget);
     expect(find.byKey(const ValueKey('target_detail_cumulative_chart')), findsOneWidget);

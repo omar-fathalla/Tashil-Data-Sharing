@@ -20,7 +20,7 @@ Kebab-case tokens. Prefer a short **area prefix**, then the control role.
 | `login-*` | Tenant login form | `login-email`, `login-password`, `login-submit` |
 | `logout` | Sign out | `logout` |
 | `nav-*` | Shell navigation destinations | `nav-sell-out`, `nav-sell-in`, `nav-pricing`, `nav-compare` |
-| `sellout-*` / `sellin-*` | Page-scoped upload controls / counters | `sellout-upload-button`, `sellin-uploaded-files` |
+| `sellout-*` / `sellin-*` | Page-scoped upload / Targets controls | `sellout-upload-button`, `sellout-targets-add`, `sellin-uploaded-files` |
 | `upload-choose-file` | Smart Upload dropzone “choose file” | `upload-choose-file` |
 | `uploaded-files-list` | Uploaded-files table / list region | `uploaded-files-list` |
 | `file-row-<archiveId>-<name>` | One archive row (unique by archive id) | `file-row-abc123-sales-jan.xlsx` |
@@ -52,7 +52,11 @@ Compact “More” sheet items for Sell-Out / Sell-In also carry `nav-sell-out` 
 | `nav-sell-out` | Navigate to Sell-Out |
 | `nav-sell-in` | Navigate to Sell-In |
 | `nav-returns` | Navigate to المرتجعات (Returns) |
-| `sellout-upload-button` | Sell-Out “upload / choose file” |
+| `sellout-upload-button` | Sell-Out archive “upload / choose file” (Uploaded Files tab) |
+| `sellout-targets-tab` | Sell-Out explorer **المستهدفات** tab |
+| `sellout-targets-add` | Sell-Out Targets toolbar **إضافة مستهدف** (upload/template hidden) |
+| `sellout-targets-export` | Sell-Out Targets toolbar **تصدير** |
+| `sellout-target-detail-back` | Sell-Out target detail page **رجوع** |
 | `sellin-upload-button` | Sell-In “upload / choose file” |
 | `upload-choose-file` | Smart Upload portal choose-file button |
 | `tashil-file-input` | Persistent hidden `<input type="file">` DOM id / `data-testid` (Playwright `setInputFiles`) |
