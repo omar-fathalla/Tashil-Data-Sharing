@@ -31,6 +31,16 @@ class TestIds {
   static const sellinUploadButton = 'sellin-upload-button';
   static const uploadChooseFile = 'upload-choose-file';
 
+  /// Sell-Out explorer «المستهدفات» tab.
+  static const selloutTargetsTab = 'sellout-targets-tab';
+
+  /// Sell-Out Targets toolbar (Add + Export only after redesign; upload/template hidden).
+  static const selloutTargetsAdd = 'sellout-targets-add';
+  static const selloutTargetsExport = 'sellout-targets-export';
+
+  /// Sell-Out target detail page back control.
+  static const selloutTargetDetailBack = 'sellout-target-detail-back';
+
   /// DOM id / data-testid of the persistent hidden `<input type="file">`
   /// (`#tashil-file-input`). Prefer Playwright `setInputFiles` on this node.
   static const fileInput = 'tashil-file-input';
@@ -69,6 +79,10 @@ class TestIds {
     selloutUploadButton,
     sellinUploadButton,
     uploadChooseFile,
+    selloutTargetsTab,
+    selloutTargetsAdd,
+    selloutTargetsExport,
+    selloutTargetDetailBack,
     uploadCommitConfirm,
     uploadCommitCancel,
     selloutUploadedFiles,

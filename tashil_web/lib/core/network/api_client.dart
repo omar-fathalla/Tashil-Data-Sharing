@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:tashil_web/core/network/backend_http.dart';
 import '../../features/cpfr_replenishment/domain/cpfr_models.dart';
 import '../../features/sell_in_returns/domain/sell_in_returns_models.dart';
+import '../../features/sell_out_analytics/data/share_target_models.dart';
+export '../../features/sell_out_analytics/data/share_target_models.dart';
 import '../security/zero_trust_digest.dart';
 import '../utils/date_range.dart';
 import '../storage/session_storage.dart';
@@ -2982,7 +2984,7 @@ class ApiClient {
 
   static String getDisplayNameForTenant(String rawSlug) {
     final cleanSlug = normalizeDataTenantSlug(rawSlug);
-    if (cleanSlug == 'adeco') return 'أديكو (Adeco)';
+    if (cleanSlug == 'adeco') return 'ادكو (Adeco)';
     if (cleanSlug == 'unilever') return 'يونيليفر (Unilever)';
     if (cleanSlug == 'pepsi') return 'بيبسيكو (PepsiCo)';
     final profile = getTenantProfileBySlug(cleanSlug);
@@ -3723,6 +3725,7 @@ class ApiClient {
     String? region,
     String? tier,
     String? chain,
+    String? brand,
     int? year,
     int? month,
     String? startDate,
@@ -3751,6 +3754,13 @@ class ApiClient {
       }
       if (effectiveChain != null && effectiveChain.isNotEmpty && effectiveChain != 'الكل' && effectiveChain != 'all') {
         params['chain'] = effectiveChain;
+      }
+      if (brand != null &&
+          brand.isNotEmpty &&
+          brand != 'الكل' &&
+          brand != 'all' &&
+          brand != 'كل العلامات التجارية') {
+        params['brand'] = brand;
       }
       if (year != null && year > 0) {
         params['year'] = year.toString();
@@ -6222,7 +6232,7 @@ class ApiClient {
         ChainShareItem(retailerChain: 'spinneys', displayName: 'سبينيس (Spinneys)', totalRevenue: 388030.0, totalUnits: 2950, marketShare: 8.0),
       ],
       supplierShares: const [
-        SupplierShareModel(supplierName: 'أديكو', totalRevenue: 9536992.70, totalUnits: 112480, skuCount: 256, marketSharePct: 18.44, isTenantBrand: true, rank: 1),
+        SupplierShareModel(supplierName: 'ادكو', totalRevenue: 9536992.70, totalUnits: 112480, skuCount: 256, marketSharePct: 18.44, isTenantBrand: true, rank: 1),
         SupplierShareModel(supplierName: 'ارما التجارية', totalRevenue: 7198431.70, totalUnits: 89200, skuCount: 40, marketSharePct: 13.92, isTenantBrand: false, rank: 2),
         SupplierShareModel(supplierName: 'بروكتر و جامبل', totalRevenue: 5797866.22, totalUnits: 61400, skuCount: 109, marketSharePct: 11.21, isTenantBrand: false, rank: 3),
         SupplierShareModel(supplierName: 'هنكل برسيل', totalRevenue: 5112202.98, totalUnits: 58300, skuCount: 86, marketSharePct: 9.88, isTenantBrand: false, rank: 4),
@@ -7765,7 +7775,7 @@ class ApiClient {
   static final List<TenantProfileModel> _inMemoryTenants = [
     TenantProfileModel(
       tenantId: 'adeco',
-      displayName: 'شركة أديكو للصناعات الغذائية (Adeco)',
+      displayName: 'شركة ادكو للصناعات الغذائية (Adeco)',
       slug: 'adeco',
       portalUrl: buildPortalUrl('adeco'),
       brandSeedColor: '#35A211',
@@ -8691,7 +8701,7 @@ class ApiClient {
         resource: '/portal/adeco',
         ipAddress: '197.55.142.18',
         status: 'SUCCESS',
-        details: 'تسجيل دخول مدير الشركة إلى البوابة المخصصة (أديكو)',
+        details: 'تسجيل دخول مدير الشركة إلى البوابة المخصصة (ادكو)',
       ),
       const AuditLogEntryModel(
         logId: 'aud_002',
@@ -9794,6 +9804,108 @@ class ApiClient {
     return TargetsSummaryModel.empty(targetType);
   }
 
+  /// Baseline categories/branches for the market-share Sell-Out wizard (one chain).
+  Future<ShareTargetBaseline> getShareTargetBaseline({
+    required String chain,
+    required int year,
+  }) async {
+    final uri = Uri.parse(ApiEndpoints.shareTargetBaseline).replace(
+      queryParameters: {
+        'chain': chain,
+        'year': year.toString(),
+      },
+    );
+    final response = await BackendHttp
+        .get(uri, headers: _headers)
+        .timeout(const Duration(seconds: 20));
+    if (response.statusCode == 200) {
+      final data =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return ShareTargetBaseline.fromJson(data);
+    }
+    throw Exception('تعذر تحميل أساس الحصة السوقية (HTTP ${response.statusCode})');
+  }
+
+  /// Preview cascade for a share-based target.
+  Future<ShareTargetPreview> previewShareTarget({
+    required String retailerChain,
+    required int year,
+    double marketGrowthPct = 0,
+    int monthsWithData = 0,
+    bool annualize = true,
+    List<String> branchKeys = const [],
+    required List<({String category, double desiredSharePct})> categories,
+    double? deltaPts,
+  }) async {
+    final uri = Uri.parse(ApiEndpoints.shareTargetPreview);
+    final body = jsonEncode({
+      'retailer_chain': retailerChain,
+      'year': year,
+      'market_growth_pct': marketGrowthPct,
+      if (monthsWithData > 0) 'months_with_data': monthsWithData,
+      'annualize': annualize,
+      if (branchKeys.isNotEmpty) 'branch_keys': branchKeys,
+      if (deltaPts != null) 'delta_pts': deltaPts,
+      'categories': categories
+          .map(
+            (c) => {
+              'category': c.category,
+              'desired_share_pct': c.desiredSharePct,
+            },
+          )
+          .toList(),
+    });
+    final response = await BackendHttp
+        .post(uri, headers: _headers, body: body)
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 200) {
+      final data =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return ShareTargetPreview.fromJson(data);
+    }
+    throw Exception('تعذر معاينة مستهدف الحصة (HTTP ${response.statusCode})');
+  }
+
+  /// Saves a share-based Sell-Out target as a normal sell_out TargetRecord.
+  Future<Map<String, dynamic>> saveShareTarget({
+    required String retailerChain,
+    required int year,
+    double marketGrowthPct = 0,
+    int monthsWithData = 0,
+    bool annualize = true,
+    List<String> branchKeys = const [],
+    required List<({String category, double desiredSharePct})> categories,
+    double? deltaPts,
+    String notes = '',
+  }) async {
+    final uri = Uri.parse(ApiEndpoints.shareTargetSave);
+    final body = jsonEncode({
+      'retailer_chain': retailerChain,
+      'year': year,
+      'market_growth_pct': marketGrowthPct,
+      if (monthsWithData > 0) 'months_with_data': monthsWithData,
+      'annualize': annualize,
+      if (branchKeys.isNotEmpty) 'branch_keys': branchKeys,
+      if (deltaPts != null) 'delta_pts': deltaPts,
+      if (notes.isNotEmpty) 'notes': notes,
+      'categories': categories
+          .map(
+            (c) => {
+              'category': c.category,
+              'desired_share_pct': c.desiredSharePct,
+            },
+          )
+          .toList(),
+    });
+    final response = await BackendHttp
+        .post(uri, headers: _headers, body: body)
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode == 200) {
+      return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    }
+    throw Exception('تعذر حفظ مستهدف الحصة (HTTP ${response.statusCode})');
+  }
+
   /// Upserts a Sell-Out or Sell-In Target manually and returns the updated summary.
   Future<TargetsSummaryModel> upsertTarget({
     String? id,
@@ -10389,7 +10501,7 @@ class ApiClient {
         : double.parse((items.fold<int>(0, (s, e) => s + e.unitsPerCarton) / items.length).toStringAsFixed(1));
     return ProductMasterSummaryModel(
       tenantId: tenantId,
-      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: sheetDateLabel,
       sourceFilename: items.isEmpty ? '' : sourceFilename,
       defaultDiscountPct: 10.0,
@@ -10701,7 +10813,7 @@ class ApiClient {
     ];
     return ProductMasterSummaryModel(
       tenantId: tenantId,
-      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: 'تحديث 01-08-2026',
       sourceFilename: 'adeco_product_master_2026_08_01.xlsx',
       defaultDiscountPct: 10.0,
@@ -10882,7 +10994,7 @@ class ApiClient {
     if (s.contains('سيترس')) return 'سيترس (Citrus)';
     if (s.contains('فاى') || s.contains('فاي')) return 'فاي (Fay)';
     if (s.contains('فلاش')) return 'فلاش (Flash)';
-    if (isOwn) return 'أدكو (Adeco)';
+    if (isOwn) return 'ادكو (Adeco)';
     if (supplier.trim().isNotEmpty && supplier.trim() != 'منافس') {
       return supplier.trim();
     }
@@ -14161,11 +14273,15 @@ class TargetComparisonModel {
   final String statusAr;
   final String notes;
   final String updatedAt;
+  /// "market_share" when created from the share wizard; empty for classic value entry.
+  final String origin;
   final List<TargetBranchBreakdownModel> branches;
   final List<TargetSKUBreakdownModel> chainSkuTotals;
   final List<TargetBrandBreakdownModel> brands;
   final List<TargetSalesRepQuotaModel> salesRepQuotas;
   final List<TargetMonthBreakdownModel> monthlyPhasing;
+
+  bool get isShareTarget => origin == 'market_share';
 
   const TargetComparisonModel({
     required this.id,
@@ -14207,6 +14323,7 @@ class TargetComparisonModel {
     required this.statusAr,
     required this.notes,
     required this.updatedAt,
+    this.origin = '',
     this.branches = const [],
     this.chainSkuTotals = const [],
     this.brands = const [],
@@ -14276,6 +14393,7 @@ class TargetComparisonModel {
       statusAr: json['status_ar'] as String? ?? 'أقل من المستهدف',
       notes: json['notes'] as String? ?? '',
       updatedAt: json['updated_at'] as String? ?? '',
+      origin: json['origin'] as String? ?? '',
       branches: branchesList,
       chainSkuTotals: chainSkusList,
       brands: brandsList,
@@ -14781,7 +14899,7 @@ class ProductMasterSummaryModel {
     return ProductMasterSummaryModel(
       tenantId: json['tenant_id'] as String? ?? 'tenant-adeco',
       companyName: json['company_name'] as String? ??
-          'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+          'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: json['sheet_date_label'] as String? ?? 'تحديث 01-08-2026',
       sourceFilename: json['source_filename'] as String? ?? defaultSourceFilename,
       defaultDiscountPct: ProductMasterItemModel.normalizeDiscountPct(

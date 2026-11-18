@@ -29,6 +29,17 @@ assert_contains() {
   fi
 }
 
+assert_file() {
+  local path="$1" msg="$2"
+  if [[ -f "$path" ]]; then
+    PASS=$((PASS + 1))
+    echo "ok - $msg"
+  else
+    FAIL=$((FAIL + 1))
+    echo "FAIL - $msg (missing file $path)" >&2
+  fi
+}
+
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
 export HOME="$tmpdir/home"
@@ -45,6 +56,8 @@ export MAC_SHARED_LOCK=1
 # --- acquire + ownership release ---
 out="$("$WRAPPER" acquire "ci-agent-1" "repo" "task" 1 1)"
 assert_contains "$out" "acquired" "acquire prints acquired"
+assert_file "$HOME/mac-resources/LOCK.d/acquired_epoch" "acquire writes acquired_epoch"
+assert_file "$HOME/mac-resources/LOCK.d/eta_deadline_epoch" "acquire writes eta_deadline_epoch"
 st="$("$WRAPPER" status)"
 assert_contains "$st" "ci-agent-1" "status shows our agent"
 out="$("$WRAPPER" release "ci-agent-1")"
@@ -70,6 +83,45 @@ assert_contains "$out" "acquired" "acquire works when parent alive"
 export MAC_SHARED_LOCK=0
 out="$("$WRAPPER" acquire "a" "r" "t" 1 1)"
 assert_contains "$out" "skipping mac lock" "MAC_SHARED_LOCK=0 skips"
+
+# --- MAC_RESOURCES_DIR override ---
+export MAC_SHARED_LOCK=1
+alt="$tmpdir/shared-mac-resources"
+mkdir -p "$alt"
+export MAC_RESOURCES_DIR="$alt"
+out="$("$WRAPPER" acquire "ci-agent-dir" "repo" "task" 1 1)"
+assert_contains "$out" "acquired" "acquire honors MAC_RESOURCES_DIR"
+assert_file "$alt/LOCK.d/owner" "lock lives under MAC_RESOURCES_DIR"
+"$WRAPPER" release "ci-agent-dir" >/dev/null
+unset MAC_RESOURCES_DIR
+
+# --- stale reclaim: expired eta_deadline_epoch + grace=0 ---
+export MAC_LOCK_STALE_GRACE_MIN=0
+mkdir -p "$HOME/mac-resources/LOCK.d"
+echo "agent=dead-orphan | repo=r | task=t | start=old Cairo | eta=1 min | pid=1" \
+  >"$HOME/mac-resources/LOCK.d/owner"
+echo "1" >"$HOME/mac-resources/LOCK.d/acquired_epoch"
+echo "1" >"$HOME/mac-resources/LOCK.d/eta_deadline_epoch"  # long expired
+out="$("$WRAPPER" acquire "ci-agent-reclaim" "repo" "task" 1 1 2>&1)"
+assert_contains "$out" "reclaiming stale Mac lock" "stale lock is reclaimed"
+assert_contains "$out" "acquired" "acquire succeeds after reclaim"
+st="$("$WRAPPER" status)"
+assert_contains "$st" "ci-agent-reclaim" "reclaimer owns lock"
+"$WRAPPER" release "ci-agent-reclaim" >/dev/null
+unset MAC_LOCK_STALE_GRACE_MIN
+
+# --- fresh lock is NOT reclaimed (long eta, grace high) ---
+export MAC_LOCK_STALE_GRACE_MIN=60
+"$WRAPPER" acquire "ci-agent-fresh" "repo" "task" 60 1 >/dev/null
+# Second acquire with short wait should fail (lock still fresh).
+set +e
+out="$("$WRAPPER" acquire "ci-agent-waiter" "repo" "task" 1 0 2>&1)"
+rc=$?
+set -e
+assert_eq "1" "$rc" "fresh lock blocks second acquire"
+assert_contains "$out" "LOCK busy" "fresh lock reports busy"
+"$WRAPPER" release "ci-agent-fresh" >/dev/null
+unset MAC_LOCK_STALE_GRACE_MIN
 
 echo ""
 echo "passed=$PASS failed=$FAIL"

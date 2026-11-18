@@ -118,6 +118,9 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   String? _chainProfilesError;
   bool _chainProfilesErrorOnLoad = true;
 
+  /// Set when a save could not be confirmed; the banner's retry re-sends exactly this list.
+  List<ChainDiscountProfileModel>? _chainProfilesUnverified;
+
   /// User choices from the columns menu (true = show); others follow the width.
   final Map<PmCatalogColumn, bool> _columnOverrides = {};
 
@@ -180,19 +183,26 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
   }
 
   Future<void> _saveChainProfiles(List<ChainDiscountProfileModel> next) async {
+    if (_chainProfilesSaving) return;
     setState(() {
       _chainProfilesSaving = true;
       _chainProfilesError = null;
+      _chainProfilesUnverified = null;
     });
     try {
       final saved = await _chainDiscRepo.save(next);
       if (!mounted) return;
       setState(() => _chainProfiles = saved);
+      // PUT returns after Firestore; Sell-In re-enrichment continues in the
+      // background. Never show a red timeout when the list is actually stored.
+      M3Feedback.showSuccess(context, kChainDiscountSavedUpdatingMessage);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _chainProfilesError = friendlyChainDiscountError(e);
         _chainProfilesErrorOnLoad = false;
+        _chainProfilesUnverified =
+            e is ChainDiscountSaveUnverifiedException ? next : null;
       });
     } finally {
       if (mounted) setState(() => _chainProfilesSaving = false);
@@ -1296,7 +1306,7 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
         if (p.startsWith('PR')) {
           return 'عروض ترويجية';
         }
-        return 'أصناف أدكو';
+        return 'أصناف ادكو';
     }
   }
 
@@ -1317,8 +1327,14 @@ class _ProductMasterScreenState extends State<ProductMasterScreen>
           error: _chainProfilesError,
           errorTitle: _chainProfilesErrorOnLoad
               ? 'تعذّر تحميل إعدادات السلاسل'
-              : 'تعذّر حفظ إعدادات السلاسل',
-          onRetry: _chainProfilesErrorOnLoad ? _loadChainProfiles : null,
+              : (_chainProfilesUnverified != null
+                  ? kChainDiscountSaveUnverifiedTitle
+                  : 'تعذّر حفظ إعدادات السلاسل'),
+          onRetry: _chainProfilesErrorOnLoad
+              ? _loadChainProfiles
+              : (_chainProfilesUnverified == null
+                  ? null
+                  : () => _saveChainProfiles(_chainProfilesUnverified!)),
           canEdit:
               widget.apiClient.currentUser?.canEditChainTerms ?? true,
           onSave: _saveChainProfiles,

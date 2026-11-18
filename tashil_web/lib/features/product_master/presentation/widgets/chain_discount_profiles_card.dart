@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/m3_shape.dart';
+import '../../../../core/utils/app_date_format.dart';
 import '../../../../core/widgets/app_icons.dart';
 import '../../../../core/widgets/m3_dropdown.dart';
 import '../../../../core/widgets/m3_states.dart';
@@ -8,6 +9,12 @@ import '../../data/chain_discount_repository.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_wrap_text.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
+
+/// «آخر تحديث» cell: calendar date only (`yyyy-MM-dd`), never email or time.
+String formatChainDiscountUpdatedAt(DateTime? at) {
+  if (at == null) return '';
+  return AppDateFormat.formatDate(at);
+}
 
 /// Product Master → «حاسبة الطلبيات»: one row per chain with its VAT, invoice
 /// discount and extra discount. Saved terms are the single source of truth for that chain's Sell-In
@@ -53,6 +60,7 @@ class ChainDiscountProfilesCard extends StatelessWidget {
 
   Future<void> _edit(BuildContext context,
       {ChainDiscountProfileModel? existing}) async {
+    if (saving) return;
     final result = await showDialog<_DialogResult>(
       context: context,
       builder: (_) => _ChainTermsDialog(
@@ -148,7 +156,12 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                       ?.copyWith(color: cs.onSurfaceVariant)),
             ),
           if (profiles.isNotEmpty)
-            Container(
+            AbsorbPointer(
+              key: const ValueKey('pm_chain_discount_absorb'),
+              absorbing: saving,
+              child: Opacity(
+                opacity: saving ? 0.6 : 1.0,
+                child: Container(
               key: const ValueKey('pm_chain_discount_tonal_surface'),
               decoration: BoxDecoration(
                 color: M3TableSurface.color(cs),
@@ -206,16 +219,8 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                               textAlign: TextAlign.center)),
                           DataCell(Text(pct(p.additionalDiscountPct),
                               textAlign: TextAlign.center)),
-                          DataCell(M3WrapText(
-                            [
-                              if (p.updatedAt != null)
-                                p.updatedAt!
-                                    .toLocal()
-                                    .toString()
-                                    .substring(0, 16),
-                              if (p.updatedBy.isNotEmpty) p.updatedBy,
-                            ].join(' • '),
-                            maxLines: 3,
+                          DataCell(Text(
+                            formatChainDiscountUpdatedAt(p.updatedAt),
                             textAlign: TextAlign.center,
                             style: theme.textTheme.labelSmall,
                           )),
@@ -223,6 +228,8 @@ class ChainDiscountProfilesCard extends StatelessWidget {
                       ),
                   ],
                 ),
+              ),
+            ),
               ),
             ),
         ],
@@ -269,6 +276,9 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
   bool _chainsLoading = false;
   String? _chainsError;
   String? _selectedKey;
+
+  /// A second tap on «حفظ» / «حذف» while the dialog is closing must not pop again.
+  bool _closing = false;
 
   static String _fmt(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
@@ -346,6 +356,7 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
   }
 
   void _submit() {
+    if (_closing) return;
     final chain = _adding ? (_selectedKey ?? '') : _chain.text.trim();
     final vat = double.tryParse(_vat.text.trim());
     final inv = double.tryParse(_inv.text.trim());
@@ -372,6 +383,7 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
       setState(() => _err = err);
       return;
     }
+    _closing = true;
     Navigator.pop(
         context,
         _DialogResult.save(ChainDiscountProfileModel(
@@ -399,7 +411,8 @@ class _ChainTermsDialogState extends State<_ChainTermsDialog> {
         ],
       ),
     );
-    if (ok == true && mounted) {
+    if (ok == true && mounted && !_closing) {
+      _closing = true;
       Navigator.pop(context, const _DialogResult.delete());
     }
   }

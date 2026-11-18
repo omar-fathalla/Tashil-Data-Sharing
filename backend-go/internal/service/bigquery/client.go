@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/sharetarget"
 	"github.com/tashil/data-sharing/backend/internal/service/targetalloc"
 )
 
@@ -55,6 +56,16 @@ type Repository interface {
 	UpsertTarget(ctx context.Context, tenantID string, target domain.TargetRecord) (*domain.TargetRecord, error)
 	DeleteTarget(ctx context.Context, tenantID, targetID string) error
 	GetTarget(ctx context.Context, tenantID, targetID string) (*domain.TargetRecord, bool)
+	GetShareTargetBaseline(ctx context.Context, tenantID, chain string, year int) (*domain.ShareTargetBaselineResponse, error)
+	BuildShareTargetCascadeInputs(ctx context.Context, tenantID, chain, category string, year int, branchFilter map[string]bool) (
+		branches []sharetarget.BranchWeight,
+		skusByBranch map[string][]sharetarget.SKUWeight,
+		months []sharetarget.MonthWeight,
+		err error,
+	)
+	// BuildShareTargetCascadesBatch scans sell-out facts once for many categories (preview latency).
+	// skuFor limits SKU-mix collection; nil/empty = collect SKUs for every requested category.
+	BuildShareTargetCascadesBatch(ctx context.Context, tenantID, chain string, year int, categories []string, branchFilter map[string]bool, skuFor map[string]bool) (map[string]ShareTargetCascadeInputs, error)
 	TargetBreakdownSource(tenantID, chain string) targetalloc.Source
 	GetProductMaster(ctx context.Context, tenantID string, filter ProductMasterFilter) (*domain.ProductMasterSummaryResponse, error)
 	SetProductMaster(ctx context.Context, tenantID string, summary *domain.ProductMasterSummaryResponse) (*domain.ProductMasterSummaryResponse, error)
@@ -105,15 +116,18 @@ type RecordFilter struct {
 	Offset        int
 }
 
-// StoreMatrixFilter allows filtering store benchmark items by region, tier, chain, and period/date.
+// StoreMatrixFilter allows filtering store benchmark items by region, tier, chain, brand, and period/date.
 type StoreMatrixFilter struct {
 	Region        string
 	Tier          string
 	RetailerChain string
-	Year          int
-	Month         int
-	StartDate     string
-	EndDate       string
+	// Brand filters sell-out facts by inferred catalog brand (Arabic/English
+	// label). Empty / "all" keeps every own-brand SKU.
+	Brand     string
+	Year      int
+	Month     int
+	StartDate string
+	EndDate   string
 	// SameMonthsAsYear (with Month == 0) keeps only the calendar months that
 	// have data in that reference year. YoY like-for-like uses it both ways:
 	// previous year with SameMonthsAsYear=current, and current year (for the
@@ -1630,11 +1644,12 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		skus     map[string]bool
 	}
 	type skuAccumulator struct {
-		barcode  string
-		skuName  string
-		category string
-		revenue  float64
-		units    int
+		barcode     string
+		skuName     string
+		category    string
+		revenue     float64
+		units       int
+		nameRevenue map[string]float64
 	}
 	type supAccumulator struct {
 		name     string
@@ -1774,18 +1789,28 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 			catAcc.skus[skuID] = true
 		}
 
-		skuKey := fmt.Sprintf("%s|%s|%s", r.Barcode, r.SKUName, catName)
-		skuAcc, exists := skuMap[skuKey]
-		if !exists {
-			skuAcc = &skuAccumulator{
-				barcode:  r.Barcode,
-				skuName:  r.SKUName,
-				category: catName,
+		// One row per distinct barcode (SKU name when the barcode is empty) —
+		// the same identity CategoryContribution.SKUCount uses. NetRevenue is
+		// still summed. Sell-out RecordID dedup is not involved here.
+		// Blank barcode and blank name are not a SKU on the category card.
+		if skuID != "" {
+			skuKey := skuID + "\x00" + catName
+			skuAcc, exists := skuMap[skuKey]
+			if !exists {
+				skuAcc = &skuAccumulator{
+					barcode:     strings.TrimSpace(r.Barcode),
+					skuName:     strings.TrimSpace(r.SKUName),
+					category:    catName,
+					nameRevenue: make(map[string]float64),
+				}
+				skuMap[skuKey] = skuAcc
 			}
-			skuMap[skuKey] = skuAcc
+			skuAcc.revenue += r.NetRevenue
+			skuAcc.units += r.QuantitySold
+			if name := strings.TrimSpace(r.SKUName); name != "" {
+				skuAcc.nameRevenue[name] += r.NetRevenue
+			}
 		}
-		skuAcc.revenue += r.NetRevenue
-		skuAcc.units += r.QuantitySold
 	}
 
 	// Build CategoryContributions sorted descending by TotalRevenue
@@ -1824,9 +1849,23 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		return categoryContributions[i].TotalRevenue > categoryContributions[j].TotalRevenue
 	})
 
-	// Build ParetoSKUs (80/20 rule) sorted descending by TotalRevenue
+	// Every own-brand SKU, sorted descending by TotalRevenue. The category
+	// drill-down lists this full set (same distinct barcodes as the category
+	// card). IsTop80Contributor is a classification badge and does not drop
+	// rows; there is no 80% cut and no row cap.
 	paretoSKUs := make([]domain.ParetoSKUItem, 0, len(skuMap))
 	for _, acc := range skuMap {
+		bestName := ""
+		bestRev := -1.0
+		for name, rev := range acc.nameRevenue {
+			if rev > bestRev || (rev == bestRev && (bestName == "" || name < bestName)) {
+				bestName = name
+				bestRev = rev
+			}
+		}
+		if bestName != "" {
+			acc.skuName = bestName
+		}
 		uPrice := 0.0
 		if acc.units > 0 {
 			uPrice = math.Round((acc.revenue/float64(acc.units))*100) / 100
@@ -1870,10 +1909,8 @@ func (c *Client) GetExecutiveKPIs(ctx context.Context, tenantID, period string, 
 		}
 		paretoSKUs[i].RevenueSharePct = math.Round(sharePct*10) / 10
 		paretoSKUs[i].CumulativeSharePct = cumRounded
+		// Badge only. Rows at and past the 80% line stay in the slice.
 		paretoSKUs[i].IsTop80Contributor = i == 0 || prevCumulative < 80.0
-	}
-	if len(paretoSKUs) > 100 {
-		paretoSKUs = paretoSKUs[:100]
 	}
 
 	chainShares := make([]domain.ChainShareSummary, 0, len(chainShareMap))
@@ -2746,12 +2783,23 @@ func (c *Client) GetStoreBenchmarkMatrix(ctx context.Context, tenantID string, f
 		sameMonths = c.ownMonthSetLocked(tenantID, filter.SameMonthsAsYear, chainOK)
 	}
 
+	brandFilter := strings.TrimSpace(filter.Brand)
+	if brandFilter == "all" || brandFilter == "الكل" || brandFilter == "كل العلامات التجارية" {
+		brandFilter = ""
+	}
+
 	for _, r := range c.records {
 		if !matchTenant(r.TenantID, tenantID) || !isOwnRecord(r) {
 			continue // Row-Level Security & Tenant's own SKUs
 		}
 		if !chainOK(r.RetailerChain) {
 			continue
+		}
+		if brandFilter != "" {
+			inferred := domain.InferBrandFromItemName(r.SKUName, r.Category)
+			if !domain.BrandLabelMatches(inferred, brandFilter) {
+				continue
+			}
 		}
 		if sameMonths != nil && (len(r.TransactionDate) < 7 || !sameMonths[r.TransactionDate[4:7]]) {
 			continue

@@ -23,8 +23,8 @@ const _headers = [
   'المستهدف',
   'المحقق (ج.م)',
   'الفرق (ج.م)',
-  'الكمية (وحدة: فعلي / مستهدف)',
-  'نسبة التحقيق %',
+  'الكمية',
+  'التحقيق %',
   'إجراءات',
 ];
 
@@ -35,7 +35,7 @@ Map<String, dynamic> _item({
   required String monthLabel,
   String branch = 'كل الفروع',
   String category = 'كل الفئات',
-  String chain = 'فتح الله',
+  String chain = 'أسواق فتح الله',
   required double target,
   required double actual,
   required double variance,
@@ -310,6 +310,7 @@ void main() {
         ));
 
     for (final key in [
+      'targets_chain_t26',
       'targets_target_money_t27',
       'targets_actual_money_t26',
       'targets_gap_money_t26',
@@ -322,20 +323,49 @@ void main() {
       expect(para.didExceedMaxLines, isFalse,
           reason: '$key w=${para.size.width}');
     }
+    expect(cell('targets_chain_t26'), 'أسواق فتح الله');
+    expect(find.textContaining('أسواق فت…'), findsNothing);
+    expect(find.textContaining('أسواق فتح الل…'), findsNothing);
 
-    expect(cell('targets_achievement_t26'), '84.8%');
-    expect(cell('targets_achievement_t-q'), '90.0%');
-    expect(cell('targets_achievement_t-hi'), '110.0%');
-    expect(cell('targets_achievement_t27'), '—');
-    for (final id in ['t26', 't27', 't-mar', 't-q', 't-hi']) {
-      expect(cell('targets_achievement_$id'), isNot(contains('مستهدف')));
+    String pill(String id) => tester
+        .widgetList<Text>(find.descendant(
+          of: find.byKey(ValueKey('targets_achievement_$id')),
+          matching: find.byType(Text),
+        ))
+        .map((t) => t.data ?? '')
+        .join(' ');
+    expect(pill('t26'), '84.8% · أقل');
+    expect(pill('t-q'), '90.0% · قريب');
+    expect(pill('t-hi'), '110.0% · محقق');
+    expect(pill('t27'), '—');
+    expect(find.textContaining('…'), findsNothing);
+    for (final id in ['t26', 't-q', 't-hi']) {
+      final para = tester.renderObject<RenderParagraph>(find.descendant(
+        of: find.byKey(ValueKey('targets_achievement_$id')),
+        matching: find.byType(Text),
+      ).first);
+      expect(para.didExceedMaxLines, isFalse,
+          reason: 'achievement $id must not clip');
     }
+    // Full Arabic status remains available on the tooltip.
+    expect(
+      tester
+          .widget<Tooltip>(find.descendant(
+            of: find.byKey(const ValueKey('targets_achievement_t26')),
+            matching: find.byType(Tooltip),
+          ))
+          .message,
+      'أقل من المستهدف',
+    );
 
     final ctx = tester.element(find.byType(TargetManagementPanel));
     final scheme = Theme.of(ctx).colorScheme;
     final accents = M3StatusColors.of(ctx).accents;
     Color chipColor(String id) => tester
-        .widget<Text>(find.byKey(ValueKey('targets_achievement_$id')))
+        .widget<Text>(find.descendant(
+          of: find.byKey(ValueKey('targets_achievement_$id')),
+          matching: find.byType(Text),
+        ).first)
         .style!
         .color!;
     expect(chipColor('t26'), scheme.error);

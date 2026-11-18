@@ -20,6 +20,7 @@ import '../../../../core/layout/m3_content_boundary.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/testing/test_semantics.dart';
 import '../../data/sell_out_explorer_repository.dart';
+import '../../domain/branch_brand_filter.dart';
 import '../../domain/branch_growth.dart';
 import '../../domain/sell_out_upload_flow.dart';
 import '../../domain/archive_delete_copy.dart';
@@ -36,7 +37,6 @@ import '../../../../core/widgets/m3_button.dart';
 import '../../../../core/widgets/m3_feedback.dart';
 import '../../../../core/widgets/m3_responsive_tab_bar.dart';
 import '../../../../core/widgets/table_scroll_container.dart';
-import '../../../cpfr_replenishment/domain/cpfr_models.dart';
 import '../../../product_master/presentation/screens/product_master_screen.dart';
 import '../widgets/cascading_filter_toolbar.dart';
 import '../widgets/sell_table_shared.dart';
@@ -210,6 +210,9 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   // 3: Uploaded Sheets (Archive)
   int _activeTab = 0;
 
+  /// When true, the Sell-Out tab bar is replaced by the target detail page.
+  bool _targetsDetailOpen = false;
+
   // Tab 0 Filter & Transaction State
   String? selectedChain;
   String? selectedStoreId;
@@ -248,6 +251,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   // Tab 1: Performance & Branch Analytics State
   String _perfChain = 'all';
   String _perfBrand = 'all';
+  /// True while store-matrix is refetching for a brand change. SKU KPIs update
+  /// client-side immediately; branch KPIs/table show a loading state instead of
+  /// stale all-brand (or previous-brand) matrix numbers.
+  bool _isPerfBrandMatrixLoading = false;
   String _perfSearch = '';
   String _perfGrowthStatusFilter = 'all'; // 'all', 'growing', 'declining', 'new_branch'
   String _priceMatrixFilter = 'all'; // 'all', 'healthy', 'low_margin', 'negative_margin', 'promo'
@@ -348,6 +355,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       setState(() {
         isLoading = true;
         _loadError = null;
+        _isPerfBrandMatrixLoading = false;
         records = [];
         _recordsSummary = const SellOutRecordsSummaryModel();
         // Drop stale year matrices so KPI subtitles/counts cannot mix years
@@ -386,6 +394,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       matrixChain: activeChartChain == 'all' ? null : activeChartChain,
       matrixYear: _selectedYear > 0 ? _selectedYear : null,
       compYear: compYear,
+      matrixBrand: _perfBrand == 'all' ? null : _perfBrand,
     ));
     if (seq != _recordsLoadSeq) return;
     if (loaded case Failure(:final error)) {
@@ -976,52 +985,57 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
 
             M3Spacing.gapSM,
 
-            // Top Tab Switcher: 100% Responsive Full-Width MD3 Large Tab Bar (4 Symmetrical Tabs)
-            M3ResponsiveTabBar<int>(
-              textDirection: TextDirection.ltr,
-              selectedValue: _activeTab,
-              items: [
-                const M3ResponsiveTabItem<int>(
-                  value: 0,
-                  icon: Icons.point_of_sale_rounded,
-                  selectedIcon: Icons.point_of_sale_rounded,
-                  label: 'بيانات المبيعات',
-                ),
-                const M3ResponsiveTabItem<int>(
-                  value: 1,
-                  icon: Icons.insights_rounded,
-                  selectedIcon: Icons.insights_rounded,
-                  label: 'أداء الفروع',
-                ),
-                const M3ResponsiveTabItem<int>(
-                  value: 2,
-                  icon: Icons.track_changes_rounded,
-                  selectedIcon: Icons.track_changes_rounded,
-                  label: 'المستهدفات',
-                ),
-                M3ResponsiveTabItem<int>(
-                  value: 3,
-                  icon: Icons.folder_copy_rounded,
-                  selectedIcon: Icons.folder_copy_rounded,
-                  label: 'الملفات المرفوعة (${_archivedSellOutFiles.length})',
-                  semanticsIdentifier: TestIds.selloutUploadedFiles,
-                ),
-              ],
-              onChanged: (next) {
-                setState(() => _activeTab = next);
-                if (next == 3) {
-                  _loadSellOutArchive(forceRefresh: true);
-                }
-              },
-            ),
+            // Top Tab Switcher — hidden while a Sell-Out target detail page is open.
+            if (!_targetsDetailOpen)
+              M3ResponsiveTabBar<int>(
+                textDirection: TextDirection.ltr,
+                selectedValue: _activeTab,
+                items: [
+                  const M3ResponsiveTabItem<int>(
+                    value: 0,
+                    icon: Icons.point_of_sale_rounded,
+                    selectedIcon: Icons.point_of_sale_rounded,
+                    label: 'بيانات المبيعات',
+                  ),
+                  const M3ResponsiveTabItem<int>(
+                    value: 1,
+                    icon: Icons.insights_rounded,
+                    selectedIcon: Icons.insights_rounded,
+                    label: 'أداء الفروع',
+                  ),
+                  const M3ResponsiveTabItem<int>(
+                    value: 2,
+                    icon: Icons.track_changes_rounded,
+                    selectedIcon: Icons.track_changes_rounded,
+                    label: 'المستهدفات',
+                    semanticsIdentifier: TestIds.selloutTargetsTab,
+                  ),
+                  M3ResponsiveTabItem<int>(
+                    value: 3,
+                    icon: Icons.folder_copy_rounded,
+                    selectedIcon: Icons.folder_copy_rounded,
+                    label: 'الملفات المرفوعة (${_archivedSellOutFiles.length})',
+                    semanticsIdentifier: TestIds.selloutUploadedFiles,
+                  ),
+                ],
+                onChanged: (next) {
+                  setState(() => _activeTab = next);
+                  if (next == 3) {
+                    _loadSellOutArchive(forceRefresh: true);
+                  }
+                },
+              ),
 
-            M3Spacing.gapMD,
+            if (!_targetsDetailOpen) M3Spacing.gapMD,
 
             if (_activeTab == 2)
               TargetManagementPanel(
                 key: ValueKey('sell_out_targets_${widget.apiClient.tenantId}'),
                 apiClient: widget.apiClient,
                 targetType: 'sell_out',
+                onDetailOpenChanged: (open) {
+                  setState(() => _targetsDetailOpen = open);
+                },
               )
             else if ((_activeTab == 0 || _activeTab == 1) &&
                 !isLoading &&
@@ -2094,6 +2108,79 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   // ===========================================================================
   // TAB 1: PERFORMANCE & BRANCH ANALYTICS (PARETO 80/20 & STORE VELOCITY)
   // ===========================================================================
+  /// Reloads branch matrices for the current [_perfBrand] without blanking the
+  /// records table first (SKU KPIs update instantly via client-side filter).
+  /// Branch KPIs/table show [_isPerfBrandMatrixLoading] until the scoped matrix
+  /// returns — never leave the previous all-brand matrix visible.
+  Future<void> _reloadMatricesForPerfBrand() async {
+    final seq = ++_recordsLoadSeq;
+    if (mounted) {
+      setState(() {
+        _isPerfBrandMatrixLoading = true;
+        // Drop stale matrix so branch KPIs/table cannot keep prior-brand totals
+        // for the ~3s store-matrix round-trip.
+        _branchChartItems = const [];
+        _prevYearBranchMap = const {};
+        _prevYearTotalChainRevenue = 0.0;
+        _yoyCurrentBranchMap = const {};
+        _yoyCurrentTotalChainRevenue = 0.0;
+        _matchedYoyMonths = const [];
+      });
+    }
+    final effectiveYear = (selectedDateRange == null && _selectedYear > 0) ? _selectedYear : null;
+    final effectiveMonth = (selectedDateRange == null && _selectedMonth > 0) ? _selectedMonth : null;
+    final activeChartChain = (selectedChain != null && selectedChain!.isNotEmpty)
+        ? selectedChain!
+        : _chartChain;
+    final compYear = (_selectedYear > 0 ? _selectedYear : _currentYear) - 1;
+    final loaded = await _repo.load(
+      SellOutExplorerQuery(
+        chain: selectedChain,
+        storeId: selectedStoreId,
+        category: selectedCategory,
+        query: searchQuery,
+        startDate: selectedDateRange != null ? _formatDate(selectedDateRange!.start) : null,
+        endDate: selectedDateRange != null ? _formatDate(selectedDateRange!.end) : null,
+        year: effectiveYear,
+        month: effectiveMonth,
+        limit: 1000,
+        matrixChain: activeChartChain == 'all' ? null : activeChartChain,
+        matrixYear: _selectedYear > 0 ? _selectedYear : null,
+        compYear: compYear,
+        matrixBrand: _perfBrand == 'all' ? null : _perfBrand,
+      ),
+    );
+    if (seq != _recordsLoadSeq || !mounted) return;
+    if (loaded case Failure()) {
+      setState(() => _isPerfBrandMatrixLoading = false);
+      return;
+    }
+    final data = loaded.valueOrNull!;
+    final prevMap = <String, StoreBenchmarkItem>{};
+    double prevTotalRev = 0.0;
+    for (final b in data.prevBranchMatrix) {
+      prevMap[b.storeId.isNotEmpty ? b.storeId : b.storeName] = b;
+      prevTotalRev += b.totalRevenue;
+    }
+    final yoyCurMap = <String, StoreBenchmarkItem>{};
+    double yoyCurRev = 0.0;
+    for (final b in data.yoyCurrentBranchMatrix) {
+      yoyCurMap[b.storeId.isNotEmpty ? b.storeId : b.storeName] = b;
+      yoyCurRev += b.totalRevenue;
+    }
+    setState(() {
+      records = data.records;
+      if (data.summary != null) _recordsSummary = data.summary!;
+      _branchChartItems = data.currentBranchMatrix;
+      _prevYearBranchMap = prevMap;
+      _prevYearTotalChainRevenue = prevTotalRev;
+      _yoyCurrentBranchMap = yoyCurMap;
+      _yoyCurrentTotalChainRevenue = yoyCurRev;
+      _matchedYoyMonths = data.matchedMonths;
+      _isPerfBrandMatrixLoading = false;
+    });
+  }
+
   Widget _buildPerformanceAndBranchAnalyticsTab(
     BuildContext context,
     ThemeData theme,
@@ -2106,11 +2193,17 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       );
     }
 
-    final effectiveRecords = _perfChain == 'all'
+    final chainRecords = _perfChain == 'all'
         ? records
         : records.where((r) => r.retailerChain.toLowerCase() == _perfChain.toLowerCase()).toList();
+    // Brand filter applies to KPI cards, SKU export, and (via matrixBrand reload)
+    // the branch table / shares. Client-side filter keeps SKU KPIs in sync
+    // immediately while the brand-scoped store-matrix request is in flight.
+    final effectiveRecords = filterRecordsByBrand(chainRecords, _perfBrand);
 
-    // 1. Group records by Branch (use full backend StoreBenchmarkItem list if available for the selected chain)
+    // 1. Group by Branch — prefer backend matrix (already brand-scoped when
+    // matrixBrand was requested). Fall back to aggregating brand-filtered records.
+    // While a brand-scoped matrix refetch is in flight, never reuse a stale matrix.
     final branchMap = <String, ({
       String storeId,
       String storeName,
@@ -2119,8 +2212,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       int units,
       double revenue,
     })>{};
-    if (_branchChartItems.isNotEmpty &&
-        (_perfChain == 'all' || _perfChain.toLowerCase() == _chartChain.toLowerCase())) {
+    final useMatrix = !_isPerfBrandMatrixLoading &&
+        _branchChartItems.isNotEmpty &&
+        (_perfChain == 'all' || _perfChain.toLowerCase() == _chartChain.toLowerCase());
+    if (useMatrix) {
       for (final item in _branchChartItems) {
         final chainName = item.retailerChain.isNotEmpty ? item.retailerChain : _chartChain;
         final sId = item.storeId.isNotEmpty ? item.storeId : item.storeName;
@@ -2217,53 +2312,24 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       ..sort((a, b) => (b.yoyGrowthPct ?? -999).compareTo(a.yoyGrowthPct ?? -999));
     final fastestGrowingBranch = growingSorted.isNotEmpty ? growingSorted.first : null;
 
-    // 2. Group records by SKU & infer Brand
-    final skuMap = <String, ({String skuName, String itemCode, String barcode, String brand, String category, int units, double revenue})>{};
-    for (final r in effectiveRecords) {
-      final key = r.barcode.isNotEmpty ? r.barcode : r.skuName;
-      final inferredBrand = SmartBrandExtractor.inferBrand(
-        r.skuName,
-        subCategory: r.category,
-        itemCode: r.itemCode,
-      );
-      final existing = skuMap[key];
-      if (existing == null) {
-        skuMap[key] = (
-          skuName: r.skuName,
-          itemCode: r.itemCode,
-          barcode: r.barcode,
-          brand: inferredBrand,
-          category: r.category,
-          units: r.quantitySold,
-          revenue: r.netRevenue,
-        );
-      } else {
-        skuMap[key] = (
-          skuName: existing.skuName,
-          itemCode: existing.itemCode.isNotEmpty ? existing.itemCode : r.itemCode,
-          barcode: existing.barcode.isNotEmpty ? existing.barcode : r.barcode,
-          brand: existing.brand,
-          category: existing.category,
-          units: existing.units + r.quantitySold,
-          revenue: existing.revenue + r.netRevenue,
-        );
-      }
-    }
-
+    // 2. SKU aggregation + brand list from the *chain* scope (so the dropdown
+    // still lists every brand). KPI cards / export use brand-filtered records.
+    final allSkusForBrandList = aggregatePerfSkus(chainRecords);
+    final availableBrands = allSkusForBrandList.map((s) => s.brand).toSet().toList()..sort();
+    final sortedByRev = aggregatePerfSkus(effectiveRecords);
     final totalRevenueAll = effectiveRecords.fold<double>(0.0, (acc, r) => acc + r.netRevenue);
-
-    // Compute Pareto 80/20 share
-    final sortedByRev = skuMap.values.toList()..sort((a, b) => b.revenue.compareTo(a.revenue));
-    int top20PctCount = (sortedByRev.length * 0.2).ceil();
-    if (top20PctCount < 1 && sortedByRev.isNotEmpty) top20PctCount = 1;
-    final top20Revenue = sortedByRev.take(top20PctCount).fold<double>(0.0, (sum, i) => sum + i.revenue);
-    final paretoSharePct = totalRevenueAll > 0 ? (top20Revenue / totalRevenueAll) * 100 : 0.0;
+    final pareto = paretoTop20Share(sortedByRev);
+    final top20PctCount = pareto.topCount;
+    final paretoSharePct = pareto.sharePct;
 
     final topSku = sortedByRev.isNotEmpty ? sortedByRev.first : null;
     final topBranch = branchList.isNotEmpty ? branchList.first : null;
     final branchTotalRevenueAll = branchList.fold<double>(0.0, (sum, b) => sum + b.revenue);
     final effectiveChainTotalRev = branchTotalRevenueAll > 0 ? branchTotalRevenueAll : totalRevenueAll;
     final avgBranchRevenue = branchList.isNotEmpty ? (effectiveChainTotalRev / branchList.length) : 0.0;
+    final unbrandedRem = _perfBrand == 'all'
+        ? unbrandedRevenueRemainder(chainRecords, availableBrands)
+        : 0.0;
 
     const monthLabelsAr = <int, String>{
       0: 'كل الشهور',
@@ -2283,10 +2349,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
     final String perfPeriodBadgeAr =
         '${_selectedYear > 0 ? "سنة $_selectedYear" : "كل السنوات"} • ${monthLabelsAr[_selectedMonth] ?? "كل الشهور"}';
 
-    // Filter SKUs for Excel export if needed
-    final availableBrands = skuMap.values.map((s) => s.brand).toSet().toList()..sort();
     final filteredSkus = sortedByRev.where((sku) {
-      if (_perfBrand != 'all' && sku.brand != _perfBrand) return false;
       if (_perfSearch.isNotEmpty) {
         if (!ApiClient.matchesProductSearch(
           _perfSearch,
@@ -2343,6 +2406,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   : 'لا توجد فروع',
               icon: Icons.leaderboard_rounded,
               color: Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.40) ?? colorScheme.primary,
+              isLoading: _isPerfBrandMatrixLoading,
+              loadingKey: const ValueKey('perf_branch_kpi_skeleton_top_store'),
             );
             final card4 = _buildSummaryCard(
               context,
@@ -2352,6 +2417,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               subtitle: '${branchList.length} فرع نشط • $perfPeriodBadgeAr',
               icon: Icons.speed_rounded,
               color: colorScheme.secondary,
+              isLoading: _isPerfBrandMatrixLoading,
+              loadingKey: const ValueKey('perf_branch_kpi_skeleton_avg_store'),
             );
 
             return _buildFourCardResponsiveLayout(
@@ -2473,7 +2540,8 @@ onChanged: m3Legacy<String>((v) {
                   M3Dropdown<String>(
 width: 210.0,
 fitOptions: true,
-value: availableBrands.contains(_perfBrand) ? _perfBrand : 'all',
+key: const ValueKey('perf_brand_dropdown'),
+value: resolvePerfBrandDropdownValue(_perfBrand, availableBrands),
 label: 'العلامة التجارية',
 leadingIcon: Icons.branding_watermark_rounded,
 options: m3OptionsFromMenuItems<String>([
@@ -2485,6 +2553,7 @@ onChanged: m3Legacy<String>((v) {
                           setState(() {
                             _perfBrand = v;
                           });
+                          _reloadMatricesForPerfBrand();
                         }
                       }),
 ),
@@ -2603,12 +2672,30 @@ onChanged: m3Legacy<String>((v) {
                     const M3SectionTitle('أداء الفروع'),
                     const Spacer(),
                     Text(
-                      '${branchList.length} فرع نشط',
+                      _perfBrand == 'all'
+                          ? '${branchList.length} فرع نشط'
+                          : '${branchList.length} فرع • $_perfBrand',
                       style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
               ),
+              if (_perfBrand == 'all' && unbrandedRem > 0.5)
+                Padding(
+                  key: const ValueKey('perf_unbranded_remainder'),
+                  padding: const EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 8.0),
+                  child: Text(
+                    'متبقي بدون علامة تجارية معروفة: ${CurrencyFormatter.formatCompactEGP(unbrandedRem)}',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                ),
+              if (_isPerfBrandMatrixLoading)
+                const Padding(
+                  key: ValueKey('perf_branch_table_loading'),
+                  padding: EdgeInsets.symmetric(vertical: 48.0),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else
               TableScrollContainer(
                 controller: _branchTableScrollController,
                 showSwipeHint: true,
@@ -3564,7 +3651,9 @@ onChanged: m3Legacy<int>((v) {
     required Color color,
     bool textValue = false,
     bool singleLineValue = false,
+    bool isLoading = false,
     Key? subtitleKey,
+    Key? loadingKey,
   }) {
     // Shared reference KPI card (Sell-Out is the reference; Compare mirrors it).
     // Arabic-only title; [titleEn] is kept as the stable key id.
@@ -3572,6 +3661,7 @@ onChanged: m3Legacy<int>((v) {
       key: ValueKey('kpi_card_$titleEn'),
       valueKey: ValueKey('kpi_value_$titleEn'),
       subtitleKey: subtitleKey,
+      loadingKey: loadingKey,
       title: titleAr,
       value: value,
       subtitle: subtitle,
@@ -3580,6 +3670,7 @@ onChanged: m3Legacy<int>((v) {
       textValue: textValue,
       valueMaxLines: singleLineValue ? 1 : 2,
       shrinkOverflowingValue: singleLineValue,
+      isLoading: isLoading,
     );
   }
 }

@@ -44,6 +44,12 @@ class ApiEndpoints {
   static String get targetsUpload => '$baseUrl/api/v1/analytics/targets/upload';
   static String targetBreakdown(String id) =>
       '$baseUrl/api/v1/sellout/targets/${Uri.encodeComponent(id)}/breakdown';
+  static String get shareTargetBaseline =>
+      '$baseUrl/api/v1/sellout/share-target/baseline';
+  static String get shareTargetPreview =>
+      '$baseUrl/api/v1/sellout/share-target/preview';
+  static String get shareTargetSave =>
+      '$baseUrl/api/v1/sellout/share-target';
   static String get storeMatrix => '$baseUrl/api/v1/analytics/store-matrix';
   static String get storeMatrixMatchedMonths =>
       '$baseUrl/api/v1/analytics/store-matrix/matched-months';

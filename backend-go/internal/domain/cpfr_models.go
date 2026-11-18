@@ -315,7 +315,7 @@ type CPFRDashboardPayload struct {
 	MatchedSellOutValueWithCostEGP  float64 `json:"matched_sell_out_value_with_cost_egp"` // مبيعات الكاشير التي لها تكلفة حقيقية (أساس الربح)
 	MatchedMissingCostSellOutEGP    float64 `json:"matched_missing_cost_sell_out_egp"`    // مبيعات مستبعدة من الربح لعدم وجود تكلفة حقيقية
 	MatchedMissingCostSellOutUnits  int     `json:"matched_missing_cost_sell_out_units"`
-	MissingCostItems                []MissingCostItem `json:"missing_cost_items"`    // أصناف بدون سعر/تكلفة حقيقية مطلوبة من أدكو
+	MissingCostItems                []MissingCostItem `json:"missing_cost_items"`    // أصناف بدون سعر/تكلفة حقيقية مطلوبة من ادكو
 	MatchedYoYUnitsGrowthPct        float64 `json:"matched_yoy_units_growth_pct"`         // نمو مبيعات القطع 2026 مقابل 2025 لنفس الأشهر %
 	MatchedYoYValueGrowthPct        float64 `json:"matched_yoy_value_growth_pct"`         // نمو مبيعات القيمة 2026 مقابل 2025 لنفس الأشهر %
 	MatchedYoYAvailable             bool    `json:"matched_yoy_available"`                // false = no matched month has last-year Sell-Out (show "—")
@@ -469,6 +469,10 @@ type TargetRecord struct {
 	TargetUnits      float64 `json:"target_units"` // Units for Sell-Out, Cases for Sell-In
 	Notes            string  `json:"notes"`
 	UpdatedAt        string  `json:"updated_at"`
+	// Origin is "market_share" for share-wizard targets, empty/value for classic entry.
+	Origin string `json:"origin,omitempty"`
+	// ShareMeta is set when Origin is market_share; detail page still uses revenue/units.
+	ShareMeta *ShareTargetMeta `json:"share_meta,omitempty"`
 }
 
 // TargetComparisonItem combines a saved TargetRecord with real-time Actual performance and comprehensive hierarchical drill-down (Chain -> Branch -> SKU).
@@ -514,6 +518,8 @@ type TargetComparisonItem struct {
 	StatusAr                string                  `json:"status_ar"` // "تجاوز المستهدف" | "قيد التحقيق" | "أقل من المستهدف"
 	Notes                   string                  `json:"notes"`
 	UpdatedAt               string                  `json:"updated_at"`
+	Origin                  string                  `json:"origin,omitempty"`
+	ShareMeta               *ShareTargetMeta        `json:"share_meta,omitempty"`
 	Branches                []TargetBranchBreakdown `json:"branches"`
 	ChainSKUTotals          []TargetSKUBreakdown    `json:"chain_sku_totals"`
 	Brands                  []TargetBrandBreakdown  `json:"brands"`
@@ -552,6 +558,68 @@ type TargetsSummaryResponse struct {
 	Items                     []TargetComparisonItem `json:"items"`
 }
 
+// NormalizeBrandKey lowercases and folds Arabic letter variants so
+// "فلفيتا" and "فلڤيتا" compare equal.
+func NormalizeBrandKey(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.ReplaceAll(s, "ڤ", "ف")
+	s = strings.ReplaceAll(s, "ى", "ي")
+	s = strings.ReplaceAll(s, "ة", "ه")
+	return s
+}
+
+// BrandLabelParts splits "عربي (English)" into Arabic / English / full keys.
+func BrandLabelParts(label string) (ar, en, full string) {
+	full = NormalizeBrandKey(label)
+	if full == "" {
+		return "", "", ""
+	}
+	open := strings.LastIndex(label, "(")
+	close := strings.LastIndex(label, ")")
+	if open >= 0 && close > open {
+		ar = NormalizeBrandKey(label[:open])
+		en = NormalizeBrandKey(label[open+1 : close])
+		return ar, en, full
+	}
+	return full, "", full
+}
+
+// BrandLabelMatches reports whether an inferred catalog brand matches a UI/API
+// brand filter. Accepts full labels ("ديفا (Diva)"), Arabic-only ("ديفا" /
+// "فلفيتا"), or English-only ("Diva" / "Velveta"), with ڤ/ف folding.
+func BrandLabelMatches(inferred, filter string) bool {
+	filter = strings.TrimSpace(filter)
+	if filter == "" || filter == "all" || filter == "الكل" || filter == "كل العلامات التجارية" {
+		return true
+	}
+	aAr, aEn, aFull := BrandLabelParts(inferred)
+	bAr, bEn, bFull := BrandLabelParts(filter)
+	if aFull == "" || bFull == "" {
+		return false
+	}
+	if aFull == bFull {
+		return true
+	}
+	candidates := func(ar, en, full string) []string {
+		out := []string{full}
+		if ar != "" {
+			out = append(out, ar)
+		}
+		if en != "" {
+			out = append(out, en)
+		}
+		return out
+	}
+	for _, a := range candidates(aAr, aEn, aFull) {
+		for _, b := range candidates(bAr, bEn, bFull) {
+			if a == b {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // InferBrandFromItemName uses AI-grade heuristic brand extraction across Arabic & English FMCG and retail goods.
 // It recognizes established brands and dynamically extracts novel brand tokens for any company.
 func InferBrandFromItemName(itemName, subCategory string) string {
@@ -559,6 +627,9 @@ func InferBrandFromItemName(itemName, subCategory string) string {
 	switch {
 	case strings.Contains(s, "ماكسيل") || strings.Contains(s, "maxel"):
 		return "ماكسيل (Maxell)"
+	// Divatol is an Adeco Diva-line SKU; match the longer token before "ديفا".
+	case strings.Contains(s, "ديفاتول") || strings.Contains(s, "divatol"):
+		return "ديفا (Diva)"
 	case strings.Contains(s, "ديفا") || strings.Contains(s, "diva"):
 		return "ديفا (Diva)"
 	case strings.Contains(s, "فلفيتا") || strings.Contains(s, "فلڤيتا") || strings.Contains(s, "velveta"):

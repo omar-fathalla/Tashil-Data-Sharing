@@ -699,7 +699,9 @@ void main() {
     // such as "Fathalla Market" are data and stay as they are.
     expect(find.text('الحصة السوقية مقارنة بالمنافسين'), findsOneWidget);
     expect(find.text('مساهمة الفئات'), findsOneWidget);
-    expect(find.text('الأصناف الأعلى مبيعًا (80/20)'), findsOneWidget);
+    expect(find.text('أصناف المبيعات'), findsOneWidget);
+    expect(find.textContaining('80/20'), findsNothing);
+    expect(find.textContaining('تحقق 80'), findsNothing);
     expect(
         find.textContaining(RegExp(
             r'Market Share vs|Market leader|Rank #|Category Contribution|Top SKUs')),
@@ -735,8 +737,8 @@ void main() {
       equals((ar: 'كل السلاسل', en: 'All Chains')),
     );
     expect(
-      ChainSharePie.splitBilingualLabel('شركة أديكو'),
-      equals((ar: 'شركة أديكو', en: null)),
+      ChainSharePie.splitBilingualLabel('شركة ادكو'),
+      equals((ar: 'شركة ادكو', en: null)),
     );
     expect(
       ChainSharePie.splitBilingualLabel('بروكتر آند جامبل (حساب 2) (P&G)'),

@@ -14,8 +14,11 @@ REPO="${GITHUB_REPOSITORY:?}"
 # Prefer explicit HEAD_SHA (PR head); fall back to GITHUB_SHA (push/merge_group).
 SHA="${HEAD_SHA:-${GITHUB_SHA:?}}"
 # Default 90m: Mac Flutter can wait behind deploy (30m) + run (35m).
-DEADLINE_MIN="${WAIT_CI_FLUTTER_DEADLINE_MIN:-90}"
+# Job timeout is typically 45m — keep deadline ≤ job so we exit cleanly when possible.
+DEADLINE_MIN="${WAIT_CI_FLUTTER_DEADLINE_MIN:-40}"
 POLL_SEC="${WAIT_CI_FLUTTER_POLL_SEC:-30}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DIAG="${SCRIPT_DIR}/ci_mac_diag.sh"
 
 if [ -z "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
   echo "::error::GH_TOKEN/GITHUB_TOKEN required"
@@ -28,8 +31,18 @@ if [ -n "${GITHUB_SHA:-}" ] && [ "$SHA" != "$GITHUB_SHA" ]; then
   echo "Note: HEAD_SHA=${SHA:0:7} ≠ GITHUB_SHA=${GITHUB_SHA:0:7} (PR virtual merge) — polling head"
 fi
 deadline=$((SECONDS + DEADLINE_MIN * 60))
+poll_n=0
 
 while (( SECONDS < deadline )); do
+  poll_n=$((poll_n + 1))
+  # Heartbeat breadcrumbs: when the Mac runner drops mid-wait, logs often 404 —
+  # flushed lines from earlier polls are the only evidence we keep.
+  if [[ -f "$DIAG" ]]; then
+    bash "$DIAG" heartbeat "wait-ci-flutter-poll-${poll_n}" 2>/dev/null || true
+  else
+    echo "wait-ci-flutter poll=${poll_n} epoch=$(date +%s) runner=${RUNNER_NAME:-local}"
+  fi
+
   run_json="$(gh run list \
     --repo "$REPO" \
     --workflow ci.yml \
@@ -55,10 +68,42 @@ while (( SECONDS < deadline )); do
     '.[] | select(.databaseId == $id) | (.conclusion // "")' | head -1)"
 
   jobs_json="$(gh api "repos/${REPO}/actions/runs/${run_id}/jobs" --paginate)"
-  flutter_status="$(printf '%s' "$jobs_json" | jq -r \
-    '[.jobs[] | select(.name == "test-flutter")] | if length == 0 then "missing" else .[0].status end')"
-  flutter_conclusion="$(printf '%s' "$jobs_json" | jq -r \
-    '[.jobs[] | select(.name == "test-flutter")] | if length == 0 then "" else (.[0].conclusion // "") end')"
+  # Matrix shards are named "test-flutter (N)"; exclude test-flutter-gate and the
+  # required-check display name "Flutter analyze & test". Aggregate:
+  # in_progress if any shard in_progress; completed only when all completed;
+  # cancelled if any shard cancelled.
+  flutter_agg="$(printf '%s' "$jobs_json" | jq -c '
+    def is_flutter_shard:
+      (.name | startswith("test-flutter"))
+      and (.name | startswith("test-flutter-gate") | not)
+      and (.name != "Flutter analyze & test");
+    [.jobs[] | select(is_flutter_shard)] as $s
+    | if ($s | length) == 0 then
+        {status: "missing", conclusion: ""}
+      elif ($s | any(.status == "in_progress")) then
+        {status: "in_progress", conclusion: ""}
+      elif ($s | any((.conclusion // "") == "cancelled")) then
+        {status: "completed", conclusion: "cancelled"}
+      elif ($s | all(.status == "completed")) then
+        {
+          status: "completed",
+          conclusion: (
+            if ($s | any((.conclusion // "") == "failure")) then "failure"
+            elif ($s | all((.conclusion // "") == "skipped")) then "skipped"
+            elif ($s | all((.conclusion // "") == "success")) then "success"
+            else ($s[0].conclusion // "")
+            end
+          )
+        }
+      else
+        {
+          status: ($s | map(.status) | map(select(. != "completed")) | .[0] // "queued"),
+          conclusion: ""
+        }
+      end
+  ')"
+  flutter_status="$(printf '%s' "$flutter_agg" | jq -r '.status')"
+  flutter_conclusion="$(printf '%s' "$flutter_agg" | jq -r '.conclusion')"
 
   echo "CI run=${run_id} status=${ci_status} conclusion=${ci_conclusion:-none}; test-flutter status=${flutter_status} conclusion=${flutter_conclusion:-none}"
 

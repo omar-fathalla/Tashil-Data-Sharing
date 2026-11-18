@@ -23,19 +23,20 @@ if [[ -x "${GCLOUD_SDK}/bin/gcloud" ]]; then
   export PATH="${GCLOUD_SDK}/bin:${PATH}"
 fi
 
-# Flutter SDK lives at $HOME/toolchains/flutter (not always symlinked into toolchains/bin).
-# Missing this path forces flutter-action downloads that have starved self-hosted Mac runners
-# ("lost communication with the server" mid-setup).
-for flutter_bin in \
-  "${TOOLCHAINS}/flutter/bin" \
-  "${HOME_DIR}/flutter/bin" \
-  "${HOME_DIR}/fvm/default/bin"; do
+# Flutter SDK: prefer $HOME/toolchains/flutter-arm64 on Apple Silicon (native
+# flutter_tester), then $HOME/toolchains/flutter. Missing these forces flutter-action
+# downloads that have starved self-hosted Mac runners ("lost communication").
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/ci_flutter_arch.sh
+source "${ROOT_DIR}/scripts/ci_flutter_arch.sh"
+while IFS= read -r flutter_bin; do
+  [[ -z "${flutter_bin}" ]] && continue
   if [[ -x "${flutter_bin}/flutter" ]]; then
     echo "${flutter_bin}" >>"${GITHUB_PATH:-/dev/null}"
     export PATH="${flutter_bin}:${PATH}"
     break
   fi
-done
+done < <(ci_flutter_candidate_bins "${HOME_DIR}")
 
 # Never share ~/.pub-cache (or a pre-set shared toolchains pub-cache) across concurrent Mac
 # runners — that caused Bad file descriptor / File exists under parallel pub get.

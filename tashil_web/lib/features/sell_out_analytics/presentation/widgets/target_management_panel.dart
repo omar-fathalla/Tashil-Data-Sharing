@@ -14,6 +14,10 @@ import '../../data/target_repository.dart';
 import '../../domain/target_kpi.dart';
 import '../../domain/target_table_format.dart';
 import 'target_breakdown_dialog.dart';
+import 'target_detail_page.dart';
+import 'target_status_pill.dart';
+import 'share_target_wizard.dart';
+import '../../domain/target_achievement_status.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/shared_display_prefix.dart';
@@ -29,6 +33,7 @@ import '../../../../core/widgets/m3_table_surface.dart';
 import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_table_text.dart';
+import '../../../../core/testing/test_semantics.dart';
 
 /// TargetManagementPanel provides a unified Target entry, Excel upload, and
 /// real-time Actual vs. Target achievement comparison experience for both
@@ -46,11 +51,16 @@ class TargetManagementPanel extends StatefulWidget {
   /// Optional injected repository (tests); defaults to one wrapping [apiClient].
   final TargetRepository? repository;
 
+  /// Fired when Sell-Out full-page detail opens/closes so the explorer can
+  /// hide its tab bar (sidebar stays).
+  final ValueChanged<bool>? onDetailOpenChanged;
+
   const TargetManagementPanel({
     super.key,
     required this.apiClient,
     required this.targetType,
     this.repository,
+    this.onDetailOpenChanged,
   });
 
   @override
@@ -63,6 +73,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   String _selectedChain = 'all';
   int _selectedYear = 0; // 0 = All Years
   TargetsSummaryModel? _summary;
+  TargetComparisonModel? _detailTarget;
 
   Map<String, String> get _branchDisplay {
     final names = <String>{};
@@ -90,17 +101,18 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
   /// Caps so the 9-column Sell-Out table fits the live 1280 shell
   /// (250dp sidebar + 24dp page padding each side ≈ 982dp) without
   /// horizontal scrolling. Sum of caps stays under that width minus
-  /// the 4dp margins and column gaps.
+  /// the 4dp margins and column gaps. Chain + achievement get enough
+  /// room for «أسواق فتح الله» and compact «63.6% · أقل».
   static const _sellOutColMax = <double>[
-    72, // السلسلة
-    100, // الفترة (Period)
-    80, // النطاق
-    88, // المستهدف
-    116, // المحقق
-    96, // الفرق
-    168, // الكمية
-    84, // نسبة التحقيق
-    88, // إجراءات
+    124, // السلسلة — «أسواق فتح الله»
+    78, // الفترة (Period)
+    96, // النطاق — «فرع المعادي»
+    74, // المستهدف
+    90, // المحقق
+    74, // الفرق
+    136, // الكمية
+    116, // نسبة التحقيق — «63.6% · أقل»
+    70, // إجراءات
   ];
 
   Widget _sellOutCap(int column, Widget child) {
@@ -330,6 +342,81 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
       }
     }
     return opts;
+  }
+
+  Future<void> _openAddTargetEntry() async {
+    if (_isSellIn) {
+      await _openTargetFormDialog();
+      return;
+    }
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final cs = theme.colorScheme;
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: const RoundedRectangleBorder(
+              borderRadius: M3Shape.radiusXl,
+            ),
+            title: Text(
+              'نوع المستهدف',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    key: const ValueKey('target_type_value'),
+                    leading: Icon(Icons.payments_rounded, color: cs.primary),
+                    title: const Text('مستهدف بالقيمة'),
+                    subtitle: const Text('إدخال القيمة أو الكمية مباشرة'),
+                    onTap: () => Navigator.pop(ctx, 'value'),
+                  ),
+                  ListTile(
+                    key: const ValueKey('target_type_share'),
+                    leading:
+                        Icon(Icons.pie_chart_outline_rounded, color: cs.primary),
+                    title: const Text('مستهدف بالحصة السوقية'),
+                    subtitle: const Text(
+                      'تحديد الحصة المستهدفة لكل فئة ثم التوزيع',
+                    ),
+                    onTap: () => Navigator.pop(ctx, 'share'),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'share') {
+      final saved = await showShareTargetWizard(
+        context: context,
+        apiClient: widget.apiClient,
+        chainOptions: _chainOptions,
+        initialChain: _selectedChain != 'all' ? _selectedChain : 'fathalla',
+        initialYear:
+            _selectedYear >= _baseCurrentYear ? _selectedYear : _baseCurrentYear,
+      );
+      if (saved && mounted) {
+        _repo.invalidateAll();
+        await _loadTargets();
+      }
+      return;
+    }
+    await _openTargetFormDialog();
   }
 
   Future<void> _openTargetFormDialog({
@@ -1078,12 +1165,27 @@ onChanged: m3Legacy<int>((v) {
     );
   }
 
+  void _setDetailTarget(TargetComparisonModel? target) {
+    setState(() => _detailTarget = target);
+    widget.onDetailOpenChanged?.call(target != null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final summary = _summary ?? TargetsSummaryModel.empty(widget.targetType);
     final activeTarget = _activeTargetItem;
+
+    if (!_isSellIn && _detailTarget != null) {
+      return TargetDetailPage(
+        key: ValueKey('target_detail_${_detailTarget!.id}'),
+        repository: _repo,
+        target: _detailTarget!,
+        siblings: summary.items,
+        onBack: () => _setDetailTarget(null),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1098,8 +1200,11 @@ onChanged: m3Legacy<int>((v) {
             const noTargets = 'لا توجد مستهدفات بعد';
             const noSalesYet = 'لا توجد مبيعات بعد';
             final neutral = colorScheme.onSurfaceVariant;
-            // Sell-Out compares only periods that have sales: a 2027 target
-            // must not turn "كل السنوات" into 38% / −202M.
+            // Sell-Out KPIs share one year-scoped total: the year filter
+            // already limits summary.items; when "كل السنوات" still mixes
+            // future years without sales, Target/Ach/Gap all use the
+            // comparable (has-sales) basis so 390M never sits next to a
+            // 200M achievement denominator.
             final kpis = TargetKpis.fromSummary(summary);
             final onlyNoData = !_isSellIn && kpis.onlyNoData;
             final includesNoData = !_isSellIn && kpis.includesNoData;
@@ -1109,8 +1214,14 @@ onChanged: m3Legacy<int>((v) {
             final double? variance = _isSellIn
                 ? summary.totalVarianceEgp
                 : (hasTargets ? kpis.gapRevenue : summary.totalVarianceEgp);
+            final sellOutTargetRevenue = includesNoData
+                ? kpis.comparableTargetRevenue
+                : summary.totalTargetRevenueEgp;
+            final sellOutTargetUnits = includesNoData
+                ? kpis.comparableTargetUnits
+                : summary.totalTargetUnits;
             final targetUnitsText =
-                '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} $_unitLabelAr مستهدفة';
+                '${CurrencyFormatter.formatNumber((_isSellIn ? summary.totalTargetUnits : sellOutTargetUnits).round())} $_unitLabelAr مستهدفة';
             final card1 = _buildKpiCard(
               context,
               titleAr: _isSellIn ? 'مستهدف التوريد' : 'مستهدف المبيعات',
@@ -1119,16 +1230,19 @@ onChanged: m3Legacy<int>((v) {
                   ? 'Sell-In Target'
                   : 'Sell-Out Target',
               value: CurrencyFormatter.formatCompactEGP(
-                summary.totalTargetRevenueEgp,
+                _isSellIn
+                    ? summary.totalTargetRevenueEgp
+                    : sellOutTargetRevenue,
               ),
               subtitleAr: _isSellIn
                   ? '${CurrencyFormatter.formatNumber(summary.totalTargetUnits.round())} كرتونة • ${summary.totalTargetWeightTons.toStringAsFixed(1)} طن'
                   : includesNoData
-                      ? 'يشمل مستهدفات سنوات قادمة'
+                      ? 'لفترات بها مبيعات • مستهدفات قادمة مستبعدة'
                       : targetUnitsText,
               subtitleTooltip: includesNoData
-                  ? 'يشمل مستهدفات سنوات قادمة بدون مبيعات '
-                      '(${CurrencyFormatter.formatCompactEGP(kpis.noDataTargetRevenue)}) • $targetUnitsText'
+                  ? 'نفس أساس نسبة التحقيق والفرق (فترات بها مبيعات). '
+                      'مستهدفات بدون مبيعات مستبعدة '
+                      '(${CurrencyFormatter.formatCompactEGP(kpis.noDataTargetRevenue)})'
                   : null,
               subtitleEn: _isSellIn
                   ? '+ returns: ${CurrencyFormatter.formatNumber(summary.totalGrossTargetUnits.round())} cases'
@@ -1176,18 +1290,29 @@ onChanged: m3Legacy<int>((v) {
                   : achPct == null
                       ? noSalesYet
                       : achPct >= 100
-                          ? 'فوق المستهدف'
-                          : (achPct >= 85 ? 'قريب من المستهدف' : 'أقل من المستهدف'),
+                          ? (_isSellIn ? 'فوق المستهدف' : 'محقق')
+                          : (achPct >=
+                                  (_isSellIn
+                                      ? 85
+                                      : TargetAchievementStatus.nearFloor)
+                              ? 'قريب من المستهدف'
+                              : 'أقل من المستهدف'),
               subtitleTooltip: achBasisTooltip,
               subtitleEn: (achPct ?? 0) >= 100
                   ? 'Above target'
-                  : ((achPct ?? 0) >= 85 ? 'Near target' : 'Below target'),
+                  : ((achPct ?? 0) >=
+                          (_isSellIn ? 85 : TargetAchievementStatus.nearFloor)
+                      ? 'Near target'
+                      : 'Below target'),
               icon: Icons.pie_chart_rounded,
               color: !hasTargets || achPct == null
                   ? neutral
                   : achPct >= 100
                       ? M3StatusColors.of(context).accents.positive
-                      : (achPct >= 85
+                      : (achPct >=
+                              (_isSellIn
+                                  ? 85
+                                  : TargetAchievementStatus.nearFloor)
                           ? M3StatusColors.of(context).accents.caution
                           : colorScheme.error),
               progressPct: hasTargets ? achPct : null,
@@ -1309,48 +1434,70 @@ onChanged: m3Legacy<String>((v) {
                 ],
               ),
 
-              // Action Buttons
+              // Action Buttons — Sell-Out keeps only Add + Export (upload/template stay in code).
               Wrap(
                 spacing: M3Spacing.xs,
                 runSpacing: M3Spacing.xs,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  FilledButton.icon(
-                    onPressed: () => _openTargetFormDialog(),
-                    icon: const Icon(Icons.add_task_rounded, size: M3ToolbarButton.iconSize),
-                    label: Text(
-                      _isSellIn
-                          ? 'إضافة مستهدف'
-                          : 'إضافة مستهدف',
+                  if (_isSellIn)
+                    FilledButton.icon(
+                      onPressed: _openAddTargetEntry,
+                      icon: const Icon(Icons.add_task_rounded, size: M3ToolbarButton.iconSize),
+                      label: const Text('إضافة مستهدف'),
+                      style: M3ToolbarButton.style,
+                    )
+                  else
+                    TestSemantics.button(
+                      identifier: TestIds.selloutTargetsAdd,
+                      label: 'إضافة مستهدف',
+                      onPressed: _openAddTargetEntry,
+                      child: FilledButton.icon(
+                        onPressed: _openAddTargetEntry,
+                        icon: const Icon(Icons.add_task_rounded, size: M3ToolbarButton.iconSize),
+                        label: const Text('إضافة مستهدف'),
+                        style: M3ToolbarButton.style,
+                      ),
                     ),
-                    style: M3ToolbarButton.style,
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: _isUploading ? null : _pickAndUploadTargetExcel,
-                    icon: _isUploading
-                        ? const SizedBox(
-                            width: 18.0,
-                            height: 18.0,
-                            child: CircularProgressIndicator(strokeWidth: 2.0),
-                          )
-                        : const Icon(Icons.upload_file_rounded, size: M3ToolbarButton.iconSize),
-                    label: const Text('رفع ملف المستهدفات'),
-                    style: M3ToolbarButton.style,
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _downloadTargetTemplate,
-                    icon: const Icon(Icons.download_rounded, size: M3ToolbarButton.iconSize),
-                    label: const Text('تنزيل القالب'),
-                    style: M3ToolbarButton.style,
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: _exportTargetsComparisonCsv,
-                    icon: const Icon(Icons.table_view_rounded, size: M3ToolbarButton.iconSize),
-                    label: Text(
-                      _isSellIn ? 'تصدير' : 'تصدير',
+                  if (_isSellIn) ...[
+                    FilledButton.tonalIcon(
+                      onPressed: _isUploading ? null : _pickAndUploadTargetExcel,
+                      icon: _isUploading
+                          ? const SizedBox(
+                              width: 18.0,
+                              height: 18.0,
+                              child: CircularProgressIndicator(strokeWidth: 2.0),
+                            )
+                          : const Icon(Icons.upload_file_rounded, size: M3ToolbarButton.iconSize),
+                      label: const Text('رفع ملف المستهدفات'),
+                      style: M3ToolbarButton.style,
                     ),
-                    style: M3ToolbarButton.style,
-                  ),
+                    OutlinedButton.icon(
+                      onPressed: _downloadTargetTemplate,
+                      icon: const Icon(Icons.download_rounded, size: M3ToolbarButton.iconSize),
+                      label: const Text('تنزيل القالب'),
+                      style: M3ToolbarButton.style,
+                    ),
+                  ],
+                  if (_isSellIn)
+                    OutlinedButton.icon(
+                      onPressed: _exportTargetsComparisonCsv,
+                      icon: const Icon(Icons.table_view_rounded, size: M3ToolbarButton.iconSize),
+                      label: const Text('تصدير'),
+                      style: M3ToolbarButton.style,
+                    )
+                  else
+                    TestSemantics.button(
+                      identifier: TestIds.selloutTargetsExport,
+                      label: 'تصدير',
+                      onPressed: _exportTargetsComparisonCsv,
+                      child: OutlinedButton.icon(
+                        onPressed: _exportTargetsComparisonCsv,
+                        icon: const Icon(Icons.table_view_rounded, size: M3ToolbarButton.iconSize),
+                        label: const Text('تصدير'),
+                        style: M3ToolbarButton.style,
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -1473,9 +1620,14 @@ onChanged: m3Legacy<String>((v) {
                                       : _sellOutCap(
                                           i,
                                           M3TableText(
-                                            // Sell-Out drops the English
-                                            // "(Chain)" so the header is one line.
-                                            i == 0 ? 'السلسلة' : h,
+                                            // Sell-Out: short one-line headers so
+                                            // chain + achievement stay readable.
+                                            switch (i) {
+                                              0 => 'السلسلة',
+                                              6 => 'الكمية',
+                                              7 => 'التحقيق %',
+                                              _ => h,
+                                            },
                                             maxLines: 1,
                                           ),
                                         ),
@@ -1486,11 +1638,18 @@ onChanged: m3Legacy<String>((v) {
                               // Future periods have no sales yet: «—», never 0.
                               final noSales = !_isSellIn && !item.hasActuals;
                               final isPositive = item.varianceRevenueEgp >= 0;
+                              final sellOutStatus = TargetAchievementStatus.fromPct(
+                                noSales ? null : item.achievementRevPct,
+                                hasActuals: !noSales,
+                              );
                               final badgeColor = noSales
                                   ? colorScheme.onSurfaceVariant
                                   : item.achievementRevPct >= 100
                                       ? M3StatusColors.of(context).accents.positive
-                                      : (item.achievementRevPct >= 85
+                                      : (item.achievementRevPct >=
+                                              (_isSellIn
+                                                  ? 85
+                                                  : TargetAchievementStatus.nearFloor)
                                           ? M3StatusColors.of(context).accents.caution
                                           : colorScheme.error);
                               final periodLabel = TargetTableFormat.period(
@@ -1546,6 +1705,9 @@ onChanged: m3Legacy<String>((v) {
                                           : _sellOutLine(
                                               item.chainDisplayName,
                                               column: 0,
+                                              key: ValueKey(
+                                                'targets_chain_${item.id}',
+                                              ),
                                               tooltip: item.chainDisplayName,
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.w800,
@@ -1783,22 +1945,33 @@ onChanged: m3Legacy<String>((v) {
                                     centered(
                                       _maybeSellOutCap(
                                         7,
-                                        M3ChipSurface(
-                                          color: badgeColor.withOpacity(0.12),
-                                          child: Text(
-                                            _isSellIn
-                                                ? '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})'
-                                                : TargetTableFormat.achievement(
-                                                    pct: item.achievementRevPct,
-                                                    hasActuals: !noSales,
-                                                  ),
-                                            key: ValueKey('targets_achievement_${item.id}'),
-                                            maxLines: 1,
-                                            softWrap: false,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: badgeColor),
-                                          ),
-                                        ),
+                                        _isSellIn
+                                            ? M3ChipSurface(
+                                                color: badgeColor.withOpacity(0.12),
+                                                child: Text(
+                                                  '${item.achievementRevPct.toStringAsFixed(1)}% (${item.statusAr})',
+                                                  key: ValueKey(
+                                                      'targets_achievement_${item.id}'),
+                                                  maxLines: 1,
+                                                  softWrap: false,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .labelMedium
+                                                      ?.copyWith(
+                                                        fontWeight: FontWeight.w600,
+                                                        color: badgeColor,
+                                                      ),
+                                                ),
+                                              )
+                                            : KeyedSubtree(
+                                                key: ValueKey(
+                                                    'targets_achievement_${item.id}'),
+                                                child: TargetStatusPill(
+                                                  status: sellOutStatus,
+                                                  compact: true,
+                                                ),
+                                              ),
                                       ),
                                     ),
                                   ),
@@ -1933,7 +2106,7 @@ onChanged: m3Legacy<String>((v) {
             child: Text(
               _isSellIn
                   ? 'أضف مستهدفًا للسلسلة وسنوزّعه تلقائيًا على الفروع والأصناف.'
-                  : 'أضف مستهدفًا أو ارفع ملف المستهدفات لمقارنته بالمحقق.',
+                  : 'أضف مستهدفًا لمقارنته بالمحقق على مستوى الشهور والفروع والأصناف.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 height: 1.5,
@@ -1948,7 +2121,7 @@ onChanged: m3Legacy<String>((v) {
             alignment: WrapAlignment.center,
             children: [
               FilledButton.icon(
-                onPressed: () => _openTargetFormDialog(),
+                onPressed: _openAddTargetEntry,
                 icon: const Icon(Icons.add_task_rounded),
                 label: const Text('إضافة مستهدف'),
               ),
@@ -3562,7 +3735,13 @@ onChanged: m3Legacy<String>((v) {
     );
   }
 
-  Future<void> _openBreakdown(TargetComparisonModel item) {
+  Future<void> _openBreakdown(TargetComparisonModel item) async {
+    // Sell-Out option B: full-page detail inside the content area (not the
+    // modal breakdown dialog). Sell-In keeps the existing workspace flow.
+    if (!_isSellIn) {
+      _setDetailTarget(item);
+      return;
+    }
     return showTargetBreakdownDialog(
       context,
       repository: _repo,

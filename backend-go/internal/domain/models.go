@@ -237,7 +237,7 @@ func InferDepartmentArFromPrefix(prefix string) string {
 		if strings.HasPrefix(p, "PR") {
 			return "عروض ترويجية مجمعة"
 		}
-		return "أصناف أدكو"
+		return "أصناف ادكو"
 	}
 }
 
@@ -534,7 +534,9 @@ type CategoryCompetitor struct {
 	SharePct float64 `json:"share_pct"`
 }
 
-// ParetoSKUItem represents a SKU in the 80/20 Pareto revenue analysis.
+// ParetoSKUItem is one own-brand SKU (distinct barcode, or SKU name when the
+// barcode is empty). The slice includes every SKU counted on the category
+// card. IsTop80Contributor classifies the SKU and does not omit it.
 type ParetoSKUItem struct {
 	ItemCode           string  `json:"item_code,omitempty"`
 	Barcode            string  `json:"barcode"`

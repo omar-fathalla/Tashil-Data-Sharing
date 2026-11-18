@@ -23,7 +23,7 @@ type TenantUser struct {
 // TenantProfile represents an enterprise tenant's branding and access configuration.
 type TenantProfile struct {
 	TenantID       string    `json:"tenant_id"`        // Permanent ID e.g. 'adeco'
-	DisplayName    string    `json:"display_name"`     // 'شركة أديكو للصناعات الغذائية'
+	DisplayName    string    `json:"display_name"`     // 'شركة ادكو للصناعات الغذائية'
 	Slug           string    `json:"slug"`             // 'adeco'
 	PortalURL      string    `json:"portal_url"`       // 'http://localhost:3000/portal/adeco'
 	BrandSeedColor string    `json:"brand_seed_color"` // Hex color code e.g. '#35A211'

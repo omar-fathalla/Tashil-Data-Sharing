@@ -71,6 +71,10 @@ jobs:
             flutter:
               - 'tashil_web/**'
               - 'scripts/ci_detect_flutter.sh'
+              - 'scripts/ci_detect_flutter_test.sh'
+              - 'scripts/ci_flutter_arch.sh'
+              - 'scripts/ci_assert_flutter_arm64.sh'
+              - 'scripts/ci_install_flutter_macos_arm64.sh'
               - 'scripts/ci_runner_env.sh'
               - 'scripts/ci_pub_cache_isolation_test.sh'
               - 'scripts/wait_mac_heavy_free.sh'
@@ -361,12 +365,19 @@ jobs:
     # No job concurrency group: GitHub keeps only one pending slot per group and
     # cancels the rest (pending-slot eviction). Let the 4 tashil-mac runners queue
     # natively instead. Cross-repo: MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
+    # Matrix shards split flutter test so each job stays under timeout under Mac load;
+    # --total-shards/--shard-index partition the suite with no gaps/overlap.
     needs: changes
     if: needs.changes.outputs.flutter == 'true'
     # TODO(billing): TEMP — same Mac expression as light jobs (was already Mac).
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
-    # Mac timeout policy: test jobs ≤45m (was 35m; lock wait + pub/analyze/test).
-    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1]
+    # Per-shard budget: lock wait + pub/analyze/test under concurrent Mac load
+    # (was 45m single job; shards + raised margin avoid cancel).
+    timeout-minutes: 70
     defaults:
       run:
         working-directory: tashil_web
@@ -386,16 +397,16 @@ jobs:
 
       - name: Acquire Mac resource lock
         id: mac_lock
-        timeout-minutes: 8
+        timeout-minutes: 20
         working-directory: .
         run: |
           set -euo pipefail
-          AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}"
+          AGENT="ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}-${{ matrix.shard }}"
           echo "MAC_LOCK_AGENT=${AGENT}" >> "$GITHUB_ENV"
           chmod +x scripts/mac_lock_ci.sh
-          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test" 12 8
+          bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test-shard-${{ matrix.shard }}" 18 20
 
-      # Prefer $HOME/toolchains/flutter; never download via flutter-action on self-hosted.
+      # Prefer $HOME/toolchains/flutter-arm64 (Apple Silicon) then flutter; never flutter-action on self-hosted.
       # PUB_CACHE is forced to $RUNNER_TEMP/pub-cache by scripts/ci_runner_env.sh (ignores presets).
       - name: Detect preinstalled Flutter
         id: flutter_pre
@@ -403,14 +414,23 @@ jobs:
         env:
           FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
         run: |
-          chmod +x scripts/ci_detect_flutter.sh
+          chmod +x scripts/ci_detect_flutter.sh scripts/ci_flutter_arch.sh
           bash scripts/ci_detect_flutter.sh
 
       - name: Require preinstalled Flutter on self-hosted
         if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
         run: |
-          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install at \$HOME/toolchains/flutter — do not download via flutter-action (drops Mac runners)."
+          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install native arm64 at \$HOME/toolchains/flutter-arm64 via scripts/ci_install_flutter_macos_arm64.sh — do not download via flutter-action (drops Mac runners)."
           exit 1
+
+      - name: Require native arm64 Flutter on Apple Silicon
+        if: steps.flutter_pre.outputs.use_action == 'false' && runner.environment == 'self-hosted'
+        working-directory: .
+        env:
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          chmod +x scripts/ci_assert_flutter_arm64.sh scripts/ci_flutter_arch.sh
+          bash scripts/ci_assert_flutter_arm64.sh
 
       - uses: subosito/flutter-action@v2
         if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
@@ -432,24 +452,27 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-pub-isolated-v1-
 
       - run: flutter pub get
+      # Analyze once (shard 0); all shards still run pub get for a consistent test env.
       - name: flutter analyze
+        if: matrix.shard == 0
         run: flutter analyze
       # Cap concurrency so Go/Flutter/Playwright jobs sharing the Mac don't thrash.
-      - name: flutter test
+      # Shards 0..1 with total-shards=2 cover the full suite exactly once.
+      - name: flutter test (shard ${{ matrix.shard }}/2)
         id: flutter_test
-        run: flutter test --concurrency=2
+        run: flutter test --concurrency=2 --total-shards=2 --shard-index=${{ matrix.shard }}
 
       - name: Surface failure summary
         if: failure()
         run: |
           {
-            echo "## Flutter job failed"
+            echo "## Flutter job failed (shard ${{ matrix.shard }}/2)"
             echo ""
             echo "Flutter analyze/test (or pub get) failed on branch \`${{ github.ref_name }}\`."
             echo "Reproduce locally:"
             echo ""
             echo '```bash'
-            echo 'cd tashil_web && flutter pub get && flutter analyze && flutter test'
+            echo 'cd tashil_web && flutter pub get && flutter analyze && flutter test --total-shards=2 --shard-index=${{ matrix.shard }}'
             echo '```'
             echo ""
             echo "Proposed next step: fix on this PR branch and push — do not auto-push fixes to main."
@@ -460,7 +483,7 @@ jobs:
         working-directory: .
         run: |
           set +e
-          AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}}"
+          AGENT="${MAC_LOCK_AGENT:-ci-Tashil-Data-Sharing-${{ github.run_id }}-${{ github.job }}-${{ matrix.shard }}}"
           bash scripts/mac_lock_ci.sh release "$AGENT"
 
   # Required-check gate: always reports "Flutter analyze & test" (success on path skip).

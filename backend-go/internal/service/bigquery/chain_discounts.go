@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -20,6 +21,11 @@ type chainDiscountStore struct {
 	fp       map[string]string // normTenant -> content fingerprint of the applied list
 
 	// Cross-instance sync (chain_discounts_sync.go).
+	// applyMu serializes SetChainDiscountProfiles; dataGen counts in-place Sell-In / Product Master
+	// changes so a background re-enrichment can detect that its copy went stale.
+	applyMu sync.Mutex
+	dataGen atomic.Uint64
+
 	syncMu  sync.Mutex
 	src     ChainDiscountSource
 	ttl     time.Duration
@@ -31,8 +37,13 @@ func (c *Client) chainDiscounts() *chainDiscountStore { return &c.chainDisc }
 func normChainKey(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
 
 // SetChainDiscountProfiles replaces the tenant's profiles used by CPFR cost and the Sell-In
-// waterfall, re-prices the tenant's in-memory Sell-In rows with the new terms and invalidates any
-// cached / precomputed analytics for that tenant.
+// waterfall, re-prices the tenant's in-memory Sell-In rows whose chain terms changed and invalidates
+// any cached / precomputed analytics for that tenant.
+//
+// The new profiles are published first (own lock), so concurrent enrichment already sees them. Only
+// rows of chains whose terms differ from the previous list are re-enriched, on a copy taken under the
+// read lock; the result is swapped in under a short write lock, and discarded and recomputed when an
+// upload or Product Master change landed in between.
 func (c *Client) SetChainDiscountProfiles(tenantID string, profiles []domain.ChainDiscountProfile) {
 	m := make(map[string]domain.ChainDiscountProfile, len(profiles))
 	for _, p := range profiles {
@@ -42,6 +53,9 @@ func (c *Client) SetChainDiscountProfiles(tenantID string, profiles []domain.Cha
 	}
 	norm := normalizeTenantKey(tenantID)
 	s := c.chainDiscounts()
+	// Serializes appliers so a slower, older apply can never overwrite a newer one.
+	s.applyMu.Lock()
+	defer s.applyMu.Unlock()
 	s.mu.Lock()
 	if s.byTenant == nil {
 		s.byTenant = map[string]map[string]domain.ChainDiscountProfile{}
@@ -49,19 +63,118 @@ func (c *Client) SetChainDiscountProfiles(tenantID string, profiles []domain.Cha
 	if s.fp == nil {
 		s.fp = map[string]string{}
 	}
+	old := s.byTenant[norm]
 	s.byTenant[norm] = m
 	s.fp[norm] = chainProfilesFingerprint(profiles)
 	s.mu.Unlock()
 
+	changed := changedChainKeys(old, m)
+	if len(changed) == 0 {
+		return
+	}
 	// Stored Sell-In rows carry VAT / discount fields derived at enrichment time; refresh them so
 	// the new terms apply on the next load without a re-upload.
+	c.reenrichSellInChains(norm, changed)
+	c.invalidateKPICache() // also bumps the precomputed-layer source version
+}
+
+func sameProfileTerms(a, b domain.ChainDiscountProfile) bool {
+	if a.InvoiceDiscountPct != b.InvoiceDiscountPct || a.AdditionalDiscountPct != b.AdditionalDiscountPct {
+		return false
+	}
+	if (a.VATRatePct == nil) != (b.VATRatePct == nil) {
+		return false
+	}
+	return a.VATRatePct == nil || *a.VATRatePct == *b.VATRatePct
+}
+
+// changedChainKeys returns the normalized chain keys that were added, removed or whose terms differ.
+func changedChainKeys(old, next map[string]domain.ChainDiscountProfile) map[string]struct{} {
+	changed := map[string]struct{}{}
+	for k, n := range next {
+		if o, ok := old[k]; !ok || !sameProfileTerms(o, n) {
+			changed[k] = struct{}{}
+		}
+	}
+	for k := range old {
+		if _, ok := next[k]; !ok {
+			changed[k] = struct{}{}
+		}
+	}
+	return changed
+}
+
+// sellInRowChainKey is the key enrichSellInRecordLocked looks the row's profile up by.
+func sellInRowChainKey(rules []customerChainRule, r *domain.SellInRecord) string {
+	k := normChainKey(resolveSellInChainFromCustomer(rules, r.CustomerName, r.RetailerChain))
+	if k == "" {
+		return "fathalla"
+	}
+	return k
+}
+
+const reenrichMaxAttempts = 3
+
+// reenrichBeforeSwapHook runs between the lock-free compute and the swap. Tests use it to let an
+// upload or a reader land in that window.
+var reenrichBeforeSwapHook func()
+
+// noteSellInDataChanged marks that stored Sell-In rows or the Product Master lookups were changed in
+// place. Callers hold c.mu for writing.
+func (c *Client) noteSellInDataChanged() { c.chainDisc.dataGen.Add(1) }
+
+func sameSellInBacking(a, b []domain.SellInRecord) bool {
+	return len(a) == len(b) && (len(a) == 0 || &a[0] == &b[0])
+}
+
+// reenrichSellInChains re-prices the tenant's Sell-In rows belonging to the given chains. The work is
+// done on copies under the read lock and swapped in under a short write lock when nothing else
+// changed the Sell-In rows meanwhile; after repeated conflicts it re-enriches in place.
+func (c *Client) reenrichSellInChains(norm string, changed map[string]struct{}) {
+	rules := activeCustomerChainRules()
+	for attempt := 0; attempt < reenrichMaxAttempts; attempt++ {
+		c.mu.RLock()
+		gen, ver := c.chainDisc.dataGen.Load(), c.precompute.sourceVersion.Load()
+		base := c.sellInRecords[norm]
+		var idx []int
+		var rows []domain.SellInRecord
+		for i := range base {
+			if _, ok := changed[sellInRowChainKey(rules, &base[i])]; ok {
+				idx = append(idx, i)
+				rows = append(rows, base[i])
+			}
+		}
+		for i := range rows {
+			c.enrichSellInRecordLocked(&rows[i])
+		}
+		c.mu.RUnlock()
+		if len(idx) == 0 {
+			return
+		}
+		if reenrichBeforeSwapHook != nil {
+			reenrichBeforeSwapHook()
+		}
+
+		c.mu.Lock()
+		cur := c.sellInRecords[norm]
+		if c.chainDisc.dataGen.Load() == gen && c.precompute.sourceVersion.Load() == ver && sameSellInBacking(cur, base) {
+			for k, i := range idx {
+				cur[i] = rows[k]
+			}
+			c.mu.Unlock()
+			return
+		}
+		c.mu.Unlock()
+	}
+
 	c.mu.Lock()
-	recs := c.sellInRecords[norm]
-	for i := range recs {
-		c.enrichSellInRecordLocked(&recs[i])
+	cur := c.sellInRecords[norm]
+	for i := range cur {
+		if _, ok := changed[sellInRowChainKey(rules, &cur[i])]; ok {
+			c.enrichSellInRecordLocked(&cur[i])
+		}
 	}
 	c.mu.Unlock()
-	c.invalidateKPICache() // also bumps the precomputed-layer source version
 }
 
 // ChainDiscountProfilesSnapshot returns the tenant's applied profiles (after syncing the shared store).

@@ -976,6 +976,10 @@ class SmartBrandExtractor {
   static const Map<String, String> _knownBrands = {
     'ماكسيل': 'ماكسيل (Maxell)',
     'maxel': 'ماكسيل (Maxell)',
+    // Longer tokens first so "ديفاتول" is not swallowed by "ديفا".
+    // Adeco: Divatol is a Diva-line SKU → same brand filter bucket.
+    'ديفاتول': 'ديفا (Diva)',
+    'divatol': 'ديفا (Diva)',
     'ديفا': 'ديفا (Diva)',
     'diva': 'ديفا (Diva)',
     'فلڤيتا': 'فلڤيتا (Velveta)',
@@ -997,7 +1001,6 @@ class SmartBrandExtractor {
     'فما': 'فيما (Fema)',
     'فيما': 'فيما (Fema)',
     'fema': 'فيما (Fema)',
-    'ديفاتول': 'ديفاتول (Divatol)',
     'كلوريل': 'كلوريل (Clorel)',
     'clorel': 'كلوريل (Clorel)',
     'جنرال': 'جنرال (General)',
@@ -1051,7 +1054,10 @@ class SmartBrandExtractor {
     }
 
     final text = '${skuName.trim()} ${subCategory ?? ''}'.toLowerCase();
-    for (final entry in _knownBrands.entries) {
+    // Prefer longer keys so multi-token brands (ديفاتول) win over prefixes (ديفا).
+    final entries = _knownBrands.entries.toList()
+      ..sort((a, b) => b.key.length.compareTo(a.key.length));
+    for (final entry in entries) {
       if (text.contains(entry.key)) {
         return entry.value;
       }
@@ -1060,8 +1066,9 @@ class SmartBrandExtractor {
     final codeUpper = (itemCode ?? '').trim().toUpperCase();
     if (codeUpper.startsWith('FGCL')) return 'كلوريل (Clorel)';
     if (codeUpper.startsWith('FGDW')) return 'فيبا (Feba)';
-    if (codeUpper.startsWith('FGDG')) return 'ديفاتول (Divatol)';
-    if (codeUpper.startsWith('FGHC')) return 'فلفيتا (Velveta)';
+    if (codeUpper.startsWith('FGDG')) return 'ديفا (Diva)';
+    if (codeUpper.startsWith('FGLC')) return 'فلڤيتا (Velveta)';
+    if (codeUpper.startsWith('FGHC')) return 'كلوريل (Clorel)';
 
     // Dynamic AI token inference for any novel company
     final cleaned = skuName
