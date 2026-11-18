@@ -361,7 +361,7 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
                 children: [
                   ListTile(
                     key: const ValueKey('target_type_value'),
-                    leading: Icon(Icons.payments_outlined, color: cs.primary),
+                    leading: Icon(Icons.payments_rounded, color: cs.primary),
                     title: const Text('مستهدف بالقيمة'),
                     subtitle: const Text('إدخال القيمة أو الكمية مباشرة'),
                     onTap: () => Navigator.pop(ctx, 'value'),
