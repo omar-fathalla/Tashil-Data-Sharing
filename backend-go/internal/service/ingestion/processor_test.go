@@ -592,7 +592,7 @@ func TestRequestedPeriodDateOverrideOnUploadAndCommit(t *testing.T) {
 		t.Fatalf("ClearTenantData failed: %v", err)
 	}
 
-	csvContent := []byte("الباركود,اسم الصنف,الفرع,الكمية,القيمة\n6221155001234,زيت زيتون أديكو 500 مل,فرع سموحة,100,25000\n")
+	csvContent := []byte("الباركود,اسم الصنف,الفرع,الكمية,القيمة\n6221155001234,زيت زيتون ادكو 500 مل,فرع سموحة,100,25000\n")
 
 	// Dry-run upload with period_date override 2025-02-15
 	ctxFeb := gemini.WithRequestedPeriodDate(ctx, "2025-02-15")
@@ -631,8 +631,8 @@ func TestUploadArchiveSaveFilterAndDownload(t *testing.T) {
 	fsRepo := firestore.NewClient("test-db", true)
 	processor := NewProcessor(agent, bqRepo, fsRepo).WithArchiveDir(tmpDir)
 
-	fathallaCSV := []byte("الباركود,اسم الصنف,الفرع,الكمية,القيمة\n6221155001234,زيت زيتون أديكو 500 مل,فرع سموحة,100,25000\n")
-	gomlaCSV := []byte("الباركود,اسم الصنف,الفرع,الكمية,القيمة\n6221155001241,زيت عباد الشمس أديكو 1 لتر,فرع الكوثر,50,12000\n")
+	fathallaCSV := []byte("الباركود,اسم الصنف,الفرع,الكمية,القيمة\n6221155001234,زيت زيتون ادكو 500 مل,فرع سموحة,100,25000\n")
+	gomlaCSV := []byte("الباركود,اسم الصنف,الفرع,الكمية,القيمة\n6221155001241,زيت عباد الشمس ادكو 1 لتر,فرع الكوثر,50,12000\n")
 
 	resFat, err := processor.ProcessUpload(ctx, "tenant-archive-test", "40-Adco -2026.xlsx", fathallaCSV, "fathalla")
 	if err != nil {
@@ -688,7 +688,7 @@ func TestUploadArchiveSaveFilterAndDownload(t *testing.T) {
 	}
 
 	// Test staging a file with a chain mismatch (selected fathalla, file is gomla), then committing with override="gomla"
-	mismatchCSV := []byte("الباركود,اسم الصنف,الفرع,الكمية,القيمة\n6221155001258,زيت ذرة أديكو,فرع جملة الدقي,30,9000\n")
+	mismatchCSV := []byte("الباركود,اسم الصنف,الفرع,الكمية,القيمة\n6221155001258,زيت ذرة ادكو,فرع جملة الدقي,30,9000\n")
 	stagedMismatch, err := processor.ProcessUploadWithDryRun(ctx, "tenant-archive-test", "Gomla_October_2026.csv", mismatchCSV, true, "fathalla")
 	if err != nil {
 		t.Fatalf("ProcessUploadWithDryRun mismatch failed: %v", err)

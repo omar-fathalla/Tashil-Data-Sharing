@@ -163,7 +163,7 @@ func TestProductMasterDiffDetectionAndPriceChangeFilter(t *testing.T) {
 
 	sheet1 := &domain.ProductMasterSummaryResponse{
 		TenantID:           "tenant-diff",
-		CompanyName:        "أدكو",
+		CompanyName:        "ادكو",
 		SheetDateLabel:     "تحديث 01-08-2026",
 		SourceFilename:     "sheet_aug_2026.xlsx",
 		DefaultDiscountPct: 0.10,
@@ -212,7 +212,7 @@ func TestProductMasterDiffDetectionAndPriceChangeFilter(t *testing.T) {
 	// Upload Sheet 2: SKU 1 price increased, SKU 2 price decreased, SKU 3 unchanged, SKU 4 new
 	sheet2 := &domain.ProductMasterSummaryResponse{
 		TenantID:           "tenant-diff",
-		CompanyName:        "أدكو",
+		CompanyName:        "ادكو",
 		SheetDateLabel:     "تحديث 01-09-2026",
 		SourceFilename:     "sheet_sep_2026.xlsx",
 		DefaultDiscountPct: 0.10,
@@ -438,7 +438,7 @@ func TestGetProductMasterPullStatsSkipsFuzzyNameScan(t *testing.T) {
 	ctx := context.Background()
 	client := NewClient("test-proj", "test-ds", true)
 	summary := &domain.ProductMasterSummaryResponse{
-		TenantID: "tenant-adeco", CompanyName: "أدكو", SheetDateLabel: "تحديث",
+		TenantID: "tenant-adeco", CompanyName: "ادكو", SheetDateLabel: "تحديث",
 		DefaultDiscountPct: 0.10, DefaultVATRate: 0.14,
 		Items: []domain.ProductMasterItem{{
 			SerialNo: 1, ItemCode: "FGCL-0550-0001", ItemCodePrefix: "FGCL",

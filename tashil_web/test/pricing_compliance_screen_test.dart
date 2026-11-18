@@ -290,7 +290,7 @@ class _FakePaginatedComplianceApiClient extends ApiClient {
     ];
     final isViolation = i % 3 == 0;
     return PricingComplianceItem(
-      skuName: 'أدكو منظف رقم ${i + 1}',
+      skuName: 'ادكو منظف رقم ${i + 1}',
       barcode: '622300139${(1000 + i)}',
       category: ApiClient.normalizeCategoryName(
           rawCategories[i % rawCategories.length]),

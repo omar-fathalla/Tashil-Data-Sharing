@@ -2984,7 +2984,7 @@ class ApiClient {
 
   static String getDisplayNameForTenant(String rawSlug) {
     final cleanSlug = normalizeDataTenantSlug(rawSlug);
-    if (cleanSlug == 'adeco') return 'أديكو (Adeco)';
+    if (cleanSlug == 'adeco') return 'ادكو (Adeco)';
     if (cleanSlug == 'unilever') return 'يونيليفر (Unilever)';
     if (cleanSlug == 'pepsi') return 'بيبسيكو (PepsiCo)';
     final profile = getTenantProfileBySlug(cleanSlug);
@@ -6232,7 +6232,7 @@ class ApiClient {
         ChainShareItem(retailerChain: 'spinneys', displayName: 'سبينيس (Spinneys)', totalRevenue: 388030.0, totalUnits: 2950, marketShare: 8.0),
       ],
       supplierShares: const [
-        SupplierShareModel(supplierName: 'أديكو', totalRevenue: 9536992.70, totalUnits: 112480, skuCount: 256, marketSharePct: 18.44, isTenantBrand: true, rank: 1),
+        SupplierShareModel(supplierName: 'ادكو', totalRevenue: 9536992.70, totalUnits: 112480, skuCount: 256, marketSharePct: 18.44, isTenantBrand: true, rank: 1),
         SupplierShareModel(supplierName: 'ارما التجارية', totalRevenue: 7198431.70, totalUnits: 89200, skuCount: 40, marketSharePct: 13.92, isTenantBrand: false, rank: 2),
         SupplierShareModel(supplierName: 'بروكتر و جامبل', totalRevenue: 5797866.22, totalUnits: 61400, skuCount: 109, marketSharePct: 11.21, isTenantBrand: false, rank: 3),
         SupplierShareModel(supplierName: 'هنكل برسيل', totalRevenue: 5112202.98, totalUnits: 58300, skuCount: 86, marketSharePct: 9.88, isTenantBrand: false, rank: 4),
@@ -7775,7 +7775,7 @@ class ApiClient {
   static final List<TenantProfileModel> _inMemoryTenants = [
     TenantProfileModel(
       tenantId: 'adeco',
-      displayName: 'شركة أديكو للصناعات الغذائية (Adeco)',
+      displayName: 'شركة ادكو للصناعات الغذائية (Adeco)',
       slug: 'adeco',
       portalUrl: buildPortalUrl('adeco'),
       brandSeedColor: '#35A211',
@@ -8701,7 +8701,7 @@ class ApiClient {
         resource: '/portal/adeco',
         ipAddress: '197.55.142.18',
         status: 'SUCCESS',
-        details: 'تسجيل دخول مدير الشركة إلى البوابة المخصصة (أديكو)',
+        details: 'تسجيل دخول مدير الشركة إلى البوابة المخصصة (ادكو)',
       ),
       const AuditLogEntryModel(
         logId: 'aud_002',
@@ -10501,7 +10501,7 @@ class ApiClient {
         : double.parse((items.fold<int>(0, (s, e) => s + e.unitsPerCarton) / items.length).toStringAsFixed(1));
     return ProductMasterSummaryModel(
       tenantId: tenantId,
-      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: sheetDateLabel,
       sourceFilename: items.isEmpty ? '' : sourceFilename,
       defaultDiscountPct: 10.0,
@@ -10813,7 +10813,7 @@ class ApiClient {
     ];
     return ProductMasterSummaryModel(
       tenantId: tenantId,
-      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: 'تحديث 01-08-2026',
       sourceFilename: 'adeco_product_master_2026_08_01.xlsx',
       defaultDiscountPct: 10.0,
@@ -10994,7 +10994,7 @@ class ApiClient {
     if (s.contains('سيترس')) return 'سيترس (Citrus)';
     if (s.contains('فاى') || s.contains('فاي')) return 'فاي (Fay)';
     if (s.contains('فلاش')) return 'فلاش (Flash)';
-    if (isOwn) return 'أدكو (Adeco)';
+    if (isOwn) return 'ادكو (Adeco)';
     if (supplier.trim().isNotEmpty && supplier.trim() != 'منافس') {
       return supplier.trim();
     }
@@ -14899,7 +14899,7 @@ class ProductMasterSummaryModel {
     return ProductMasterSummaryModel(
       tenantId: json['tenant_id'] as String? ?? 'tenant-adeco',
       companyName: json['company_name'] as String? ??
-          'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+          'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: json['sheet_date_label'] as String? ?? 'تحديث 01-08-2026',
       sourceFilename: json['source_filename'] as String? ?? defaultSourceFilename,
       defaultDiscountPct: ProductMasterItemModel.normalizeDiscountPct(

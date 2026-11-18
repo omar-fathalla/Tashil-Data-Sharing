@@ -61,7 +61,7 @@ class _FakeProductMasterApiClient extends ApiClient {
   }) async {
     return ProductMasterSummaryModel(
       tenantId: 'tenant-adeco',
-      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: sheet2Deleted ? 'تحديث 01-08-2026' : 'تحديث 01-09-2026',
       sourceFilename: sheet2Deleted
           ? 'adeco_product_master_2026_08_01.xlsx'
