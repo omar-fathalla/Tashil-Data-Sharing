@@ -201,7 +201,7 @@ void main() {
       find.descendant(of: dropdown, matching: find.byType(EditableText)),
     );
     expect(
-      field.controller?.text,
+      field.controller.text,
       'كل العلامات التجارية',
       reason: 'all filter must not restore ديفا (first sorted brand) after load',
     );
