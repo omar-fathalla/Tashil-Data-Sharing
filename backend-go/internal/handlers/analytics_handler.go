@@ -381,6 +381,7 @@ func (h *AnalyticsHandler) HandleStoreMatrix(w http.ResponseWriter, r *http.Requ
 		Region:        q.Get("region"),
 		Tier:          q.Get("tier"),
 		RetailerChain: q.Get("chain"),
+		Brand:         strings.TrimSpace(q.Get("brand")),
 		Year:          yr,
 		Month:         mo,
 		StartDate:     q.Get("start_date"),

@@ -90,6 +90,9 @@ class SellOutExplorerQuery {
   final int? matrixYear;
   final int compYear;
 
+  /// Brand filter for store-matrix / YoY branch aggregates (null / 'all' = every brand).
+  final String? matrixBrand;
+
   const SellOutExplorerQuery({
     this.chain,
     this.storeId,
@@ -103,10 +106,11 @@ class SellOutExplorerQuery {
     this.matrixChain,
     this.matrixYear,
     required this.compYear,
+    this.matrixBrand,
   });
 
   List<Object?> get parts =>
-      [chain, storeId, category, query, startDate, endDate, year, month, limit, matrixChain, matrixYear, compYear];
+      [chain, storeId, category, query, startDate, endDate, year, month, limit, matrixChain, matrixYear, compYear, matrixBrand];
 }
 
 /// Repository for the Sell-Out explorer (records + branch analytics). Caches per filter combo
@@ -151,11 +155,13 @@ class SellOutExplorerRepository {
             endDate: q.endDate,
           );
           final refYearForPrev = q.matrixYear ?? (q.compYear + 1);
+          final brand = q.matrixBrand;
           final results = await Future.wait([
             side<Object>(api.getStores(), const <Map<String, dynamic>>[]),
             side<Object>(
               api.getStoreBenchmarkMatrix(
                 chain: q.matrixChain,
+                brand: brand,
                 year: q.matrixYear,
                 month: q.month,
                 startDate: q.startDate,
@@ -166,6 +172,7 @@ class SellOutExplorerRepository {
             side<Object>(
               api.getStoreBenchmarkMatrix(
                 chain: q.matrixChain,
+                brand: brand,
                 year: q.compYear,
                 month: q.month,
                 // Same period last year: the date range is shifted one year
@@ -183,6 +190,7 @@ class SellOutExplorerRepository {
               intersect
                   ? api.getStoreBenchmarkMatrix(
                       chain: q.matrixChain,
+                      brand: brand,
                       year: q.matrixYear,
                       month: q.month,
                       startDate: q.startDate,

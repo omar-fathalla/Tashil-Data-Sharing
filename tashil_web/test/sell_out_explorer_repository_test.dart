@@ -32,6 +32,19 @@ void main() {
       expect(log.length, n, reason: 'same combo served from cache');
       await repo.load(const SellOutExplorerQuery(year: 2026, month: 3, matrixYear: 2026, compYear: 2025));
       expect(log.length, greaterThan(n), reason: 'different combo');
+      final afterMonth = log.length;
+      await repo.load(const SellOutExplorerQuery(
+        year: 2026,
+        matrixYear: 2026,
+        compYear: 2025,
+        matrixBrand: 'ديفا (Diva)',
+      ));
+      expect(log.length, greaterThan(afterMonth), reason: 'brand must be part of cache key');
+      expect(
+        log.where((u) => u.queryParameters['brand'] == 'ديفا (Diva)').isNotEmpty,
+        isTrue,
+        reason: 'store-matrix requests must send brand',
+      );
       final m = log.length;
       repo.invalidateAll();
       await repo.load(q);
