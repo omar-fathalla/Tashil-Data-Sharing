@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
-import 'package:tashil_web/features/sell_out_analytics/data/share_target_models.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/widgets/share_target_wizard.dart';
 
 class _ShareWizardApi extends ApiClient {
