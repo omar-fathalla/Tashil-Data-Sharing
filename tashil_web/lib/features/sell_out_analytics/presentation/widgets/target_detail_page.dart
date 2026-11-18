@@ -763,10 +763,10 @@ class _CumulativePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (points.isEmpty || size.width <= 0 || size.height <= 0) return;
-    final padL = 8.0;
-    final padR = 8.0;
-    final padT = 8.0;
-    final padB = 18.0;
+    const padL = 8.0;
+    const padR = 8.0;
+    const padT = 8.0;
+    const padB = 18.0;
     final w = size.width - padL - padR;
     final h = size.height - padT - padB;
 
