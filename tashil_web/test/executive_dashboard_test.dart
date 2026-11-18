@@ -737,8 +737,8 @@ void main() {
       equals((ar: 'كل السلاسل', en: 'All Chains')),
     );
     expect(
-      ChainSharePie.splitBilingualLabel('شركة أديكو'),
-      equals((ar: 'شركة أديكو', en: null)),
+      ChainSharePie.splitBilingualLabel('شركة ادكو'),
+      equals((ar: 'شركة ادكو', en: null)),
     );
     expect(
       ChainSharePie.splitBilingualLabel('بروكتر آند جامبل (حساب 2) (P&G)'),

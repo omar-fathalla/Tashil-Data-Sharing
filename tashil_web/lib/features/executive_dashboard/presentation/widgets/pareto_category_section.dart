@@ -141,12 +141,22 @@ class _SupplierMarketShareCard extends StatefulWidget {
 class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
   bool _showAll = false;
 
+  /// True when [raw] is the tenant company under any legacy Arabic spelling.
+  /// Hamza-alef + ياء stripped so legacy misspellings match; display is «ادكو».
+  static bool _isAdcoSupplierName(String raw) {
+    final normalized = raw
+        .replaceAll('أ', 'ا')
+        .replaceAll('إ', 'ا')
+        .replaceAll('آ', 'ا')
+        .replaceAll('\u064A', '');
+    return normalized.contains('ادكو') ||
+        raw.contains('الإسكندرية للمنظفات');
+  }
+
   static String _cleanSupplierName(String rawName, bool isTenant) {
-    if (isTenant ||
-        rawName.contains('أديكو') ||
-        rawName.contains('ادكو') ||
-        rawName.contains('الإسكندرية للمنظفات')) {
-      return 'شركة أديكو';
+    // Recognition accepts legacy ياء/hamza aliases; canonical display is «ادكو».
+    if (isTenant || _isAdcoSupplierName(rawName)) {
+      return 'شركة ادكو';
     }
     var clean = rawName.trim();
     if (clean.contains('بروكتور و جامبل') || clean.contains('بروكتر و جامبل')) {
@@ -190,11 +200,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
     final colorScheme = theme.colorScheme;
 
     // Determine tenant rank dynamically
-    final adecoIndex = widget.supplierShares.indexWhere((s) =>
-        s.isTenantBrand ||
-        s.supplierName.contains('أديكو') ||
-        s.supplierName.contains('ادكو') ||
-        s.supplierName.contains('الإسكندرية للمنظفات'));
+    final adecoIndex = widget.supplierShares.indexWhere(
+        (s) => s.isTenantBrand || _isAdcoSupplierName(s.supplierName));
     final adecoRank = adecoIndex >= 0
         ? (widget.supplierShares[adecoIndex].rank > 0
             ? widget.supplierShares[adecoIndex].rank
@@ -325,10 +332,8 @@ class _SupplierMarketShareCardState extends State<_SupplierMarketShareCard> {
               final idx = entry.key;
               final sup = entry.value;
               final rank = (sup.rank > 0) ? sup.rank : (idx + 1);
-              final isTenant = sup.isTenantBrand ||
-                  sup.supplierName.contains('أديكو') ||
-                  sup.supplierName.contains('ادكو') ||
-                  sup.supplierName.contains('الإسكندرية للمنظفات');
+              final isTenant =
+                  sup.isTenantBrand || _isAdcoSupplierName(sup.supplierName);
               final supplierDisplayName =
                   _cleanSupplierName(sup.supplierName, isTenant);
               final supplierParts =

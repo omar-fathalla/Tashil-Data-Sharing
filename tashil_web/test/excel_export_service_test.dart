@@ -6,8 +6,8 @@ void main() {
     test('generateCsv includes UTF-8 BOM and formats Arabic data correctly', () {
       final headers = ['الباركود', 'اسم الصنف', 'السلسلة', 'الكمية', 'الإيراد'];
       final rows = [
-        ['6221001122334', 'زيت أديكو ممتاز 1 لتر', 'كارفور المعادي', 450, 29250.0],
-        ['6221001998877', 'سمن أديكو "خاص، فاخر"', 'فتح الله سموحة', 320, 30400.0],
+        ['6221001122334', 'زيت ادكو ممتاز 1 لتر', 'كارفور المعادي', 450, 29250.0],
+        ['6221001998877', 'سمن ادكو "خاص، فاخر"', 'فتح الله سموحة', 320, 30400.0],
       ];
 
       final csv = ExcelExportService.generateCsv(headers: headers, rows: rows);
@@ -20,14 +20,14 @@ void main() {
 
       // Verify row data presence and escaping of quotes/commas
       expect(csv.contains('"6221001122334"'), isTrue);
-      expect(csv.contains('"زيت أديكو ممتاز 1 لتر"'), isTrue);
-      expect(csv.contains('"سمن أديكو ""خاص، فاخر"""'), isTrue);
+      expect(csv.contains('"زيت ادكو ممتاز 1 لتر"'), isTrue);
+      expect(csv.contains('"سمن ادكو ""خاص، فاخر"""'), isTrue);
     });
 
     test('generatePrintableReport generates valid RTL HTML with Cairo font and tables', () {
       final headers = ['الباركود', 'اسم الصنف', 'الفرع', 'صافي الإيراد'];
       final rows = [
-        ['6221001122334', 'زيت أديكو ممتاز 1 لتر', 'كارفور المعادي', '29,250 ج.م'],
+        ['6221001122334', 'زيت ادكو ممتاز 1 لتر', 'كارفور المعادي', '29,250 ج.م'],
       ];
 
       final html = ExcelExportService.generatePrintableReport(
@@ -35,7 +35,7 @@ void main() {
         headers: headers,
         rows: rows,
         metadata: {
-          'الشركة': 'أديكو (Adeco)',
+          'الشركة': 'ادكو (Adeco)',
           'الفترة': 'أكتوبر 2026',
         },
       );
@@ -50,13 +50,13 @@ void main() {
 
       // Verify title and metadata
       expect(html.contains('تقرير حركة مبيعات التجزئة'), isTrue);
-      expect(html.contains('أديكو (Adeco)'), isTrue);
+      expect(html.contains('ادكو (Adeco)'), isTrue);
       expect(html.contains('أكتوبر 2026'), isTrue);
 
       // Verify table headers and cells
       expect(html.contains('<th>الباركود</th>'), isTrue);
       expect(html.contains('<th>اسم الصنف</th>'), isTrue);
-      expect(html.contains('<td>زيت أديكو ممتاز 1 لتر</td>'), isTrue);
+      expect(html.contains('<td>زيت ادكو ممتاز 1 لتر</td>'), isTrue);
       expect(html.contains('<td>29,250 ج.م</td>'), isTrue);
 
       // Verify print stylesheet

@@ -89,7 +89,7 @@ func (a *AuthMiddleware) Handler(next http.Handler) http.Handler {
 						TenantID:      "tenant-adeco",
 						Email:         "admin@adeco-retail.com",
 						Role:          domain.RoleVendorAdmin,
-						Name:          "مدير العمليات (أديكو)",
+						Name:          "مدير العمليات (ادكو)",
 						RoleDisplayAr: "مدير الشركة الموردة",
 					}
 				} else if a.allowDemoTokens && strings.HasPrefix(tokenStr, "demo-") && strings.HasSuffix(tokenStr, "-token") {

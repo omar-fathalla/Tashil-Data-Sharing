@@ -1326,7 +1326,7 @@ func (p *Processor) ProcessProductMaster(ctx context.Context, tenantID, filename
 				Barcode:          item.Barcode,
 				SKUName:          item.OfficialName,
 				Category:         item.Category,
-				Supplier:         "شركة أديكو (Adeco)",
+				Supplier:         "شركة ادكو (Adeco)",
 				IsOwnBrand:       true,
 				QuantitySold:     item.UnitsPerCarton,
 				NetRevenue:       math.Round(item.NetCartonInvoiceCost*100) / 100,

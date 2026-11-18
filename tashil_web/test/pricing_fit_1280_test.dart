@@ -27,7 +27,7 @@ class _FitApiClient extends PricingShotApiClient {
   }) async {
     return const ProductMasterSummaryModel(
       tenantId: 'tenant-adeco',
-      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (أدكو - Adeco)',
+      companyName: 'شركة الإسكندرية للمنظفات والكيماويات (ادكو - Adeco)',
       sheetDateLabel: 'تحديث 01-08-2026',
       sourceFilename: 'adeco_product_master_2026_08_01.xlsx',
       totalSkus: 389,

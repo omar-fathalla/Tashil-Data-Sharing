@@ -754,10 +754,15 @@ func isAdcoOrTenantSupplier(sup string) bool {
 	if s == "" {
 		return true // If no supplier column exists, treat rows as tenant's own SKUs
 	}
+	// Canonical display is «ادكو»; keep legacy ياء/hamza spellings as input aliases only.
 	return strings.Contains(s, "ادكو") ||
 		strings.Contains(s, "أدكو") ||
 		strings.Contains(s, "اديكو") ||
 		strings.Contains(s, "أديكو") ||
+		strings.Contains(s, "إديكو") ||
+		strings.Contains(s, "أيديكو") ||
+		strings.Contains(s, "ايديكو") ||
+		strings.Contains(s, "آديكو") ||
 		strings.Contains(s, "adco") ||
 		strings.Contains(s, "adeco") ||
 		strings.Contains(s, "الإسكندرية للمنظفات") ||
