@@ -248,6 +248,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   // Tab 1: Performance & Branch Analytics State
   String _perfChain = 'all';
   String _perfBrand = 'all';
+  /// True while store-matrix is refetching for a brand change. SKU KPIs update
+  /// client-side immediately; branch KPIs/table show a loading state instead of
+  /// stale all-brand (or previous-brand) matrix numbers.
+  bool _isPerfBrandMatrixLoading = false;
   String _perfSearch = '';
   String _perfGrowthStatusFilter = 'all'; // 'all', 'growing', 'declining', 'new_branch'
   String _priceMatrixFilter = 'all'; // 'all', 'healthy', 'low_margin', 'negative_margin', 'promo'
@@ -348,6 +352,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       setState(() {
         isLoading = true;
         _loadError = null;
+        _isPerfBrandMatrixLoading = false;
         records = [];
         _recordsSummary = const SellOutRecordsSummaryModel();
         // Drop stale year matrices so KPI subtitles/counts cannot mix years
@@ -2097,8 +2102,23 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   // ===========================================================================
   /// Reloads branch matrices for the current [_perfBrand] without blanking the
   /// records table first (SKU KPIs update instantly via client-side filter).
+  /// Branch KPIs/table show [_isPerfBrandMatrixLoading] until the scoped matrix
+  /// returns — never leave the previous all-brand matrix visible.
   Future<void> _reloadMatricesForPerfBrand() async {
     final seq = ++_recordsLoadSeq;
+    if (mounted) {
+      setState(() {
+        _isPerfBrandMatrixLoading = true;
+        // Drop stale matrix so branch KPIs/table cannot keep prior-brand totals
+        // for the ~3s store-matrix round-trip.
+        _branchChartItems = const [];
+        _prevYearBranchMap = const {};
+        _prevYearTotalChainRevenue = 0.0;
+        _yoyCurrentBranchMap = const {};
+        _yoyCurrentTotalChainRevenue = 0.0;
+        _matchedYoyMonths = const [];
+      });
+    }
     final effectiveYear = (selectedDateRange == null && _selectedYear > 0) ? _selectedYear : null;
     final effectiveMonth = (selectedDateRange == null && _selectedMonth > 0) ? _selectedMonth : null;
     final activeChartChain = (selectedChain != null && selectedChain!.isNotEmpty)
@@ -2123,7 +2143,10 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       ),
     );
     if (seq != _recordsLoadSeq || !mounted) return;
-    if (loaded case Failure()) return;
+    if (loaded case Failure()) {
+      setState(() => _isPerfBrandMatrixLoading = false);
+      return;
+    }
     final data = loaded.valueOrNull!;
     final prevMap = <String, StoreBenchmarkItem>{};
     double prevTotalRev = 0.0;
@@ -2146,6 +2169,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       _yoyCurrentBranchMap = yoyCurMap;
       _yoyCurrentTotalChainRevenue = yoyCurRev;
       _matchedYoyMonths = data.matchedMonths;
+      _isPerfBrandMatrixLoading = false;
     });
   }
 
@@ -2171,6 +2195,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
 
     // 1. Group by Branch — prefer backend matrix (already brand-scoped when
     // matrixBrand was requested). Fall back to aggregating brand-filtered records.
+    // While a brand-scoped matrix refetch is in flight, never reuse a stale matrix.
     final branchMap = <String, ({
       String storeId,
       String storeName,
@@ -2179,7 +2204,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
       int units,
       double revenue,
     })>{};
-    final useMatrix = _branchChartItems.isNotEmpty &&
+    final useMatrix = !_isPerfBrandMatrixLoading &&
+        _branchChartItems.isNotEmpty &&
         (_perfChain == 'all' || _perfChain.toLowerCase() == _chartChain.toLowerCase());
     if (useMatrix) {
       for (final item in _branchChartItems) {
@@ -2372,6 +2398,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
                   : 'لا توجد فروع',
               icon: Icons.leaderboard_rounded,
               color: Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.40) ?? colorScheme.primary,
+              isLoading: _isPerfBrandMatrixLoading,
+              loadingKey: const ValueKey('perf_branch_kpi_skeleton_top_store'),
             );
             final card4 = _buildSummaryCard(
               context,
@@ -2381,6 +2409,8 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
               subtitle: '${branchList.length} فرع نشط • $perfPeriodBadgeAr',
               icon: Icons.speed_rounded,
               color: colorScheme.secondary,
+              isLoading: _isPerfBrandMatrixLoading,
+              loadingKey: const ValueKey('perf_branch_kpi_skeleton_avg_store'),
             );
 
             return _buildFourCardResponsiveLayout(
@@ -2503,9 +2533,7 @@ onChanged: m3Legacy<String>((v) {
 width: 210.0,
 fitOptions: true,
 key: const ValueKey('perf_brand_dropdown'),
-value: availableBrands.any((b) => brandLabelMatches(b, _perfBrand))
-                        ? availableBrands.firstWhere((b) => brandLabelMatches(b, _perfBrand))
-                        : 'all',
+value: resolvePerfBrandDropdownValue(_perfBrand, availableBrands),
 label: 'العلامة التجارية',
 leadingIcon: Icons.branding_watermark_rounded,
 options: m3OptionsFromMenuItems<String>([
@@ -2653,6 +2681,13 @@ onChanged: m3Legacy<String>((v) {
                     style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
                   ),
                 ),
+              if (_isPerfBrandMatrixLoading)
+                const Padding(
+                  key: ValueKey('perf_branch_table_loading'),
+                  padding: EdgeInsets.symmetric(vertical: 48.0),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else
               TableScrollContainer(
                 controller: _branchTableScrollController,
                 showSwipeHint: true,
@@ -3608,7 +3643,9 @@ onChanged: m3Legacy<int>((v) {
     required Color color,
     bool textValue = false,
     bool singleLineValue = false,
+    bool isLoading = false,
     Key? subtitleKey,
+    Key? loadingKey,
   }) {
     // Shared reference KPI card (Sell-Out is the reference; Compare mirrors it).
     // Arabic-only title; [titleEn] is kept as the stable key id.
@@ -3616,6 +3653,7 @@ onChanged: m3Legacy<int>((v) {
       key: ValueKey('kpi_card_$titleEn'),
       valueKey: ValueKey('kpi_value_$titleEn'),
       subtitleKey: subtitleKey,
+      loadingKey: loadingKey,
       title: titleAr,
       value: value,
       subtitle: subtitle,
@@ -3624,6 +3662,7 @@ onChanged: m3Legacy<int>((v) {
       textValue: textValue,
       valueMaxLines: singleLineValue ? 1 : 2,
       shrinkOverflowingValue: singleLineValue,
+      isLoading: isLoading,
     );
   }
 }
