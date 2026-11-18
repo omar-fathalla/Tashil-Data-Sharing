@@ -647,15 +647,16 @@ class _MonthCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              _kv('المستهدف', targetText),
-              _kv('المحقق', actualText),
+              _kv(context, 'المستهدف', targetText),
+              _kv(context, 'المحقق', actualText),
               _kv(
+                context,
                 'نسبة التحقيق',
                 point.achievementPct == null
                     ? '—'
                     : '${point.achievementPct!.toStringAsFixed(1)}%',
               ),
-              _kv('الفرق', gapText),
+              _kv(context, 'الفرق', gapText),
             ],
           ),
         ),
@@ -663,13 +664,14 @@ class _MonthCard extends StatelessWidget {
     );
   }
 
-  Widget _kv(String k, String v) {
+  Widget _kv(BuildContext context, String k, String v) {
+    final body = Theme.of(context).textTheme.bodySmall;
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: Row(
         children: [
-          Expanded(child: Text(k, style: const TextStyle(fontSize: 12))),
-          Text(v, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          Expanded(child: Text(k, style: body)),
+          Text(v, style: body?.copyWith(fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -723,9 +725,9 @@ class _CumulativeChart extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              _legend(cs.primary, 'المستهدف'),
+              _legend(context, cs.primary, 'المستهدف'),
               const SizedBox(width: 12),
-              _legend(accents.teal, 'المحقق'),
+              _legend(context, accents.teal, 'المحقق'),
             ],
           ),
         ],
@@ -733,13 +735,13 @@ class _CumulativeChart extends StatelessWidget {
     );
   }
 
-  Widget _legend(Color c, String label) {
+  Widget _legend(BuildContext context, Color c, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(width: 14, height: 3, color: c),
         const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
   }
@@ -763,10 +765,10 @@ class _CumulativePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (points.isEmpty || size.width <= 0 || size.height <= 0) return;
-    final padL = 8.0;
-    final padR = 8.0;
-    final padT = 8.0;
-    final padB = 18.0;
+    const padL = 8.0;
+    const padR = 8.0;
+    const padT = 8.0;
+    const padB = 18.0;
     final w = size.width - padL - padR;
     final h = size.height - padT - padB;
 
