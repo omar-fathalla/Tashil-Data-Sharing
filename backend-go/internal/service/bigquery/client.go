@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/sharetarget"
 	"github.com/tashil/data-sharing/backend/internal/service/targetalloc"
 )
 
@@ -55,6 +56,13 @@ type Repository interface {
 	UpsertTarget(ctx context.Context, tenantID string, target domain.TargetRecord) (*domain.TargetRecord, error)
 	DeleteTarget(ctx context.Context, tenantID, targetID string) error
 	GetTarget(ctx context.Context, tenantID, targetID string) (*domain.TargetRecord, bool)
+	GetShareTargetBaseline(ctx context.Context, tenantID, chain string, year int) (*domain.ShareTargetBaselineResponse, error)
+	BuildShareTargetCascadeInputs(ctx context.Context, tenantID, chain, category string, year int, branchFilter map[string]bool) (
+		branches []sharetarget.BranchWeight,
+		skusByBranch map[string][]sharetarget.SKUWeight,
+		months []sharetarget.MonthWeight,
+		err error,
+	)
 	TargetBreakdownSource(tenantID, chain string) targetalloc.Source
 	GetProductMaster(ctx context.Context, tenantID string, filter ProductMasterFilter) (*domain.ProductMasterSummaryResponse, error)
 	SetProductMaster(ctx context.Context, tenantID string, summary *domain.ProductMasterSummaryResponse) (*domain.ProductMasterSummaryResponse, error)

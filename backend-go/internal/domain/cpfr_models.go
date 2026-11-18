@@ -469,6 +469,10 @@ type TargetRecord struct {
 	TargetUnits      float64 `json:"target_units"` // Units for Sell-Out, Cases for Sell-In
 	Notes            string  `json:"notes"`
 	UpdatedAt        string  `json:"updated_at"`
+	// Origin is "market_share" for share-wizard targets, empty/value for classic entry.
+	Origin string `json:"origin,omitempty"`
+	// ShareMeta is set when Origin is market_share; detail page still uses revenue/units.
+	ShareMeta *ShareTargetMeta `json:"share_meta,omitempty"`
 }
 
 // TargetComparisonItem combines a saved TargetRecord with real-time Actual performance and comprehensive hierarchical drill-down (Chain -> Branch -> SKU).
@@ -514,6 +518,8 @@ type TargetComparisonItem struct {
 	StatusAr                string                  `json:"status_ar"` // "تجاوز المستهدف" | "قيد التحقيق" | "أقل من المستهدف"
 	Notes                   string                  `json:"notes"`
 	UpdatedAt               string                  `json:"updated_at"`
+	Origin                  string                  `json:"origin,omitempty"`
+	ShareMeta               *ShareTargetMeta        `json:"share_meta,omitempty"`
 	Branches                []TargetBranchBreakdown `json:"branches"`
 	ChainSKUTotals          []TargetSKUBreakdown    `json:"chain_sku_totals"`
 	Brands                  []TargetBrandBreakdown  `json:"brands"`

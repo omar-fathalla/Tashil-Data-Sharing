@@ -567,6 +567,9 @@ void main() {
       await pumpPanel(tester, api: api);
       await tester.tap(find.text('إضافة مستهدف').first);
       await tester.pumpAndSettle();
+      // Sell-out add flow: choose value target before the form dialog.
+      await tester.tap(find.byKey(const ValueKey('target_type_value')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('target_dialog_year_dropdown')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('${_baseYear + 1}').last);
