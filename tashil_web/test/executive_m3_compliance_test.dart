@@ -205,12 +205,16 @@ void main() {
     final csTable = Theme.of(tester.element(tonal)).colorScheme;
     expect((tonalBox.decoration as BoxDecoration).color,
         csTable.surfaceContainerLow);
-    // Short chip labels + descriptions underneath (OOS / TM pattern).
-    for (final label in ['سليم', 'زائد', 'تموين']) {
+    // Short chips for سليم/زائد; urgent_replenishment is description-only
+    // (no redundant «تموين» chip).
+    for (final label in ['سليم', 'زائد']) {
       expect(find.descendant(of: stock, matching: find.text(label)),
           findsOneWidget,
           reason: 'short status chip "$label"');
     }
+    expect(find.descendant(of: stock, matching: find.text('تموين')),
+        findsNothing,
+        reason: 'تموين chip removed from الحالة');
     for (final desc in ['مخزون متوازن', 'مخزون زائد', 'يحتاج إعادة توريد']) {
       expect(find.descendant(of: stock, matching: find.text(desc)),
           findsOneWidget,
@@ -380,7 +384,8 @@ void main() {
     expect(find.text('سليم'), findsOneWidget);
     expect(find.text('زائد'), findsOneWidget);
     expect(find.text('مخزون زائد'), findsOneWidget);
-    expect(find.text('تموين'), findsOneWidget);
+    expect(find.text('تموين'), findsNothing);
+    expect(find.text('يحتاج إعادة توريد'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -28,6 +28,54 @@ func newSeededTestClient(t *testing.T) *Client {
 	return c
 }
 
+// newTinyPrecomputeClient builds a one-chain, few-row fixture so layer equality /
+// invalidation tests stay under a second even when Mac CI loadavg is high.
+func newTinyPrecomputeClient(t *testing.T) *Client {
+	t.Helper()
+	t.Setenv("TASHIL_PRODUCT_MASTER_DIR", t.TempDir())
+	c := NewClient("test-project", "tashil_analytics", true)
+	if err := c.ClearTenantData(context.Background(), "all"); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if err := c.ReplaceTenantFacts(ctx, "tenant-adeco", []domain.SellOutFact{
+		{
+			RecordID: "so1", TenantID: "tenant-adeco", RetailerChain: "fathalla",
+			StoreID: "fat_1", StoreName: "فرع", TransactionDate: "2026-01-15",
+			ItemCode: "P1", SKUName: "sku-1", Barcode: "6220000000001",
+			IsOwnBrand: true, QuantitySold: 10, NetRevenue: 100, UnitPrice: 10,
+			Supplier: "Adeco", FactoryUnitCost: 7, TotalFactoryCost: 70,
+		},
+		{
+			RecordID: "so2", TenantID: "tenant-adeco", RetailerChain: "fathalla",
+			StoreID: "fat_1", StoreName: "فرع", TransactionDate: "2026-02-15",
+			ItemCode: "P1", SKUName: "sku-1", Barcode: "6220000000001",
+			IsOwnBrand: true, QuantitySold: 8, NetRevenue: 80, UnitPrice: 10,
+			Supplier: "Adeco", FactoryUnitCost: 7, TotalFactoryCost: 56,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetSellInRecords(ctx, "tenant-adeco", "plan.xlsx", []domain.SellInRecord{
+		{
+			RecordID: "si1", TenantID: "tenant-adeco", RetailerChain: "fathalla",
+			Year: 2026, MonthNum: 1, CustomerName: "فرع", CustomerBranchCode: "b1",
+			ItemName: "sku-1", ItemCode: "P1", Barcode: "6220000000001",
+			NetValueEGP: 50, NetQtyCases: 5,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.UpsertProductMasterItem(ctx, "tenant-adeco", domain.ProductMasterItem{
+		ItemCode: "P1", OfficialName: "sku-1", Barcode: "6220000000001", Brand: "own",
+		UnitsPerCarton: 6, VATRate: 0.14, UnitPriceExclVAT: 8, UnitPriceInclVAT: 9.12,
+		NetUnitInvoiceCost: 7,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
 func mustJSON(t *testing.T, v interface{}) string {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -162,8 +210,13 @@ func assertAggregatesEqualOnTheFly(t *testing.T, c *Client, agg *domain.Analytic
 }
 
 func TestPrecomputedLayerMatchesOnTheFlyAndInvalidates(t *testing.T) {
-	c := newSeededTestClient(t)
+	c := newTinyPrecomputeClient(t)
 	ctx := context.Background()
+
+	fixed := time.Date(2024, 6, 1, 12, 0, 0, 0, time.UTC)
+	oldClock := aggregatesNow
+	aggregatesNow = func() time.Time { return fixed }
+	defer func() { aggregatesNow = oldClock }()
 
 	agg1, err := c.GetAnalyticsAggregates(ctx, "tenant-adeco")
 	if err != nil {
@@ -171,6 +224,9 @@ func TestPrecomputedLayerMatchesOnTheFlyAndInvalidates(t *testing.T) {
 	}
 	if len(agg1.ChainProfitMonthly) == 0 || len(agg1.SellThrough) == 0 {
 		t.Fatalf("expected non-empty materialized tables")
+	}
+	if !agg1.UpdatedAt.Equal(fixed) {
+		t.Fatalf("injected clock not used: %v", agg1.UpdatedAt)
 	}
 	assertAggregatesEqualOnTheFly(t, c, agg1)
 
@@ -190,8 +246,7 @@ func TestPrecomputedLayerMatchesOnTheFlyAndInvalidates(t *testing.T) {
 	}
 
 	// Source change (chain discount profile) -> new version, recomputed, still equal on-the-fly.
-	chains := c.tenantChains("tenant-adeco")
-	c.SetChainDiscountProfiles("tenant-adeco", []domain.ChainDiscountProfile{{Chain: chains[0], InvoiceDiscountPct: 25, AdditionalDiscountPct: 3}})
+	c.SetChainDiscountProfiles("tenant-adeco", []domain.ChainDiscountProfile{{Chain: "fathalla", InvoiceDiscountPct: 25, AdditionalDiscountPct: 3}})
 	agg2, _ := c.GetAnalyticsAggregates(ctx, "tenant-adeco")
 	if agg2.Version <= agg1.Version || agg2 == agg1 {
 		t.Fatalf("expected recompute after source change: v1=%d v2=%d", agg1.Version, agg2.Version)
@@ -203,7 +258,9 @@ func TestPrecomputedLayerMatchesOnTheFlyAndInvalidates(t *testing.T) {
 	}
 
 	// Source change (product master edit) -> invalidated again.
-	if _, err := c.UpsertProductMasterItem(ctx, "tenant-adeco", domain.ProductMasterItem{ItemCode: "ZZ-TEST-1", OfficialName: "test", UnitsPerCarton: 6, VATRate: 0.14, UnitPriceExclVAT: 10}); err != nil {
+	if _, err := c.UpsertProductMasterItem(ctx, "tenant-adeco", domain.ProductMasterItem{
+		ItemCode: "ZZ-TEST-1", OfficialName: "test", UnitsPerCarton: 6, VATRate: 0.14, UnitPriceExclVAT: 10,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	agg3, _ := c.GetAnalyticsAggregates(ctx, "tenant-adeco")
@@ -216,35 +273,39 @@ func TestPrecomputedLayerMatchesOnTheFlyAndInvalidates(t *testing.T) {
 type fakeAggWriter struct{ got chan *domain.AnalyticsAggregates }
 
 func (f *fakeAggWriter) WriteAnalyticsAggregates(_ context.Context, a *domain.AnalyticsAggregates) error {
-	f.got <- a
+	select {
+	case f.got <- a:
+	default:
+		f.got <- a
+	}
 	return nil
 }
 
-// backgroundComputeWait bounds one full aggregates compute over the seeded dataset. It is not a race:
-// a single compute (4 chains) measured 7.7s on an M-series Mac, and the CI runner runs it 2-3x slower
-// while other package tests run in parallel, so the old 20s wait failed intermittently.
-const backgroundComputeWait = 90 * time.Second
-
 func TestPrecomputedLayerRecomputesInBackgroundAndMirrors(t *testing.T) {
-	c := newSeededTestClient(t)
-	old := recomputeDelay
-	recomputeDelay = 10 * time.Millisecond
-	defer func() { recomputeDelay = old }()
+	c := newTinyPrecomputeClient(t)
+
+	oldDelay := recomputeDelay
+	oldSched := scheduleAfter
+	recomputeDelay = 0
+	// Fire the callback on a goroutine with no wall delay; tests wait on channels.
+	scheduleAfter = func(_ time.Duration, f func()) *time.Timer {
+		t := time.NewTimer(time.Hour)
+		t.Stop()
+		go f()
+		return t
+	}
+	defer func() {
+		recomputeDelay = oldDelay
+		scheduleAfter = oldSched
+	}()
+
 	w := &fakeAggWriter{got: make(chan *domain.AnalyticsAggregates, 8)}
 	c.WithAggregatesWriter(w, "tenant-adeco")
-	var first *domain.AnalyticsAggregates
-	select {
-	case first = <-w.got:
-	case <-time.After(backgroundComputeWait):
-		t.Fatal("no background compute after attaching writer")
-	}
-	c.SetChainDiscountProfiles("tenant-adeco", []domain.ChainDiscountProfile{{Chain: "x", InvoiceDiscountPct: 5}})
-	select {
-	case a := <-w.got:
-		if a.Version <= first.Version {
-			t.Fatalf("expected newer version mirrored, got %d after %d", a.Version, first.Version)
-		}
-	case <-time.After(backgroundComputeWait):
-		t.Fatal("no background recompute after source change")
+	first := <-w.got
+
+	c.SetChainDiscountProfiles("tenant-adeco", []domain.ChainDiscountProfile{{Chain: "fathalla", InvoiceDiscountPct: 5}})
+	a := <-w.got
+	if a.Version <= first.Version {
+		t.Fatalf("expected newer version mirrored, got %d after %d", a.Version, first.Version)
 	}
 }

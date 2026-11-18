@@ -16,6 +16,7 @@ import '../../domain/target_table_format.dart';
 import 'target_breakdown_dialog.dart';
 import 'target_detail_page.dart';
 import 'target_status_pill.dart';
+import 'share_target_wizard.dart';
 import '../../domain/target_achievement_status.dart';
 import '../../../../core/theme/m3_spacing.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -339,6 +340,81 @@ class _TargetManagementPanelState extends State<TargetManagementPanel> {
       }
     }
     return opts;
+  }
+
+  Future<void> _openAddTargetEntry() async {
+    if (_isSellIn) {
+      await _openTargetFormDialog();
+      return;
+    }
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final cs = theme.colorScheme;
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            shape: const RoundedRectangleBorder(
+              borderRadius: M3Shape.radiusXl,
+            ),
+            title: Text(
+              'نوع المستهدف',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            content: SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    key: const ValueKey('target_type_value'),
+                    leading: Icon(Icons.payments_rounded, color: cs.primary),
+                    title: const Text('مستهدف بالقيمة'),
+                    subtitle: const Text('إدخال القيمة أو الكمية مباشرة'),
+                    onTap: () => Navigator.pop(ctx, 'value'),
+                  ),
+                  ListTile(
+                    key: const ValueKey('target_type_share'),
+                    leading:
+                        Icon(Icons.pie_chart_outline_rounded, color: cs.primary),
+                    title: const Text('مستهدف بالحصة السوقية'),
+                    subtitle: const Text(
+                      'تحديد الحصة المستهدفة لكل فئة ثم التوزيع',
+                    ),
+                    onTap: () => Navigator.pop(ctx, 'share'),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted || choice == null) return;
+    if (choice == 'share') {
+      final saved = await showShareTargetWizard(
+        context: context,
+        apiClient: widget.apiClient,
+        chainOptions: _chainOptions,
+        initialChain: _selectedChain != 'all' ? _selectedChain : 'fathalla',
+        initialYear:
+            _selectedYear >= _baseCurrentYear ? _selectedYear : _baseCurrentYear,
+      );
+      if (saved && mounted) {
+        _repo.invalidateAll();
+        await _loadTargets();
+      }
+      return;
+    }
+    await _openTargetFormDialog();
   }
 
   Future<void> _openTargetFormDialog({
@@ -1351,7 +1427,7 @@ onChanged: m3Legacy<String>((v) {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   FilledButton.icon(
-                    onPressed: () => _openTargetFormDialog(),
+                    onPressed: _openAddTargetEntry,
                     icon: const Icon(Icons.add_task_rounded, size: M3ToolbarButton.iconSize),
                     label: const Text('إضافة مستهدف'),
                     style: M3ToolbarButton.style,
@@ -1997,7 +2073,7 @@ onChanged: m3Legacy<String>((v) {
             alignment: WrapAlignment.center,
             children: [
               FilledButton.icon(
-                onPressed: () => _openTargetFormDialog(),
+                onPressed: _openAddTargetEntry,
                 icon: const Icon(Icons.add_task_rounded),
                 label: const Text('إضافة مستهدف'),
               ),

@@ -1603,6 +1603,8 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 		StatusAr:                statusAr,
 		Notes:                   t.Notes,
 		UpdatedAt:               t.UpdatedAt,
+		Origin:                  t.Origin,
+		ShareMeta:               t.ShareMeta,
 		Branches:                branchesBreakdown,
 		ChainSKUTotals:          chainSKUTotals,
 		Brands:                  brandsBreakdown,

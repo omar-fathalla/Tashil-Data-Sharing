@@ -263,8 +263,10 @@ void main() {
 
       expect(find.byKey(ValueKey('sell_out_targets_${apiClient.tenantId}')), findsOneWidget);
 
-      // Open Add Target Manually dialog and verify dynamic future years formula (2026, 2027, 2028)
+      // Open Add Target → value path (not share wizard) and verify future years (2026–2028)
       await tester.tap(find.text('إضافة مستهدف').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('target_type_value')));
       await tester.pumpAndSettle();
 
       final yearDropdown = find.byKey(const ValueKey('target_dialog_year_dropdown'));

@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -31,6 +33,8 @@ type ChainDiscountHandler struct {
 	audit   firestore.Repository
 	applier ChainDiscountApplier
 	chains  KnownChainLister
+
+	apply chainApplyQueue
 }
 
 // NewChainDiscountHandler constructs the handler. audit and applier may be nil.
@@ -66,7 +70,7 @@ func wrapChainDiscounts(d *domain.ChainDiscountProfiles) chainDiscountResponse {
 }
 
 // chainDiscountGetTimeout bounds the Firestore read so the page gets an answer well inside the
-// client's 10s budget.
+// client's 20s GET budget.
 var chainDiscountGetTimeout = 5 * time.Second
 
 // knownChainsGetTimeout bounds the in-memory chain scan. The scan never waits on the analytics
@@ -79,7 +83,7 @@ var knownChainsGetTimeout = 5 * time.Second
 // It is a pure read: it must not call the applier. Applying re-enriches every Sell-In row under the
 // analytics client's global write lock and invalidates all cached analytics, so a read would queue
 // behind any long-running analytics request. Instances converge through the TTL sync instead
-// (bigquery.WithChainDiscountSource), and PUT applies synchronously.
+// (bigquery.WithChainDiscountSource), and PUT applies in the background (see chainApplyQueue).
 func (h *ChainDiscountHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	c, ok := tmClaims(w, r)
 	if !ok {
@@ -132,8 +136,90 @@ func (h *ChainDiscountHandler) HandleListChains(w http.ResponseWriter, r *http.R
 	}{Chains: chains})
 }
 
+// chainApplyQueue hands saved profiles to the applier on one background worker. The applier takes
+// the analytics client's locks and can run for tens of seconds, so PUT answers as soon as Firestore
+// has the list. A newer save for a tenant replaces a still-pending one (latest list wins).
+type chainApplyQueue struct {
+	mu      sync.Mutex
+	pending map[string][]domain.ChainDiscountProfile
+	order   []string
+	running bool
+	done    chan struct{} // closed when the worker drains the queue; replaced per run
+}
+
+func (h *ChainDiscountHandler) enqueueApply(tenantID string, profiles []domain.ChainDiscountProfile) {
+	if h.applier == nil {
+		return
+	}
+	q := &h.apply
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.pending == nil {
+		q.pending = map[string][]domain.ChainDiscountProfile{}
+	}
+	if _, queued := q.pending[tenantID]; !queued {
+		q.order = append(q.order, tenantID)
+	}
+	q.pending[tenantID] = append([]domain.ChainDiscountProfile(nil), profiles...)
+	if q.running {
+		return
+	}
+	q.running = true
+	q.done = make(chan struct{})
+	go h.runApplyWorker(q.done)
+}
+
+func (h *ChainDiscountHandler) runApplyWorker(done chan struct{}) {
+	q := &h.apply
+	for {
+		q.mu.Lock()
+		if len(q.order) == 0 {
+			q.running = false
+			q.mu.Unlock()
+			close(done)
+			return
+		}
+		tenant := q.order[0]
+		q.order = q.order[1:]
+		profiles := q.pending[tenant]
+		delete(q.pending, tenant)
+		q.mu.Unlock()
+		h.applyOne(tenant, profiles)
+	}
+}
+
+func (h *ChainDiscountHandler) applyOne(tenant string, profiles []domain.ChainDiscountProfile) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("ERROR [chain-discounts] tenant=%s background apply panicked: %v", tenant, r)
+		}
+	}()
+	start := time.Now()
+	h.applier.SetChainDiscountProfiles(tenant, profiles)
+	log.Printf("[chain-discounts] tenant=%s applied %d profile(s) in %s", tenant, len(profiles), time.Since(start).Round(time.Millisecond))
+}
+
+// waitApplyIdle blocks until the background worker has drained the queue (tests, graceful stop).
+func (h *ChainDiscountHandler) waitApplyIdle(timeout time.Duration) bool {
+	q := &h.apply
+	q.mu.Lock()
+	done := q.done
+	running := q.running
+	q.mu.Unlock()
+	if !running {
+		return true
+	}
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
 // HandlePut serves PUT /api/v1/product-master/chain-discounts with body {"profiles":[...]}:
 // it replaces the tenant's full list (add / edit / delete are all done by sending the new list).
+// It returns once the list is saved; applying it to the analytics client happens in the background.
 func (h *ChainDiscountHandler) HandlePut(w http.ResponseWriter, r *http.Request) {
 	c, ok := tmWriteClaims(w, r)
 	if !ok {
@@ -179,9 +265,7 @@ func (h *ChainDiscountHandler) HandlePut(w http.ResponseWriter, r *http.Request)
 		writeErr(w, http.StatusInternalServerError, "failed to save chain discounts")
 		return
 	}
-	if h.applier != nil {
-		h.applier.SetChainDiscountProfiles(c.TenantID, doc.Profiles)
-	}
+	h.enqueueApply(c.TenantID, doc.Profiles)
 	h.recordAudit(r, c, describeChainDiscountChange(prevBy, doc.Profiles))
 	writeJSON(w, http.StatusOK, wrapChainDiscounts(doc))
 }

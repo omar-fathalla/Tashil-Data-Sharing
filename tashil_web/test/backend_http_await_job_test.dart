@@ -7,6 +7,13 @@ import 'package:tashil_web/core/network/api_client.dart';
 import 'package:tashil_web/core/network/backend_http.dart';
 import 'package:tashil_web/features/data_ingestion/presentation/widgets/sell_in_upload_target.dart';
 
+/// Advances [now] by [d] with no wall-clock wait — keeps awaitJob tests load-proof.
+Future<void> Function(Duration) _advance(DateTime Function() read, void Function(DateTime) write) {
+  return (Duration d) async {
+    write(read().add(d));
+  };
+}
+
 /// Long Sell-In jobs (in26 ≈ 5–6 min) must keep polling past the old 5-minute UI ceiling.
 void main() {
   tearDown(BackendHttp.cache.clear);
@@ -50,6 +57,7 @@ void main() {
       );
     });
 
+    var now = DateTime.utc(2024, 1, 1);
     await http.runWithClient(() async {
       final accepted = http.Response(
         jsonEncode({'job_id': 'job-long', 'status': 'running'}),
@@ -62,6 +70,8 @@ void main() {
         accepted,
         pollEvery: const Duration(milliseconds: 20),
         maxWait: const Duration(seconds: 5),
+        clock: () => now,
+        delay: _advance(() => now, (v) => now = v),
       );
       expect(done.statusCode, 200);
       final body = jsonDecode(done.body) as Map<String, dynamic>;
@@ -84,6 +94,13 @@ void main() {
       );
     });
 
+    // Virtual clock: maxWait / pollEvery = 120ms / 30ms → exactly 4 polls, then 504.
+    // No wall-clock dependence (was flaky under Mac CI load: Expected >1 Actual: <1>).
+    const pollEvery = Duration(milliseconds: 30);
+    const maxWait = Duration(milliseconds: 120);
+    const expectedPolls = 4; // floor(maxWait / pollEvery) while advancing after each sleep
+    var now = DateTime.utc(2024, 6, 1, 12);
+
     await http.runWithClient(() async {
       final accepted = http.Response(
         jsonEncode({'job_id': 'job-slow', 'status': 'running'}),
@@ -94,8 +111,10 @@ void main() {
       );
       final timedOut = await BackendHttp.awaitJob(
         accepted,
-        pollEvery: const Duration(milliseconds: 30),
-        maxWait: const Duration(milliseconds: 120),
+        pollEvery: pollEvery,
+        maxWait: maxWait,
+        clock: () => now,
+        delay: _advance(() => now, (v) => now = v),
       );
       expect(timedOut.statusCode, 504);
       final body = jsonDecode(timedOut.body) as Map<String, dynamic>;
@@ -114,7 +133,56 @@ void main() {
           isNot(contains('مفيش حاجة اتحفظت')));
     }, () => client);
 
-    expect(polls, greaterThan(1));
+    expect(polls, expectedPolls);
+    expect(now, DateTime.utc(2024, 6, 1, 12).add(maxWait));
+  });
+
+  test('awaitJob does not emit 504 before the ceiling when the job is still running', () async {
+    var polls = 0;
+    final client = MockClient((req) async {
+      polls++;
+      if (polls < 3) {
+        return http.Response(
+          jsonEncode({'job_id': 'job-mid', 'status': 'running'}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response(
+        jsonEncode({
+          'job_id': 'job-mid',
+          'status': 'done',
+          'http_status': 200,
+          'body': {'ok': true},
+        }),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
+
+    var now = DateTime.utc(2024, 6, 1, 12);
+    await http.runWithClient(() async {
+      final accepted = http.Response(
+        jsonEncode({'job_id': 'job-mid', 'status': 'running'}),
+        202,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+        request: http.Request(
+            'POST', Uri.parse('https://api.example/api/v1/ingest/load-sell-in-plan')),
+      );
+      final done = await BackendHttp.awaitJob(
+        accepted,
+        pollEvery: const Duration(milliseconds: 50),
+        maxWait: const Duration(milliseconds: 500),
+        clock: () => now,
+        delay: _advance(() => now, (v) => now = v),
+      );
+      expect(done.statusCode, 200);
+      expect(jsonDecode(done.body)['ok'], isTrue);
+    }, () => client);
+
+    expect(polls, 3);
+    // Only three poll intervals elapsed — well under the 500ms ceiling.
+    expect(now, DateTime.utc(2024, 6, 1, 12).add(const Duration(milliseconds: 150)));
   });
 
   test('uploadSellInFile follows a long job to terminal success (not a false failure)', () async {

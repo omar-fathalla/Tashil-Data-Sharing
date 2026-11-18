@@ -69,9 +69,11 @@ func activeCustomerChainRules() []customerChainRule {
 	return customerChainRules
 }
 
+var arabicCustomerReplacer = strings.NewReplacer("أ", "ا", "إ", "ا", "آ", "ا", "ة", "ه", "ى", "ي")
+
 func normalizeArabicCustomer(s string) string {
 	s = strings.TrimSpace(s)
-	s = strings.NewReplacer("أ", "ا", "إ", "ا", "آ", "ا", "ة", "ه", "ى", "ي").Replace(s)
+	s = arabicCustomerReplacer.Replace(s)
 	return strings.Join(strings.Fields(s), " ")
 }
 

@@ -12,6 +12,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
+	"github.com/tashil/data-sharing/backend/internal/service/firestore"
 )
 
 const wfTenant = "tenant-waterfall"
@@ -242,4 +243,38 @@ func TestSellInTotalsSQLUsesFlatDefaults(t *testing.T) {
 	if inv, extra, vat, saved := sellInTermsFor("unknown", nil); inv != domain.DefaultChainInvoiceDiscountPct || extra != 0 || vat != 14 || saved {
 		t.Fatalf("handler defaults: %v %v %v %v", inv, extra, vat, saved)
 	}
+}
+
+// PUT returns before the analytics client is updated; once the background apply finished, the
+// Sell-In waterfall must carry the new terms and still reconcile to the piastre.
+func TestSellInWaterfallReconcilesAfterBackgroundChainApply(t *testing.T) {
+	repo := newWaterfallRepo(t)
+	repo.ReplaceSellInRecords(wfTenant, []domain.SellInRecord{
+		wfRow("f", "fathalla", "FGCL-0550-0001", 3, 256.5),
+		wfRow("g", "gomla", "FGCL-0550-0001", 1, 88),
+		wfRow("u", "fathalla", "", 1, 50),
+	})
+	if r := wfFetch(t, repo, ""); r.TotalInvoiceDiscountEGP != 40 || r.TotalExtraChainDiscountEGP != 0 {
+		t.Fatalf("defaults before save: %+v", r)
+	}
+
+	fs := firestore.NewClient("", true)
+	h := NewChainDiscountHandler(fs, fs, repo)
+	mux := cdMux(h)
+	admin := &domain.UserClaims{UserID: "u1", Email: "admin@wf.test", TenantID: wfTenant, Role: domain.RoleAdmin}
+	rec, _ := tmDo(t, mux, admin, "PUT", "/api/v1/product-master/chain-discounts", map[string]interface{}{
+		"profiles": []map[string]interface{}{{"chain": "fathalla", "invoice_discount_pct": 10, "additional_discount_pct": 5, "vat_rate_pct": 14}},
+	})
+	if rec.Code != 200 {
+		t.Fatalf("PUT: %d", rec.Code)
+	}
+	waitApplied(t, h)
+
+	r := wfFetch(t, repo, "")
+	// fathalla: 300 official → 270 after 10% → 256.50 after 5%; gomla keeps the 10% / 0% defaults.
+	if r.TotalOfficialListExclVATEGP != 400 || r.TotalInvoiceDiscountEGP != 40 || r.TotalExtraChainDiscountEGP != 13.5 ||
+		r.TotalExpectedNetEGP != 346.5 || r.TotalExecutionDiffEGP != 2 || r.TotalUnpricedNetEGP != 50 || r.TotalNetExclVATEGP != 394.5 {
+		t.Fatalf("card after background apply: %+v", r)
+	}
+	assertCardReconciles(t, "after background apply", r)
 }

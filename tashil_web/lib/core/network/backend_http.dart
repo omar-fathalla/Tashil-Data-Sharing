@@ -116,6 +116,10 @@ class BackendHttp {
     Map<String, String>? headers,
     Duration pollEvery = const Duration(seconds: 2),
     Duration maxWait = defaultJobMaxWait,
+    /// Injectable clock for tests. Production leaves this null → [DateTime.now].
+    DateTime Function()? clock,
+    /// Injectable delay for tests. Production leaves this null → [Future.delayed].
+    Future<void> Function(Duration duration)? delay,
   }) async {
     if (response.statusCode != 202) return response;
     final Object? decoded;
@@ -134,10 +138,12 @@ class BackendHttp {
     final pollHeaders = Map<String, String>.from(headers ?? const {})
       ..remove('Content-Type')
       ..remove(asyncJobHeader);
-    final deadline = DateTime.now().add(maxWait);
+    final now = clock ?? DateTime.now;
+    final sleep = delay ?? Future<void>.delayed;
+    final deadline = now().add(maxWait);
     var misses = 0;
-    while (DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(pollEvery);
+    while (now().isBefore(deadline)) {
+      await sleep(pollEvery);
       http.Response poll;
       try {
         poll = await get(jobUri, headers: pollHeaders).timeout(const Duration(seconds: 20));

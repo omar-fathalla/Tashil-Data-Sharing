@@ -92,6 +92,7 @@ func (c *Client) ImportSnapshot(raw []byte) error {
 	c.productMasterByName = st.ProductMasterByName
 	c.cleanedTenants = st.CleanedTenants
 	c.ensureSnapshotMapsLocked()
+	c.noteSellInDataChanged()
 	c.mu.Unlock()
 	c.invalidateKPICache()
 	return nil
