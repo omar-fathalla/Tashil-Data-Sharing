@@ -44,14 +44,17 @@ if [[ -d "$REAL_HOME/.cache/firebase/emulators" ]]; then
 fi
 
 # Ports in 5600+ (avoid other bot's 5570–5580 Android emulator band).
-read -r FS_PORT HUB_PORT LOG_PORT <<<"$(python3 "$ROOT/scripts/pick_free_ports.py" -n 3 --min 5600 --max 5899)"
-echo "Isolated emulator: firestore=127.0.0.1:${FS_PORT} hub=${HUB_PORT} logging=${LOG_PORT} project=${PROJECT}"
+# websocketPort must be pinned too — firebase-tools defaults to 9150, which
+# clashes when multiple Mac CI jobs (or another bot) already hold it, and the
+# JVM then exits mid-emulators:exec with "Firestore Emulator has exited with code: 1".
+read -r FS_PORT HUB_PORT LOG_PORT WS_PORT <<<"$(python3 "$ROOT/scripts/pick_free_ports.py" -n 4 --min 5600 --max 5899)"
+echo "Isolated emulator: firestore=127.0.0.1:${FS_PORT} hub=${HUB_PORT} logging=${LOG_PORT} websocket=${WS_PORT} project=${PROJECT}"
 echo "job_dir=${JOB_DIR}"
 
 cat >"$CFG" <<EOF
 {
   "emulators": {
-    "firestore": { "host": "127.0.0.1", "port": ${FS_PORT} },
+    "firestore": { "host": "127.0.0.1", "port": ${FS_PORT}, "websocketPort": ${WS_PORT} },
     "ui": { "enabled": false },
     "hub": { "host": "127.0.0.1", "port": ${HUB_PORT} },
     "logging": { "host": "127.0.0.1", "port": ${LOG_PORT} }
@@ -107,4 +110,12 @@ else
 fi
 echo "----- emulator log (tail) -----"
 tail -n 100 "$LOG" || true
+# Java-side crash reason often lands here, not in the firebase-tools wrapper log.
+if [[ -f "$JOB_DIR/firestore-debug.log" ]]; then
+  echo "----- firestore-debug.log (tail) -----"
+  tail -n 80 "$JOB_DIR/firestore-debug.log" || true
+elif [[ -f "$ROOT/firestore-debug.log" ]]; then
+  echo "----- firestore-debug.log (cwd, tail) -----"
+  tail -n 80 "$ROOT/firestore-debug.log" || true
+fi
 exit "$ec"

@@ -3725,6 +3725,7 @@ class ApiClient {
     String? region,
     String? tier,
     String? chain,
+    String? brand,
     int? year,
     int? month,
     String? startDate,
@@ -3753,6 +3754,13 @@ class ApiClient {
       }
       if (effectiveChain != null && effectiveChain.isNotEmpty && effectiveChain != 'الكل' && effectiveChain != 'all') {
         params['chain'] = effectiveChain;
+      }
+      if (brand != null &&
+          brand.isNotEmpty &&
+          brand != 'الكل' &&
+          brand != 'all' &&
+          brand != 'كل العلامات التجارية') {
+        params['brand'] = brand;
       }
       if (year != null && year > 0) {
         params['year'] = year.toString();

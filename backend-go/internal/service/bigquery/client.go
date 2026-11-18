@@ -113,15 +113,18 @@ type RecordFilter struct {
 	Offset        int
 }
 
-// StoreMatrixFilter allows filtering store benchmark items by region, tier, chain, and period/date.
+// StoreMatrixFilter allows filtering store benchmark items by region, tier, chain, brand, and period/date.
 type StoreMatrixFilter struct {
 	Region        string
 	Tier          string
 	RetailerChain string
-	Year          int
-	Month         int
-	StartDate     string
-	EndDate       string
+	// Brand filters sell-out facts by inferred catalog brand (Arabic/English
+	// label). Empty / "all" keeps every own-brand SKU.
+	Brand     string
+	Year      int
+	Month     int
+	StartDate string
+	EndDate   string
 	// SameMonthsAsYear (with Month == 0) keeps only the calendar months that
 	// have data in that reference year. YoY like-for-like uses it both ways:
 	// previous year with SameMonthsAsYear=current, and current year (for the
@@ -2777,12 +2780,23 @@ func (c *Client) GetStoreBenchmarkMatrix(ctx context.Context, tenantID string, f
 		sameMonths = c.ownMonthSetLocked(tenantID, filter.SameMonthsAsYear, chainOK)
 	}
 
+	brandFilter := strings.TrimSpace(filter.Brand)
+	if brandFilter == "all" || brandFilter == "الكل" || brandFilter == "كل العلامات التجارية" {
+		brandFilter = ""
+	}
+
 	for _, r := range c.records {
 		if !matchTenant(r.TenantID, tenantID) || !isOwnRecord(r) {
 			continue // Row-Level Security & Tenant's own SKUs
 		}
 		if !chainOK(r.RetailerChain) {
 			continue
+		}
+		if brandFilter != "" {
+			inferred := domain.InferBrandFromItemName(r.SKUName, r.Category)
+			if !domain.BrandLabelMatches(inferred, brandFilter) {
+				continue
+			}
 		}
 		if sameMonths != nil && (len(r.TransactionDate) < 7 || !sameMonths[r.TransactionDate[4:7]]) {
 			continue

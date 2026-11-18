@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show listEquals;
+import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:tashil_web/core/widgets/m3_chip_surface.dart';
 import 'package:tashil_web/core/widgets/m3_section_title.dart';
@@ -171,6 +171,49 @@ String _monthAr(int n) => n >= 1 && n <= 12 ? _monthsAr[n] : '$n';
 
 String _pct(double v) => '${v.toStringAsFixed(v >= 10 || v == 0 ? 0 : 1)}%';
 
+/// Largest-remainder rounding so [shares] (non-negative weights) become
+/// integer percents that always sum to 100 (or all zeros when empty).
+@visibleForTesting
+List<int> roundSharePercents(List<double> shares) {
+  if (shares.isEmpty) return const [];
+  final total = shares.fold<double>(0, (a, b) => a + b);
+  if (total <= 0) return List<int>.filled(shares.length, 0);
+  final exact = [for (final s in shares) s / total * 100.0];
+  final floors = [for (final e in exact) e.floor()];
+  var left = 100 - floors.fold<int>(0, (a, b) => a + b);
+  final remainders = [
+    for (var i = 0; i < exact.length; i++) exact[i] - floors[i],
+  ];
+  final order = List<int>.generate(exact.length, (i) => i)
+    ..sort((a, b) {
+      final byRemainder = remainders[b].compareTo(remainders[a]);
+      if (byRemainder != 0) return byRemainder;
+      return a.compareTo(b);
+    });
+  final out = List<int>.from(floors);
+  for (var k = 0; k < left && k < order.length; k++) {
+    out[order[k]] += 1;
+  }
+  return out;
+}
+
+/// SKU / own-other / competitor shares of [marketTotalRevenue], as integer
+/// percents that sum to 100. Green («هذا الصنف») is the SKU's own share.
+@visibleForTesting
+({int self, int ownOther, int competitors}) skuSegmentPercents({
+  required double skuRevenue,
+  required double ownCategoryRevenue,
+  required double marketTotalRevenue,
+}) {
+  if (marketTotalRevenue <= 0) {
+    return (self: 0, ownOther: 0, competitors: 0);
+  }
+  final self = (skuRevenue / marketTotalRevenue).clamp(0.0, 1.0);
+  final own = (ownCategoryRevenue / marketTotalRevenue).clamp(self, 1.0);
+  final pcts = roundSharePercents([self, own - self, 1.0 - own]);
+  return (self: pcts[0], ownOther: pcts[1], competitors: pcts[2]);
+}
+
 class _CardHeader extends StatelessWidget {
   const _CardHeader({
     required this.icon,
@@ -307,18 +350,26 @@ class _SkuShareCard extends StatelessWidget {
     final cats = {for (final c in kpis.categoryContributions) c.category: c};
     final rows = <({
       ParetoSkuItemModel sku,
-      double self,
-      double ownOther,
-      double comp
+      int self,
+      int ownOther,
+      int comp,
     })>[];
     final skus = [...kpis.paretoSkus]
       ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
     for (final s in skus) {
       final c = cats[s.category];
       if (c == null || c.marketTotalRevenue <= 0) continue;
-      final self = (s.totalRevenue / c.marketTotalRevenue).clamp(0.0, 1.0);
-      final own = (c.totalRevenue / c.marketTotalRevenue).clamp(self, 1.0);
-      rows.add((sku: s, self: self, ownOther: own - self, comp: 1.0 - own));
+      final pct = skuSegmentPercents(
+        skuRevenue: s.totalRevenue,
+        ownCategoryRevenue: c.totalRevenue,
+        marketTotalRevenue: c.marketTotalRevenue,
+      );
+      rows.add((
+        sku: s,
+        self: pct.self,
+        ownOther: pct.ownOther,
+        comp: pct.competitors,
+      ));
       if (rows.length == 6) break;
     }
     return Card.outlined(
@@ -372,31 +423,11 @@ class _SkuShareCard extends StatelessWidget {
                           color: cs.onSurfaceVariant,
                         ),
                       ),
-                      bar: ClipRRect(
+                      bar: _SkuShareStackedBar(
                         key: ValueKey('sku_share_bar_$i'),
-                        borderRadius: M3Shape.radiusSm,
-                        child: Row(
-                          children: [
-                            _seg(
-                              context,
-                              rows[i].self,
-                              cs.primary,
-                              cs.onPrimary,
-                            ),
-                            _seg(
-                              context,
-                              rows[i].ownOther,
-                              cs.tertiaryContainer,
-                              cs.onTertiaryContainer,
-                            ),
-                            _seg(
-                              context,
-                              rows[i].comp,
-                              cs.surfaceContainerHighest,
-                              cs.onSurfaceVariant,
-                            ),
-                          ],
-                        ),
+                        selfPct: rows[i].self,
+                        ownOtherPct: rows[i].ownOther,
+                        competitorsPct: rows[i].comp,
                       ),
                     ),
                 ],
@@ -406,25 +437,134 @@ class _SkuShareCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _seg(BuildContext context, double v, Color bg, Color fg) {
-    final flex = (v * 1000).round();
-    if (flex <= 0) return const SizedBox.shrink();
-    return Expanded(
-      flex: flex,
-      child: Container(
-        color: bg,
-        alignment: Alignment.center,
-        child: v >= 0.08
-            ? Text(
-                _pct(v * 100),
-                maxLines: 1,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: fg),
-              )
-            : null,
+/// Stacked share bar: every non-zero segment keeps a visible «N%» label.
+/// Wide segments paint the label inside the fill; narrow ones get a callout
+/// beside the bar so green «هذا الصنف» is never clipped away.
+class _SkuShareStackedBar extends StatelessWidget {
+  const _SkuShareStackedBar({
+    super.key,
+    required this.selfPct,
+    required this.ownOtherPct,
+    required this.competitorsPct,
+  });
+
+  final int selfPct;
+  final int ownOtherPct;
+  final int competitorsPct;
+
+  /// Minimum paint width before an in-segment label is readable.
+  static const double minInsideWidth = 28.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final segs = <({int pct, Color bg, Color fg, String key})>[
+      (pct: selfPct, bg: cs.primary, fg: cs.onPrimary, key: 'self'),
+      (
+        pct: ownOtherPct,
+        bg: cs.tertiaryContainer,
+        fg: cs.onTertiaryContainer,
+        key: 'own_other',
       ),
+      (
+        pct: competitorsPct,
+        bg: cs.surfaceContainerHighest,
+        fg: cs.onSurfaceVariant,
+        key: 'competitors',
+      ),
+    ].where((s) => s.pct > 0).toList();
+
+    if (segs.isEmpty) return const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final labelStyle = theme.textTheme.labelSmall;
+        // Reserve space for side callouts before measuring segment widths so
+        // the in-bar vs outside decision matches the painted bar.
+        const calloutSlot = 52.0;
+        final maybeNarrow = segs.any(
+          (s) => constraints.maxWidth * s.pct / 100.0 < minInsideWidth,
+        );
+        final barW = maybeNarrow
+            ? math.max(0.0, constraints.maxWidth - calloutSlot)
+            : constraints.maxWidth;
+        final narrowKeys = {
+          for (final s in segs)
+            if (barW * s.pct / 100.0 < minInsideWidth) s.key,
+        };
+        final needsOutside = narrowKeys.isNotEmpty;
+
+        final fill = ClipRRect(
+          borderRadius: M3Shape.radiusSm,
+          child: Row(
+            children: [
+              for (final s in segs)
+                Expanded(
+                  flex: s.pct,
+                  child: ColoredBox(
+                    color: s.bg,
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: !narrowKeys.contains(s.key)
+                          ? Text(
+                              '${s.pct}%',
+                              key: ValueKey('sku_share_pct_${s.key}_in'),
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.visible,
+                              style: labelStyle?.copyWith(color: s.fg),
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+
+        if (!needsOutside) return fill;
+
+        final callouts = [
+          for (final s in segs)
+            if (narrowKeys.contains(s.key))
+              Text(
+                '${s.pct}%',
+                key: ValueKey('sku_share_pct_${s.key}_out'),
+                maxLines: 1,
+                softWrap: false,
+                style: labelStyle?.copyWith(
+                  color: s.bg,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+        ];
+
+        return Row(
+          children: [
+            Expanded(child: fill),
+            const SizedBox(width: 4),
+            SizedBox(
+              width: calloutSlot - 4,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var i = 0; i < callouts.length; i++) ...[
+                      if (i > 0) const SizedBox(width: 4),
+                      callouts[i],
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -926,10 +1066,11 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     // Short chip + description underneath (OOS / TM / Errors finishing pass).
     // Long phrases stay out of the 32dp chip so they never clip mid-word.
+    // «يحتاج إعادة توريد» keeps description only — no redundant «تموين» chip.
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final statusColors = M3StatusColors.of(context);
-    final (String short, String description, Color bg, Color fg) =
+    final (String? short, String description, Color bg, Color fg) =
         switch (status) {
       'optimal' => (
           'سليم',
@@ -944,7 +1085,7 @@ class _StatusChip extends StatelessWidget {
           cs.onErrorContainer,
         ),
       'urgent_replenishment' => (
-          'تموين',
+          null,
           'يحتاج إعادة توريد',
           cs.tertiaryContainer,
           cs.onTertiaryContainer,
@@ -960,21 +1101,23 @@ class _StatusChip extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        M3ChipSurface(
-          color: bg,
-          child: Text(
-            short,
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.clip,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: fg,
-              fontWeight: FontWeight.w800,
+        if (short != null) ...[
+          M3ChipSurface(
+            color: bg,
+            child: Text(
+              short,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.clip,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: fg,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: M3Spacing.xxs),
+          const SizedBox(height: M3Spacing.xxs),
+        ],
         Text(
           description,
           maxLines: 3,
@@ -982,7 +1125,8 @@ class _StatusChip extends StatelessWidget {
           overflow: TextOverflow.clip,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: cs.onSurfaceVariant,
+            color: short == null ? fg : cs.onSurfaceVariant,
+            fontWeight: short == null ? FontWeight.w700 : null,
           ),
         ),
       ],

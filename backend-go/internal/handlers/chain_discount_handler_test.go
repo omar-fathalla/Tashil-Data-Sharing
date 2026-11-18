@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,13 +14,29 @@ import (
 )
 
 type recordingApplier struct {
+	mu       sync.Mutex
 	tenant   string
 	profiles []domain.ChainDiscountProfile
 	calls    int
 }
 
 func (a *recordingApplier) SetChainDiscountProfiles(tenantID string, p []domain.ChainDiscountProfile) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.tenant, a.profiles, a.calls = tenantID, p, a.calls+1
+}
+
+func (a *recordingApplier) snapshot() (string, []domain.ChainDiscountProfile, int) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.tenant, append([]domain.ChainDiscountProfile(nil), a.profiles...), a.calls
+}
+
+func waitApplied(t *testing.T, h *ChainDiscountHandler) {
+	t.Helper()
+	if !h.waitApplyIdle(2 * time.Second) {
+		t.Fatal("background applier did not finish")
+	}
 }
 
 func cdMux(h *ChainDiscountHandler) *http.ServeMux {
@@ -33,7 +50,8 @@ func cdMux(h *ChainDiscountHandler) *http.ServeMux {
 func TestChainDiscountProfilesCRUDAuditAndTenantIsolation(t *testing.T) {
 	fs := firestore.NewClient("", true)
 	app := &recordingApplier{}
-	mux := cdMux(NewChainDiscountHandler(fs, fs, app))
+	h := NewChainDiscountHandler(fs, fs, app)
+	mux := cdMux(h)
 	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
 	other := &domain.UserClaims{UserID: "u2", Email: "x@pepsi.test", TenantID: "tenant-pepsi", Role: domain.RoleAdmin}
 	kam := &domain.UserClaims{UserID: "u3", Email: "kam@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleChainKAM, AssignedChain: "fathalla"}
@@ -53,7 +71,8 @@ func TestChainDiscountProfilesCRUDAuditAndTenantIsolation(t *testing.T) {
 	if rec.Code != 200 || len(out["profiles"].([]interface{})) != 2 {
 		t.Fatalf("PUT failed: %d %v", rec.Code, out)
 	}
-	if app.calls == 0 || len(app.profiles) != 2 {
+	waitApplied(t, h)
+	if _, ps, calls := app.snapshot(); calls == 0 || len(ps) != 2 {
 		t.Fatalf("profiles must be applied to CPFR cost")
 	}
 
@@ -175,7 +194,8 @@ func TestChainDiscountGetTimesOutWithGatewayTimeout(t *testing.T) {
 func TestChainDiscountVATRateRoundTripValidationAndAudit(t *testing.T) {
 	fs := firestore.NewClient("", true)
 	app := &recordingApplier{}
-	mux := cdMux(NewChainDiscountHandler(fs, fs, app))
+	h := NewChainDiscountHandler(fs, fs, app)
+	mux := cdMux(h)
 	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
 
 	put := func(profiles []map[string]interface{}) (int, map[string]interface{}) {
@@ -204,8 +224,9 @@ func TestChainDiscountVATRateRoundTripValidationAndAudit(t *testing.T) {
 	if v, set := byChain["zero"]["vat_rate_pct"]; !set || v.(float64) != 0 {
 		t.Fatalf("an explicit 0%% VAT must be kept: %v", byChain["zero"])
 	}
-	if len(app.profiles) != 3 || app.profiles[0].VATRatePct == nil {
-		t.Fatalf("applier must receive VAT: %+v", app.profiles)
+	waitApplied(t, h)
+	if _, ps, _ := app.snapshot(); len(ps) != 3 || ps[0].VATRatePct == nil {
+		t.Fatalf("applier must receive VAT: %+v", ps)
 	}
 
 	// Reload (GET) keeps it.
@@ -215,9 +236,10 @@ func TestChainDiscountVATRateRoundTripValidationAndAudit(t *testing.T) {
 	}
 
 	// Changing only the VAT is a change (audited, applied).
-	before := app.calls
+	_, _, before := app.snapshot()
 	code, _ = put([]map[string]interface{}{{"chain": "fathalla", "invoice_discount_pct": 10, "additional_discount_pct": 20, "vat_rate_pct": 14}})
-	if code != 200 || app.calls != before+1 {
+	waitApplied(t, h)
+	if _, _, calls := app.snapshot(); code != 200 || calls != before+1 {
 		t.Fatalf("VAT-only change must apply: %d", code)
 	}
 	logs, _ := fs.GetAuditLogs(context.Background(), "tenant-adeco", "chain_discounts_update", 10)
@@ -325,5 +347,117 @@ func TestListKnownChainsTimesOutWithGatewayTimeout(t *testing.T) {
 	}
 	if time.Since(start) > time.Second {
 		t.Fatalf("GET took %v; must be bounded by knownChainsGetTimeout", time.Since(start))
+	}
+}
+
+// gatedApplier blocks every apply until released and records what it was given.
+type gatedApplier struct {
+	mu      sync.Mutex
+	started chan struct{}
+	release chan struct{}
+	applied [][]domain.ChainDiscountProfile
+}
+
+func newGatedApplier() *gatedApplier {
+	return &gatedApplier{started: make(chan struct{}, 16), release: make(chan struct{})}
+}
+
+func (a *gatedApplier) SetChainDiscountProfiles(_ string, p []domain.ChainDiscountProfile) {
+	a.started <- struct{}{}
+	<-a.release
+	a.mu.Lock()
+	a.applied = append(a.applied, p)
+	a.mu.Unlock()
+}
+
+func TestChainDiscountPutReturnsWhileApplierBlockedAndCoalescesSaves(t *testing.T) {
+	// Contract for the live «false timeout» bug: PUT must answer as soon as Firestore
+	// has the list, even while Sell-In re-enrichment is still running. The client then
+	// shows success (not «انتهت مهلة حفظ») and re-reads if its own budget expires.
+	fs := firestore.NewClient("", true)
+	app := newGatedApplier()
+	h := NewChainDiscountHandler(fs, fs, app)
+	mux := cdMux(h)
+	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
+
+	put := func(invoice float64) {
+		t.Helper()
+		done := make(chan int, 1)
+		start := time.Now()
+		go func() {
+			rec, _ := tmDo(t, mux, admin, "PUT", "/api/v1/product-master/chain-discounts", map[string]interface{}{
+				"profiles": []map[string]interface{}{{"chain": "kazyon", "invoice_discount_pct": invoice}},
+			})
+			done <- rec.Code
+		}()
+		select {
+		case code := <-done:
+			if code != 200 {
+				t.Fatalf("PUT: %d", code)
+			}
+			if d := time.Since(start); d > 500*time.Millisecond {
+				t.Fatalf("PUT took %v while applier was blocked — must return after Firestore only", d)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("PUT blocked on the applier (analytics write lock)")
+		}
+	}
+
+	put(11)
+	select {
+	case <-app.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("background applier never started")
+	}
+	// The worker is stuck in the first apply: later saves must still return at once and coalesce.
+	put(12)
+	put(13)
+	put(14)
+
+	// The saved list is readable immediately, independent of the applier.
+	_, out := tmDo(t, mux, admin, "GET", "/api/v1/product-master/chain-discounts", nil)
+	if ps, _ := out["profiles"].([]interface{}); len(ps) != 1 || ps[0].(map[string]interface{})["invoice_discount_pct"].(float64) != 14 {
+		t.Fatalf("GET must show the latest saved list: %v", out)
+	}
+
+	close(app.release)
+	waitApplied(t, h)
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	if len(app.applied) != 2 {
+		t.Fatalf("expected the in-flight apply plus one coalesced apply, got %d", len(app.applied))
+	}
+	if first := app.applied[0][0].InvoiceDiscountPct; first != 11 {
+		t.Fatalf("first apply: %v", first)
+	}
+	if last := app.applied[1][0].InvoiceDiscountPct; last != 14 {
+		t.Fatalf("latest list must win, got %v", last)
+	}
+}
+
+type panickyApplier struct{ calls chan struct{} }
+
+func (a panickyApplier) SetChainDiscountProfiles(string, []domain.ChainDiscountProfile) {
+	a.calls <- struct{}{}
+	panic("boom")
+}
+
+func TestChainDiscountApplierPanicDoesNotKillWorker(t *testing.T) {
+	fs := firestore.NewClient("", true)
+	app := panickyApplier{calls: make(chan struct{}, 4)}
+	h := NewChainDiscountHandler(fs, fs, app)
+	mux := cdMux(h)
+	admin := &domain.UserClaims{UserID: "u1", Email: "admin@adeco.test", TenantID: "tenant-adeco", Role: domain.RoleAdmin}
+	for i := 0; i < 2; i++ {
+		rec, _ := tmDo(t, mux, admin, "PUT", "/api/v1/product-master/chain-discounts", map[string]interface{}{
+			"profiles": []map[string]interface{}{{"chain": "kazyon", "invoice_discount_pct": float64(10 + i)}},
+		})
+		if rec.Code != 200 {
+			t.Fatalf("PUT: %d", rec.Code)
+		}
+		waitApplied(t, h)
+	}
+	if len(app.calls) != 2 {
+		t.Fatalf("worker must keep applying after a panic, calls=%d", len(app.calls))
 	}
 }
