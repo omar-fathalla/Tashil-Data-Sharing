@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
@@ -181,6 +182,64 @@ func TestShareTargetPreviewAndSave(t *testing.T) {
 	h.HandleTargetBreakdown(bdRec, bdReq)
 	if bdRec.Code != http.StatusOK {
 		t.Fatalf("breakdown HTTP %d: %s", bdRec.Code, bdRec.Body.String())
+	}
+}
+
+func TestShareTargetBaselineListsEveryCategory(t *testing.T) {
+	t.Setenv("TASHIL_TARGETS_DIR", t.TempDir())
+	h, bq := setupTestAnalyticsHandler()
+	tenant := "tenant-share-many"
+	ctx := context.Background()
+	var facts []domain.SellOutFact
+	for i := 0; i < 12; i++ {
+		cat := "فئة-" + strconv.Itoa(i+1)
+		facts = append(facts,
+			shareFact("o"+strconv.Itoa(i), tenant, "fathalla", "s1", "الرحاب", cat, "sku"+strconv.Itoa(i), "2026-05-01", 5, 10+float64(i), true, ""),
+			shareFact("c"+strconv.Itoa(i), tenant, "fathalla", "s1", "الرحاب", cat, "comp"+strconv.Itoa(i), "2026-05-01", 5, 20+float64(i), false, "Comp"),
+		)
+	}
+	if err := bq.InsertSellOutFacts(ctx, facts); err != nil {
+		t.Fatal(err)
+	}
+	req := authenticatedRequest(http.MethodGet, "/api/v1/sellout/share-target/baseline?chain=fathalla&year=2026", tenant)
+	rec := httptest.NewRecorder()
+	h.HandleShareTargetBaseline(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("HTTP %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp domain.ShareTargetBaselineResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Categories) != 12 {
+		t.Fatalf("step2 must list all categories, got %d", len(resp.Categories))
+	}
+
+	annualize := false
+	body, _ := json.Marshal(map[string]interface{}{
+		"retailer_chain": "fathalla",
+		"year":           2026,
+		"annualize":      annualize,
+		"delta_pts":      1.0,
+	})
+	claims := &domain.UserClaims{
+		UserID: "u", TenantID: tenant, Role: domain.RoleVendorAdmin, Email: "m@x.com",
+	}
+	prevReq := authenticatedRequest(http.MethodPost, "/api/v1/sellout/share-target/preview", tenant)
+	prevReq = prevReq.WithContext(context.WithValue(prevReq.Context(), middleware.UserClaimsContextKey, claims))
+	prevReq.Body = ioNopCloser(bytes.NewReader(body))
+	prevReq.Header.Set("Content-Type", "application/json")
+	prevRec := httptest.NewRecorder()
+	h.HandleShareTargetPreview(prevRec, prevReq)
+	if prevRec.Code != http.StatusOK {
+		t.Fatalf("preview HTTP %d: %s", prevRec.Code, prevRec.Body.String())
+	}
+	var preview shareTargetPreviewResponse
+	if err := json.NewDecoder(prevRec.Body).Decode(&preview); err != nil {
+		t.Fatal(err)
+	}
+	if len(preview.Plan.Categories) != 12 || len(preview.Cascades) != 12 {
+		t.Fatalf("step3 must list same categories: plan=%d cascades=%d", len(preview.Plan.Categories), len(preview.Cascades))
 	}
 }
 

@@ -437,6 +437,8 @@ class _ShareTargetWizardDialogState extends State<ShareTargetWizardDialog> {
     if (b == null) {
       return const Center(child: Text('لا توجد بيانات.'));
     }
+    // Every baseline category is editable — same set step 3 reviews.
+    final categories = b.categories;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -449,6 +451,15 @@ class _ShareTargetWizardDialogState extends State<ShareTargetWizardDialog> {
                     ?.copyWith(fontWeight: FontWeight.w800),
               ),
             ),
+            Text(
+              key: const ValueKey('share_category_count'),
+              '${categories.length} فئة',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: 8),
             TextButton(
               onPressed: () => _applyDelta(5),
               child: const Text('+5 نقط للكل'),
@@ -513,10 +524,11 @@ class _ShareTargetWizardDialogState extends State<ShareTargetWizardDialog> {
           ),
         Expanded(
           child: ListView.separated(
-            itemCount: b.categories.length,
+            key: const ValueKey('share_category_list'),
+            itemCount: categories.length,
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (ctx, i) {
-              final c = b.categories[i];
+              final c = categories[i];
               final desired = _desired[c.category] ?? c.currentSharePct;
               ShareCategoryPlan? catPlan;
               if (plan != null) {
@@ -528,6 +540,7 @@ class _ShareTargetWizardDialogState extends State<ShareTargetWizardDialog> {
                 }
               }
               return _CategoryShareCard(
+                key: ValueKey('share_cat_${c.category}'),
                 category: c.category,
                 currentSharePct: c.currentSharePct,
                 desiredSharePct: desired,
@@ -575,7 +588,11 @@ class _ShareTargetWizardDialogState extends State<ShareTargetWizardDialog> {
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 12),
-          Text('الحصص', style: theme.textTheme.labelLarge),
+          Text(
+            key: const ValueKey('share_review_category_count'),
+            'الحصص (${plan.categories.length} فئة)',
+            style: theme.textTheme.labelLarge,
+          ),
           const SizedBox(height: 6),
           for (final c in plan.categories)
             Padding(
@@ -708,6 +725,7 @@ class _BottomBar extends StatelessWidget {
 
 class _CategoryShareCard extends StatefulWidget {
   const _CategoryShareCard({
+    super.key,
     required this.category,
     required this.currentSharePct,
     required this.desiredSharePct,
@@ -739,6 +757,7 @@ class _CategoryShareCard extends StatefulWidget {
 
 class _CategoryShareCardState extends State<_CategoryShareCard> {
   late final TextEditingController _ctrl;
+  late final FocusNode _focus;
 
   @override
   void initState() {
@@ -746,26 +765,36 @@ class _CategoryShareCardState extends State<_CategoryShareCard> {
     _ctrl = TextEditingController(
       text: widget.desiredSharePct.toStringAsFixed(1),
     );
+    _focus = FocusNode();
+    _focus.addListener(_onFocusChange);
   }
 
-  @override
-  void didUpdateWidget(covariant _CategoryShareCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final next = widget.desiredSharePct.toStringAsFixed(1);
-    if (_ctrl.text != next && !_ctrl.selection.isValid) {
-      _ctrl.text = next;
-    } else if (_ctrl.text != next &&
-        double.tryParse(_ctrl.text) != widget.desiredSharePct) {
-      final sel = _ctrl.selection;
-      _ctrl.text = next;
-      if (sel.isValid) {
-        _ctrl.selection = sel;
+  void _onFocusChange() {
+    if (!_focus.hasFocus) {
+      // Normalize display once editing ends (e.g. 35 → 35.0).
+      final next = widget.desiredSharePct.toStringAsFixed(1);
+      if (_ctrl.text != next) {
+        _ctrl.text = next;
       }
     }
   }
 
   @override
+  void didUpdateWidget(covariant _CategoryShareCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Never rewrite the field while the user is typing — that clipped/mangled
+    // values (39.0→"39.", typing 35→5) when the narrow field + parent rebuilds.
+    if (_focus.hasFocus) return;
+    final next = widget.desiredSharePct.toStringAsFixed(1);
+    if (_ctrl.text != next) {
+      _ctrl.text = next;
+    }
+  }
+
+  @override
   void dispose() {
+    _focus.removeListener(_onFocusChange);
+    _focus.dispose();
     _ctrl.dispose();
     super.dispose();
   }
@@ -814,19 +843,34 @@ class _CategoryShareCardState extends State<_CategoryShareCard> {
                     label: '${widget.desiredSharePct.toStringAsFixed(1)}%',
                     onChanged: (v) {
                       final n = double.parse(v.toStringAsFixed(1));
-                      _ctrl.text = n.toStringAsFixed(1);
+                      if (!_focus.hasFocus) {
+                        _ctrl.text = n.toStringAsFixed(1);
+                      }
                       widget.onChanged(n);
                     },
                   ),
                 ),
+                const SizedBox(width: 8),
                 SizedBox(
-                  width: 72,
+                  // Was 72 — clipped multi-digit shares (39.0→"39.", 15→"5").
+                  width: 112,
                   child: TextField(
+                    key: ValueKey('share_pct_field_${widget.category}'),
                     controller: _ctrl,
+                    focusNode: _focus,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                     decoration: InputDecoration(
                       isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 12,
+                      ),
                       suffixText: '%',
                       errorText: widget.exceedsMarket ? '!' : null,
                       border: const OutlineInputBorder(),

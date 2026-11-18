@@ -177,6 +177,13 @@ func (c *Client) GetShareTargetBaseline(ctx context.Context, tenantID, chain str
 	return resp, nil
 }
 
+// ShareTargetCascadeInputs is historical branch / SKU / month weight for one category.
+type ShareTargetCascadeInputs struct {
+	Branches     []sharetarget.BranchWeight
+	SKUsByBranch map[string][]sharetarget.SKUWeight
+	Months       []sharetarget.MonthWeight
+}
+
 // BuildShareTargetCascadeInputs collects historical branch / SKU / month weights for one
 // category inside a chain/year so the wizard can preview the cascade.
 func (c *Client) BuildShareTargetCascadeInputs(ctx context.Context, tenantID, chain, category string, year int, branchFilter map[string]bool) (
@@ -185,12 +192,54 @@ func (c *Client) BuildShareTargetCascadeInputs(ctx context.Context, tenantID, ch
 	months []sharetarget.MonthWeight,
 	err error,
 ) {
+	batch, err := c.BuildShareTargetCascadesBatch(ctx, tenantID, chain, year, []string{category}, branchFilter, nil)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	want := domain.NormalizeProductCategory(category)
+	if want == "" {
+		want = "غير مصنف"
+	}
+	in, ok := batch[want]
+	if !ok {
+		// Fall back to raw key when normalize was a no-op identity.
+		in = batch[strings.TrimSpace(category)]
+	}
+	if in.SKUsByBranch == nil {
+		in.SKUsByBranch = map[string][]sharetarget.SKUWeight{}
+	}
+	return in.Branches, in.SKUsByBranch, in.Months, nil
+}
+
+// BuildShareTargetCascadesBatch scans sell-out facts once and buckets cascade weights by
+// normalized category. skuFor limits SKU-mix collection (nil/empty = all requested cats).
+func (c *Client) BuildShareTargetCascadesBatch(ctx context.Context, tenantID, chain string, year int, categories []string, branchFilter map[string]bool, skuFor map[string]bool) (map[string]ShareTargetCascadeInputs, error) {
 	_ = ctx
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	ch := strings.ToLower(strings.TrimSpace(chain))
-	wantCat := domain.NormalizeProductCategory(category)
+	want := map[string]bool{}
+	for _, cat := range categories {
+		name := domain.NormalizeProductCategory(cat)
+		if name == "" {
+			name = "غير مصنف"
+		}
+		want[name] = true
+	}
+	collectAllSKU := len(skuFor) == 0
+	skuWant := map[string]bool{}
+	for k, v := range skuFor {
+		if !v {
+			continue
+		}
+		name := domain.NormalizeProductCategory(k)
+		if name == "" {
+			name = "غير مصنف"
+		}
+		skuWant[name] = true
+	}
+
 	type skuAcc struct {
 		name, key string
 		rev       float64
@@ -201,8 +250,16 @@ func (c *Client) BuildShareTargetCascadeInputs(ctx context.Context, tenantID, ch
 		own  float64
 		skus map[string]*skuAcc
 	}
-	brMap := map[string]*brAcc{}
-	monthRev := map[int]float64{}
+	type catAcc struct {
+		brMap    map[string]*brAcc
+		monthRev map[int]float64
+	}
+	byCat := map[string]*catAcc{}
+	for name := range want {
+		byCat[name] = &catAcc{brMap: map[string]*brAcc{}, monthRev: map[int]float64{}}
+	}
+	// Empty want → collect every category seen (useful for probes).
+	collectAllCats := len(want) == 0
 
 	for _, r := range c.records {
 		if !matchTenant(r.TenantID, tenantID) || !matchChainFilter(r.RetailerChain, ch) {
@@ -219,7 +276,7 @@ func (c *Client) BuildShareTargetCascadeInputs(ctx context.Context, tenantID, ch
 		if catName == "" {
 			catName = "غير مصنف"
 		}
-		if wantCat != "" && catName != wantCat {
+		if !collectAllCats && !want[catName] {
 			continue
 		}
 		if !isOwnRecord(r) {
@@ -236,64 +293,83 @@ func (c *Client) BuildShareTargetCascadeInputs(ctx context.Context, tenantID, ch
 		if len(branchFilter) > 0 && !branchFilter[brKey] && !branchFilter[strings.TrimSpace(r.StoreName)] {
 			continue
 		}
-		b, ok := brMap[brKey]
+		acc, ok := byCat[catName]
+		if !ok {
+			acc = &catAcc{brMap: map[string]*brAcc{}, monthRev: map[int]float64{}}
+			byCat[catName] = acc
+		}
+		b, ok := acc.brMap[brKey]
 		if !ok {
 			b = &brAcc{name: strings.TrimSpace(r.StoreName), skus: map[string]*skuAcc{}}
 			if b.name == "" {
 				b.name = brKey
 			}
-			brMap[brKey] = b
+			acc.brMap[brKey] = b
 		}
 		if n := strings.TrimSpace(r.StoreName); n != "" {
 			b.name = n
 		}
 		b.own += r.NetRevenue
-		skuKey := strings.TrimSpace(r.Barcode)
-		if skuKey == "" {
-			skuKey = strings.TrimSpace(r.SKUName)
-		}
-		if skuKey != "" {
-			s, ok := b.skus[skuKey]
-			if !ok {
-				s = &skuAcc{key: skuKey, name: strings.TrimSpace(r.SKUName)}
-				b.skus[skuKey] = s
+		needSKU := collectAllSKU || skuWant[catName]
+		if needSKU {
+			skuKey := strings.TrimSpace(r.Barcode)
+			if skuKey == "" {
+				skuKey = strings.TrimSpace(r.SKUName)
 			}
-			if n := strings.TrimSpace(r.SKUName); n != "" {
-				s.name = n
+			if skuKey != "" {
+				s, ok := b.skus[skuKey]
+				if !ok {
+					s = &skuAcc{key: skuKey, name: strings.TrimSpace(r.SKUName)}
+					b.skus[skuKey] = s
+				}
+				if n := strings.TrimSpace(r.SKUName); n != "" {
+					s.name = n
+				}
+				s.rev += r.NetRevenue
+				s.units += float64(r.QuantitySold)
 			}
-			s.rev += r.NetRevenue
-			s.units += float64(r.QuantitySold)
 		}
 		if mo := monthNum(r.TransactionDate); mo >= 1 && mo <= 12 {
-			monthRev[mo] += r.NetRevenue
+			acc.monthRev[mo] += r.NetRevenue
 		}
 	}
 
-	skusByBranch = map[string][]sharetarget.SKUWeight{}
-	for key, b := range brMap {
-		branches = append(branches, sharetarget.BranchWeight{
-			BranchKey: key, BranchName: b.name, OwnRevenue: b.own,
-		})
-		list := make([]sharetarget.SKUWeight, 0, len(b.skus))
-		for _, s := range b.skus {
-			avg := 0.0
-			if s.units > 0 {
-				avg = s.rev / s.units
-			}
-			list = append(list, sharetarget.SKUWeight{
-				SKUKey: s.key, SKUName: s.name, OwnRevenue: s.rev, AvgPrice: avg,
+	out := make(map[string]ShareTargetCascadeInputs, len(byCat))
+	for catName, acc := range byCat {
+		var branches []sharetarget.BranchWeight
+		skusByBranch := map[string][]sharetarget.SKUWeight{}
+		for key, b := range acc.brMap {
+			branches = append(branches, sharetarget.BranchWeight{
+				BranchKey: key, BranchName: b.name, OwnRevenue: b.own,
 			})
+			if len(b.skus) == 0 {
+				continue
+			}
+			list := make([]sharetarget.SKUWeight, 0, len(b.skus))
+			for _, s := range b.skus {
+				avg := 0.0
+				if s.units > 0 {
+					avg = s.rev / s.units
+				}
+				list = append(list, sharetarget.SKUWeight{
+					SKUKey: s.key, SKUName: s.name, OwnRevenue: s.rev, AvgPrice: avg,
+				})
+			}
+			skusByBranch[key] = list
 		}
-		skusByBranch[key] = list
+		sort.Slice(branches, func(i, j int) bool {
+			return branches[i].OwnRevenue > branches[j].OwnRevenue
+		})
+		var months []sharetarget.MonthWeight
+		for m, w := range acc.monthRev {
+			months = append(months, sharetarget.MonthWeight{Month: m, Weight: w})
+		}
+		sort.Slice(months, func(i, j int) bool { return months[i].Month < months[j].Month })
+		out[catName] = ShareTargetCascadeInputs{
+			Branches: branches, SKUsByBranch: skusByBranch, Months: months,
+		}
 	}
-	sort.Slice(branches, func(i, j int) bool {
-		return branches[i].OwnRevenue > branches[j].OwnRevenue
-	})
-	for m, w := range monthRev {
-		months = append(months, sharetarget.MonthWeight{Month: m, Weight: w})
-	}
-	sort.Slice(months, func(i, j int) bool { return months[i].Month < months[j].Month })
-	return branches, skusByBranch, months, nil
+	return out, nil
 }
 
 var errShareTargetChainRequired = errString("retailer_chain is required (one chain; no cross-chain merge)")
