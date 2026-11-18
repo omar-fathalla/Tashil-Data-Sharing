@@ -2,9 +2,12 @@ import '../../../core/network/api_client.dart';
 
 /// KPI-card numbers of the Targets tab.
 ///
-/// The target card keeps every target (a 2027 target counts), but achievement
-/// % and the gap only compare periods that have actual sales: a future year
-/// with no sales yet must not read as "0% achieved, gap −180M".
+/// Sell-Out header cards are year-scoped: when the filter is a single year,
+/// [fromSummary] already sees only that year. When "كل السنوات" still mixes
+/// future periods without sales, the UI Target / Achievement / Gap cards all
+/// use the comparable (has-sales) totals so they share one denominator. The
+/// [targetRevenue] field still sums every item for diagnostics; the panel
+/// prefers [comparableTargetRevenue] whenever [includesNoData] is true.
 class TargetKpis {
   const TargetKpis({
     required this.targetRevenue,
