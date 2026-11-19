@@ -779,10 +779,6 @@ class _CumulativeChart extends StatefulWidget {
 class _CumulativeChartState extends State<_CumulativeChart> {
   int? _hoverIndex;
 
-  /// Brand green (solid) = المحقق; indigo (dashed) = المستهدف.
-  static const _actualColor = Color(0xFF1B7A4E);
-  static const _targetColor = Color(0xFF3D5AFE);
-
   static String _yTick(double v) =>
       CurrencyFormatter.formatCompactEGP(v, decimals: 0);
 
@@ -885,6 +881,11 @@ class _CumulativeChartState extends State<_CumulativeChart> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final accents = M3StatusColors.of(context).accents;
+    // High contrast theme roles (not the old close primary/teal pair):
+    // solid positiveStrong = المحقق; dashed indigo = المستهدف.
+    final actualColor = accents.positiveStrong;
+    final targetColor = accents.indigo;
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
           color: cs.onSurfaceVariant,
           fontWeight: FontWeight.w600,
@@ -967,8 +968,8 @@ class _CumulativeChartState extends State<_CumulativeChart> {
                                         painter: _CumulativePainter(
                                           points: widget.points,
                                           maxY: maxY,
-                                          targetColor: _targetColor,
-                                          actualColor: _actualColor,
+                                          targetColor: targetColor,
+                                          actualColor: actualColor,
                                           gridColor: cs.outlineVariant
                                               .withOpacity(0.4),
                                           hoverIndex: _hoverIndex,
@@ -1015,9 +1016,9 @@ class _CumulativeChartState extends State<_CumulativeChart> {
           const SizedBox(height: 4),
           Row(
             children: [
-              _legend(context, _targetColor, 'المستهدف', dashed: true),
+              _legend(context, targetColor, 'المستهدف', dashed: true),
               const SizedBox(width: 12),
-              _legend(context, _actualColor, 'المحقق', dashed: false),
+              _legend(context, actualColor, 'المحقق', dashed: false),
             ],
           ),
         ],
@@ -1078,8 +1079,8 @@ class _CumulativePainter extends CustomPainter {
     required this.targetColor,
     required this.actualColor,
     required this.gridColor,
+    required this.crosshairColor,
     this.hoverIndex,
-    this.crosshairColor = const Color(0xFF9E9E9E),
   });
 
   final List<TargetCumulativePoint> points;
