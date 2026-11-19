@@ -97,4 +97,12 @@ type TargetBreakdownResponse struct {
 	Branches  []TargetBreakdownBranch    `json:"branches"`
 	NoHistory []TargetBreakdownNoHistory `json:"no_history"`
 	Source    string                     `json:"source"` // "bigquery" | "memory"
+
+	// MonthlyPhasing is the seasonal 12-month series for the (possibly branch-filtered) target.
+	// Present for annual targets so the detail page can rebuild Monthly / chart when filters change.
+	MonthlyPhasing []TargetMonthBreakdown `json:"monthly_phasing,omitempty"`
+
+	// AppliedBranch / AppliedMonth echo optional query filters (empty / 0 = none).
+	AppliedBranch string `json:"applied_branch,omitempty"`
+	AppliedMonth  int    `json:"applied_month,omitempty"`
 }

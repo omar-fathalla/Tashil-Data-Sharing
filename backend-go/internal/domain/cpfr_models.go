@@ -438,19 +438,21 @@ type TargetSalesRepQuota struct {
 
 // TargetMonthBreakdown breaks down an annual or multi-month target across individual calendar months using historical seasonality.
 type TargetMonthBreakdown struct {
-	Year               int     `json:"year"`
-	Month              int     `json:"month"`
-	MonthLabelAr       string  `json:"month_label_ar"`
-	MonthLabelEn       string  `json:"month_label_en"`
+	Year                int     `json:"year"`
+	Month               int     `json:"month"`
+	MonthLabelAr        string  `json:"month_label_ar"`
+	MonthLabelEn        string  `json:"month_label_en"`
 	SeasonalitySharePct float64 `json:"seasonality_share_pct"`
-	TargetRevenueEGP   float64 `json:"target_revenue_egp"`
-	TargetUnits        float64 `json:"target_units"`
-	TargetWeightTons   float64 `json:"target_weight_tons"`
-	ActualRevenueEGP   float64 `json:"actual_revenue_egp"`
-	ActualUnits        float64 `json:"actual_units"`
-	ExpectedRevenueEGP float64 `json:"expected_revenue_egp"`
-	VarianceRevenueEGP float64 `json:"variance_revenue_egp"`
-	AchievementPct     float64 `json:"achievement_pct"`
+	TargetRevenueEGP    float64 `json:"target_revenue_egp"`
+	TargetUnits         float64 `json:"target_units"`
+	TargetWeightTons    float64 `json:"target_weight_tons"`
+	ActualRevenueEGP    float64 `json:"actual_revenue_egp"`
+	ActualUnits         float64 `json:"actual_units"`
+	ExpectedRevenueEGP  float64 `json:"expected_revenue_egp"`
+	VarianceRevenueEGP  float64 `json:"variance_revenue_egp"`
+	AchievementPct      float64 `json:"achievement_pct"`
+	// HasActuals is true when the month has at least one in-scope Sell-Out row (even if revenue is 0).
+	HasActuals bool `json:"has_actuals"`
 }
 
 // TargetRecord represents a saved Sell-Out or Sell-In target for a tenant, chain, period (year/month), and optional branch/category.

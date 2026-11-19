@@ -7,8 +7,11 @@ import 'package:tashil_web/core/testing/test_semantics.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/target_breakdown_models.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/target_repository.dart';
+import 'package:tashil_web/features/sell_out_analytics/domain/target_monthly_series.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/widgets/target_detail_page.dart';
 import 'package:tashil_web/features/sell_out_analytics/presentation/widgets/target_management_panel.dart';
+
+import 'helpers/m3_dropdown_tester.dart';
 
 SemanticsNode? _findNodeById(WidgetTester tester, String id) {
   final root = tester.binding.pipelineOwner.semanticsOwner?.rootSemanticsNode;
@@ -192,15 +195,63 @@ class _FakeRepo extends TargetRepository {
           {bool forceRefresh = false}) async =>
       const Success(<RetailChainModel>[]);
 
+  final breakdownFilterRequests = <Map<String, Object?>>[];
+
   @override
   Future<Result<TargetBreakdownModel>> loadBreakdown(
     String targetId, {
+    String? branch,
+    int? month,
     bool forceRefresh = false,
   }) async {
     breakdownRequests.add(targetId);
-    final json = breakdowns[targetId];
-    if (json == null) {
+    breakdownFilterRequests.add({
+      'id': targetId,
+      'branch': branch,
+      'month': month,
+    });
+    final json = Map<String, dynamic>.from(breakdowns[targetId] ?? const {});
+    if (json.isEmpty) {
       return const Failure(AppError.unknown('missing'));
+    }
+    // Simulate server filters for widget tests.
+    if (branch != null && branch.isNotEmpty) {
+      final branches = (json['branches'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .where((b) => b['branch_key'] == branch)
+          .toList();
+      json['branches'] = branches;
+      json['applied_branch'] = branch;
+      if (branches.isNotEmpty) {
+        json['target_revenue_egp'] = branches.first['allocated_target_egp'];
+        json['actual_revenue_egp'] = branches.first['actual_revenue_egp'];
+        json['achievement_pct'] = branches.first['achievement_pct'];
+        json['gap_egp'] = branches.first['gap_egp'];
+      }
+    }
+    if (month != null && month >= 1 && month <= 12) {
+      json['applied_month'] = month;
+      json['month'] = month;
+    }
+    if (json['monthly_phasing'] == null) {
+      final target = (json['target_revenue_egp'] as num?)?.toDouble() ?? 0;
+      final units = (json['target_units'] as num?)?.toDouble() ?? 0;
+      json['monthly_phasing'] = [
+        for (var m = 1; m <= 12; m++)
+          {
+            'year': json['year'],
+            'month': m,
+            'month_label_ar': 'm$m',
+            'month_label_en': 'm$m',
+            'seasonality_share_pct': m <= 4 ? (m == 2 ? 16.0 : 10.0) : 8.3,
+            'target_revenue_egp': target / 12,
+            'target_units': units / 12,
+            'actual_revenue_egp': m <= 3 ? target / 36 : 0,
+            'actual_units': m <= 3 ? units / 36 : 0,
+            'has_actuals': m <= 3,
+            'achievement_pct': m <= 3 ? 100 : 0,
+          },
+      ];
     }
     return Success(TargetBreakdownModel.fromJson(json));
   }
@@ -412,5 +463,145 @@ void main() {
     final para = tester.renderObject<RenderParagraph>(header);
     expect(para.didExceedMaxLines, isFalse);
     expect(find.text('ال…'), findsNothing);
+  });
+
+  testWidgets('branch filter reloads breakdown and updates monthly cards',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final target = TargetComparisonModel.fromJson(_item('t26', 2026,
+        target: 150000000,
+        actual: 127135120,
+        hasActuals: true,
+        units: 250000,
+        actualUnits: 1532854));
+    final repo = _FakeRepo(const [], {'t26': _breakdownJson()});
+
+    await tester.pumpWidget(_host(TargetDetailPage(
+      repository: repo,
+      target: target,
+      onBack: () {},
+    )));
+    await tester.pumpAndSettle();
+
+    expect(repo.breakdownFilterRequests, isNotEmpty);
+    expect(repo.breakdownFilterRequests.first['branch'], isNull);
+
+    // Shared prefix «فرع » is stripped in the menu → «الزمالك» (key B).
+    await selectM3Option(
+      tester,
+      find.byKey(const ValueKey('target_detail_branch_filter')),
+      'الزمالك',
+    );
+
+    expect(
+      repo.breakdownFilterRequests.any((r) => r['branch'] == 'B'),
+      isTrue,
+    );
+    expect(find.byKey(const ValueKey('target_detail_month_card_1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('target_detail_kpi_year')), findsOneWidget);
+  });
+
+  testWidgets('month filter passes month to breakdown and shows one card',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final target = TargetComparisonModel.fromJson(_item('t26', 2026,
+        target: 150000000,
+        actual: 127135120,
+        hasActuals: true,
+        units: 250000,
+        actualUnits: 1532854));
+    final repo = _FakeRepo(const [], {'t26': _breakdownJson()});
+
+    await tester.pumpWidget(_host(TargetDetailPage(
+      repository: repo,
+      target: target,
+      onBack: () {},
+    )));
+    await tester.pumpAndSettle();
+
+    await selectM3Option(
+      tester,
+      find.byKey(const ValueKey('target_detail_month_filter')),
+      'مارس',
+    );
+
+    expect(
+      repo.breakdownFilterRequests.any((r) => r['month'] == 3),
+      isTrue,
+    );
+    expect(find.byKey(const ValueKey('target_detail_month_card_3')), findsOneWidget);
+    expect(find.byKey(const ValueKey('target_detail_month_card_1')), findsNothing);
+    expect(find.byKey(const ValueKey('target_detail_month_card_12')), findsNothing);
+  });
+
+  testWidgets('chart shows hover tooltip; actual line stops; legend distinct',
+      (tester) async {
+    tester.view.physicalSize = const Size(1280, 1800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final target = TargetComparisonModel.fromJson(_item('t26', 2026,
+        target: 150000000,
+        actual: 127135120,
+        hasActuals: true,
+        units: 250000,
+        actualUnits: 1532854));
+    final repo = _FakeRepo(const [], {'t26': _breakdownJson()});
+
+    await tester.pumpWidget(_host(TargetDetailPage(
+      repository: repo,
+      target: target,
+      onBack: () {},
+    )));
+    await tester.pumpAndSettle();
+
+    final chart = find.byKey(const ValueKey('target_detail_cumulative_chart'));
+    expect(chart, findsOneWidget);
+    expect(find.text('المستهدف'), findsWidgets);
+    expect(find.text('المحقق'), findsWidgets);
+
+    final box = tester.getRect(chart);
+    await tester.tapAt(Offset(box.left + box.width * 0.35, box.top + 90));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('target_detail_chart_tooltip')), findsOneWidget);
+    expect(find.textContaining('المستهدف:'), findsWidgets);
+    expect(find.textContaining('نسبة التحقيق:'), findsWidgets);
+
+    // After reload, series has hasActuals only for months 1..3 — cumulative flags match.
+    final series = TargetMonthlySeries.build(
+      target: target,
+      phasingOverride: [
+        for (var m = 1; m <= 12; m++)
+          TargetMonthBreakdownModel(
+            year: 2026,
+            month: m,
+            monthLabelAr: 'm$m',
+            monthLabelEn: 'm$m',
+            seasonalitySharePct: 8.3,
+            targetRevenueEgp: 100,
+            targetUnits: 10,
+            targetWeightTons: 0,
+            actualRevenueEgp: m <= 3 ? 50 : 0,
+            actualUnits: m <= 3 ? 5 : 0,
+            expectedRevenueEgp: 0,
+            varianceRevenueEgp: 0,
+            achievementPct: 0,
+            hasActuals: m <= 3,
+          ),
+      ],
+    );
+    expect(series.cumulative.where((p) => p.hasActuals).length, 3);
+    expect(series.cumulative.last.hasActuals, isFalse);
+    expect(series.cumulative[2].hasActuals, isTrue);
   });
 }

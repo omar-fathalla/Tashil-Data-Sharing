@@ -167,6 +167,8 @@ class _FakeRepo extends TargetRepository {
   @override
   Future<Result<TargetBreakdownModel>> loadBreakdown(
     String targetId, {
+    String? branch,
+    int? month,
     bool forceRefresh = false,
   }) async {
     breakdownRequests.add(targetId);

@@ -114,3 +114,22 @@ func (m *memTargetSource) Rows(_ context.Context, baseline, actual targetalloc.W
 	}
 	return out, nil
 }
+
+// BuildSellOutMonthlyPhasing returns seasonal monthly targets + year-Y actuals for a Sell-Out
+// target. branchKey scopes weights/actuals to one store key (empty = target / chain scope).
+func (c *Client) BuildSellOutMonthlyPhasing(_ context.Context, tenantID string, t domain.TargetRecord, yearTargetRev, yearTargetUnits float64, branchKey string) []domain.TargetMonthBreakdown {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.buildSellOutMonthlyPhasingFilteredLocked(normalizeTenantKey(tenantID), t, yearTargetRev, yearTargetUnits, branchKey)
+}
+
+// PriorYearMonthShare returns the Y-1 seasonal revenue/units share for one calendar month (1..12).
+func (c *Client) PriorYearMonthShare(_ context.Context, tenantID string, t domain.TargetRecord, branchKey string, month int) (revShare, unitShare float64) {
+	if month < 1 || month > 12 {
+		return 1.0 / 12.0, 1.0 / 12.0
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	rev, units := c.priorYearSeasonalSharesLocked(normalizeTenantKey(tenantID), t, branchKey)
+	return rev[month-1], units[month-1]
+}
