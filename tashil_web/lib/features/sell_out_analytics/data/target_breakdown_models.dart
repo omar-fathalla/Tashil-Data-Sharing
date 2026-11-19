@@ -1,3 +1,5 @@
+import '../../../core/network/api_client.dart' show TargetMonthBreakdownModel;
+
 /// Response of `GET /api/v1/sellout/targets/{id}/breakdown`: how one Sell-Out
 /// target is spread over branches and SKUs (proportional to a historical
 /// baseline) next to the actuals of the target period.
@@ -30,6 +32,11 @@ class TargetBreakdownModel {
   final List<TargetBreakdownNoHistoryModel> noHistory;
   final String source;
 
+  /// Seasonal 12-month series for the (possibly branch-filtered) annual target.
+  final List<TargetMonthBreakdownModel> monthlyPhasing;
+  final String appliedBranch;
+  final int appliedMonth;
+
   const TargetBreakdownModel({
     required this.targetId,
     required this.retailerChain,
@@ -55,6 +62,9 @@ class TargetBreakdownModel {
     this.branches = const [],
     this.noHistory = const [],
     this.source = '',
+    this.monthlyPhasing = const [],
+    this.appliedBranch = '',
+    this.appliedMonth = 0,
   });
 
   /// Sum of the branch allocations; equals [targetRevenueEgp] when a
@@ -101,6 +111,9 @@ class TargetBreakdownModel {
       branches: list('branches', TargetBreakdownBranchModel.fromJson),
       noHistory: list('no_history', TargetBreakdownNoHistoryModel.fromJson),
       source: json['source'] as String? ?? '',
+      monthlyPhasing: list('monthly_phasing', TargetMonthBreakdownModel.fromJson),
+      appliedBranch: json['applied_branch'] as String? ?? '',
+      appliedMonth: (json['applied_month'] as num?)?.toInt() ?? 0,
     );
   }
 }

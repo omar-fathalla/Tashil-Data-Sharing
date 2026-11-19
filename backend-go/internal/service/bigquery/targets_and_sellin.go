@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/targetalloc"
 )
 
 func getTargetsStorageDir() string {
@@ -1613,10 +1614,18 @@ func (c *Client) buildComprehensiveTargetItemLocked(normTenant string, t domain.
 	}
 }
 
-// buildSellOutMonthlyPhasingLocked splits a yearly Sell-Out target into 12 equal
-// months and fills each month's actuals with the same own-brand SUM used by
-// computeActualForTargetLocked. Month-scoped targets keep a single entry.
+// buildSellOutMonthlyPhasingLocked splits a yearly Sell-Out target across 12 months
+// using prior-year (Y-1) seasonal weights from own-brand sell_out_facts, then fills
+// each month's actuals with the same SUM used by computeActualForTargetLocked.
+// Month-scoped targets keep a single entry (100% share).
 func (c *Client) buildSellOutMonthlyPhasingLocked(normTenant string, t domain.TargetRecord, yearTargetRev, yearTargetUnits float64) []domain.TargetMonthBreakdown {
+	return c.buildSellOutMonthlyPhasingFilteredLocked(normTenant, t, yearTargetRev, yearTargetUnits, "")
+}
+
+// buildSellOutMonthlyPhasingFilteredLocked is like buildSellOutMonthlyPhasingLocked but
+// optionally scopes prior-year weights and year-Y actuals to an exact branch key
+// (store id / store key). Empty branchKey keeps the target's own branch scope.
+func (c *Client) buildSellOutMonthlyPhasingFilteredLocked(normTenant string, t domain.TargetRecord, yearTargetRev, yearTargetUnits float64, branchKey string) []domain.TargetMonthBreakdown {
 	arabicMonths := []string{
 		"يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
 		"يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
@@ -1626,9 +1635,16 @@ func (c *Client) buildSellOutMonthlyPhasingLocked(normTenant string, t domain.Ta
 		"July", "August", "September", "October", "November", "December",
 	}
 
-	buildOne := func(month int, targetRev, targetUnits float64) domain.TargetMonthBreakdown {
+	revShares, unitShares := c.priorYearSeasonalSharesLocked(normTenant, t, branchKey)
+	revTargets := targetalloc.ApportionByShare(yearTargetRev, revShares)
+	unitTargets := targetalloc.ApportionByShare(yearTargetUnits, unitShares)
+
+	buildOne := func(month int, targetRev, targetUnits, share float64) domain.TargetMonthBreakdown {
 		mt := t
 		mt.Month = month
+		if branchKey != "" {
+			mt.BranchName = branchKey
+		}
 		actualRev, actualUnits, rows := c.computeActualForTargetLocked(normTenant, mt)
 		ach := 0.0
 		if targetRev > 0 && rows > 0 {
@@ -1640,31 +1656,126 @@ func (c *Client) buildSellOutMonthlyPhasingLocked(normTenant string, t domain.Ta
 			actualRev, actualUnits, ach = 0, 0, 0
 		}
 		return domain.TargetMonthBreakdown{
-			Year:               t.Year,
-			Month:              month,
-			MonthLabelAr:       arabicMonths[month-1],
-			MonthLabelEn:       englishMonths[month-1],
-			SeasonalitySharePct: round2(100.0 / 12.0),
-			TargetRevenueEGP:   round2(targetRev),
-			TargetUnits:        round2(targetUnits),
-			ActualRevenueEGP:   round2(actualRev),
-			ActualUnits:        round2(actualUnits),
-			VarianceRevenueEGP: round2(actualRev - targetRev),
-			AchievementPct:     ach,
+			Year:                t.Year,
+			Month:               month,
+			MonthLabelAr:        arabicMonths[month-1],
+			MonthLabelEn:        englishMonths[month-1],
+			SeasonalitySharePct: targetalloc.SharePct(share),
+			TargetRevenueEGP:    round2(targetRev),
+			TargetUnits:         round2(targetUnits),
+			ActualRevenueEGP:    round2(actualRev),
+			ActualUnits:         round2(actualUnits),
+			VarianceRevenueEGP:  round2(actualRev - targetRev),
+			AchievementPct:      ach,
+			HasActuals:          rows > 0,
 		}
 	}
 
 	if t.Month >= 1 && t.Month <= 12 {
-		return []domain.TargetMonthBreakdown{buildOne(t.Month, yearTargetRev, yearTargetUnits)}
+		m := t.Month
+		return []domain.TargetMonthBreakdown{buildOne(m, yearTargetRev, yearTargetUnits, 1.0)}
 	}
 
-	monthRev := yearTargetRev / 12.0
-	monthUnits := yearTargetUnits / 12.0
 	out := make([]domain.TargetMonthBreakdown, 0, 12)
 	for m := 1; m <= 12; m++ {
-		out = append(out, buildOne(m, monthRev, monthUnits))
+		out = append(out, buildOne(m, revTargets[m-1], unitTargets[m-1], revShares[m-1]))
 	}
 	return out
+}
+
+// priorYearSeasonalSharesLocked returns revenue and units seasonal shares for target year Y
+// from Y-1 own-brand Sell-Out. Branch with no Y-1 sales falls back to the chain; chain with
+// none → equal 1/12. branchKey, when set, is matched as store id / store name / store key.
+func (c *Client) priorYearSeasonalSharesLocked(normTenant string, t domain.TargetRecord, branchKey string) (revShares, unitShares [12]float64) {
+	ch := strings.ToLower(strings.TrimSpace(t.RetailerChain))
+	if ch == "all" || ch == "الكل" {
+		ch = ""
+	}
+	cat := strings.ToLower(strings.TrimSpace(t.Category))
+	if cat == "all" || cat == "كل الفئات" {
+		cat = ""
+	}
+	br := strings.ToLower(strings.TrimSpace(branchKey))
+	if br == "" {
+		br = strings.ToLower(strings.TrimSpace(t.BranchName))
+		if br == "all" || br == "كل الفروع" {
+			br = ""
+		}
+	}
+	prior := t.Year - 1
+	if prior < 1900 {
+		return targetalloc.SeasonalShares([12]float64{}), targetalloc.SeasonalShares([12]float64{})
+	}
+	prefix := fmt.Sprintf("%04d-", prior)
+
+	matchScope := func(r domain.SellOutFact, branchFilter string) bool {
+		if !matchTenant(r.TenantID, normTenant) || !isOwnRecord(r) {
+			return false
+		}
+		if ch != "" && !strings.EqualFold(r.RetailerChain, ch) {
+			return false
+		}
+		if !strings.HasPrefix(r.TransactionDate, prefix) {
+			return false
+		}
+		if cat != "" {
+			normCat := strings.ToLower(domain.NormalizeProductCategory(r.Category))
+			if !strings.Contains(normCat, cat) &&
+				!strings.Contains(strings.ToLower(r.Category), cat) &&
+				!strings.Contains(strings.ToLower(r.SKUName), cat) {
+				return false
+			}
+		}
+		if branchFilter != "" {
+			storeKey := r.StoreID
+			if storeKey == "" {
+				storeKey = r.StoreName
+			}
+			if !strings.EqualFold(storeKey, branchFilter) &&
+				!strings.Contains(strings.ToLower(r.StoreName), branchFilter) &&
+				!strings.Contains(strings.ToLower(r.StoreID), branchFilter) {
+				return false
+			}
+		}
+		return true
+	}
+
+	accumulate := func(branchFilter string) (rev, units [12]float64, any bool) {
+		for _, r := range c.records {
+			if !matchScope(r, branchFilter) {
+				continue
+			}
+			mo := monthNum(r.TransactionDate)
+			if mo < 1 || mo > 12 {
+				continue
+			}
+			if r.NetRevenue > 0 {
+				rev[mo-1] += r.NetRevenue
+				any = true
+			}
+			if r.QuantitySold > 0 {
+				units[mo-1] += float64(r.QuantitySold)
+				any = true
+			}
+		}
+		return rev, units, any
+	}
+
+	var revHist, unitHist [12]float64
+	var any bool
+	if br != "" {
+		revHist, unitHist, any = accumulate(br)
+		if !any {
+			// Branch with no Y-1 sales → chain fallback.
+			revHist, unitHist, any = accumulate("")
+		}
+	} else {
+		revHist, unitHist, any = accumulate("")
+	}
+	_ = any
+	revShares = targetalloc.SeasonalShares(revHist)
+	unitShares = targetalloc.PickSeasonalShares(unitHist, revHist)
+	return revShares, unitShares
 }
 
 // computeActualForTargetLocked returns the actual revenue, units and the number of matching rows

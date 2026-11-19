@@ -44,15 +44,30 @@ class TargetRepository {
   }
 
   /// Branch / SKU distribution of one Sell-Out target (read-only, computed in BigQuery).
+  /// Optional [branch] (store key) and [month] (1..12) live-filter Monthly / KPIs / Items.
   Future<Result<TargetBreakdownModel>> loadBreakdown(
     String targetId, {
+    String? branch,
+    int? month,
     bool forceRefresh = false,
   }) {
-    final k = CacheStore.key(api.tenantId, feature, ['breakdown', ..._userParts, targetId]);
+    final branchKey = (branch ?? '').trim();
+    final monthKey = (month != null && month >= 1 && month <= 12) ? month : 0;
+    final k = CacheStore.key(
+      api.tenantId,
+      feature,
+      ['breakdown', ..._userParts, targetId, branchKey, monthKey],
+    );
     if (forceRefresh) cache.invalidate(k);
     return Result.guard(() => cache.getOrLoad<TargetBreakdownModel>(
           k,
-          () async => TargetBreakdownModel.fromJson(await api.getTargetBreakdownJson(targetId)),
+          () async => TargetBreakdownModel.fromJson(
+            await api.getTargetBreakdownJson(
+              targetId,
+              branch: branchKey.isEmpty ? null : branchKey,
+              month: monthKey == 0 ? null : monthKey,
+            ),
+          ),
         ));
   }
 }

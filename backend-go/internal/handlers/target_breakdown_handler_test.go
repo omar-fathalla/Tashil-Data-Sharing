@@ -57,7 +57,15 @@ func seedBreakdown(t *testing.T, tenant string) (*AnalyticsHandler, string, stri
 }
 
 func getBreakdown(h *AnalyticsHandler, tenant, id string) *httptest.ResponseRecorder {
-	req := authenticatedRequest(http.MethodGet, "/api/v1/sellout/targets/"+id+"/breakdown", tenant)
+	return getBreakdownQuery(h, tenant, id, "")
+}
+
+func getBreakdownQuery(h *AnalyticsHandler, tenant, id, rawQuery string) *httptest.ResponseRecorder {
+	url := "/api/v1/sellout/targets/" + id + "/breakdown"
+	if rawQuery != "" {
+		url += "?" + rawQuery
+	}
+	req := authenticatedRequest(http.MethodGet, url, tenant)
 	req.SetPathValue("id", id)
 	rec := httptest.NewRecorder()
 	h.HandleTargetBreakdown(rec, req)
@@ -225,6 +233,67 @@ func TestTargetBreakdownUsesBigQueryThenFallsBack(t *testing.T) {
 	resp = decodeBreakdown(t, getBreakdown(h, "tenant-bd", id26))
 	if resp.Source != "memory" || len(resp.Branches) != 2 {
 		t.Fatalf("an empty BigQuery answer must fall back to memory: %+v", resp)
+	}
+}
+
+func TestTargetBreakdownBranchAndMonthFilters(t *testing.T) {
+	h, id26, _ := seedBreakdown(t, "tenant-bd-filt")
+
+	// Branch filter: only s1 (60% of 1000 = 600), KPIs scoped, monthly phasing present.
+	resp := decodeBreakdown(t, getBreakdownQuery(h, "tenant-bd-filt", id26, "branch=s1"))
+	if resp.AppliedBranch != "s1" {
+		t.Fatalf("applied_branch %q", resp.AppliedBranch)
+	}
+	if len(resp.Branches) != 1 || resp.Branches[0].BranchKey != "s1" {
+		t.Fatalf("branches %+v", resp.Branches)
+	}
+	if resp.TargetRevenueEGP != 600 {
+		t.Errorf("branch target want 600 got %v", resp.TargetRevenueEGP)
+	}
+	if resp.ActualRevenueEGP != 500 {
+		t.Errorf("branch actual want 500 got %v", resp.ActualRevenueEGP)
+	}
+	if len(resp.MonthlyPhasing) != 12 {
+		t.Fatalf("monthly_phasing len %d", len(resp.MonthlyPhasing))
+	}
+	var phSum float64
+	for _, m := range resp.MonthlyPhasing {
+		phSum += m.TargetRevenueEGP
+	}
+	if math.Abs(phSum-600) > 0.05 {
+		t.Errorf("branch monthly targets sum %v want 600", phSum)
+	}
+
+	// Month filter: February actuals only (500+100=600 in seed), seasonal target slice.
+	respM := decodeBreakdown(t, getBreakdownQuery(h, "tenant-bd-filt", id26, "month=2"))
+	if respM.AppliedMonth != 2 {
+		t.Fatalf("applied_month %d", respM.AppliedMonth)
+	}
+	if respM.Month != 2 {
+		t.Errorf("response month %d", respM.Month)
+	}
+	if !respM.HasActuals || respM.ActualRevenueEGP != 600 {
+		t.Errorf("feb actuals want 600 got has=%v actual=%v", respM.HasActuals, respM.ActualRevenueEGP)
+	}
+	// Baseline Mar+Apr 2025: s1=600, s2=400 → same shares; month target ≈ annual/12 when no strong seasonality
+	// (seed prior year is Mar+Apr only → partial with neutral fill). Target should be < annual.
+	if respM.TargetRevenueEGP <= 0 || respM.TargetRevenueEGP >= 1000 {
+		t.Errorf("month target should be a seasonal slice, got %v", respM.TargetRevenueEGP)
+	}
+	if len(respM.MonthlyPhasing) != 12 {
+		t.Fatalf("month filter still returns 12-month phasing, got %d", len(respM.MonthlyPhasing))
+	}
+
+	// Combined branch + month.
+	respBM := decodeBreakdown(t, getBreakdownQuery(h, "tenant-bd-filt", id26, "branch=s1&month=2"))
+	if respBM.AppliedBranch != "s1" || respBM.AppliedMonth != 2 {
+		t.Fatalf("applied %+v/%d", respBM.AppliedBranch, respBM.AppliedMonth)
+	}
+	if len(respBM.Branches) != 1 || respBM.Branches[0].BranchKey != "s1" {
+		t.Fatalf("combined branches %+v", respBM.Branches)
+	}
+	if respBM.ActualRevenueEGP != 500 {
+		t.Errorf("s1 feb actual want 500 got %v", respBM.ActualRevenueEGP)
 	}
 }
 

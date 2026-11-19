@@ -39,7 +39,7 @@ void main() {
   });
 
   group('TargetMonthlySeries', () {
-    test('yearly target splits to 12 equal months unless monthly exist', () {
+    test('yearly target uses API phasing; equal split only as fallback', () {
       final yearly = TargetComparisonModel.fromJson({
         'id': 'y',
         'target_type': 'sell_out',

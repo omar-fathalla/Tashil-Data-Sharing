@@ -28,6 +28,7 @@ class TargetMonthPoint {
     required this.actualUnits,
     required this.hasActuals,
     required this.fromExplicitMonthlyTarget,
+    this.seasonalitySharePct,
   });
 
   final int year;
@@ -39,6 +40,7 @@ class TargetMonthPoint {
   final double actualUnits;
   final bool hasActuals;
   final bool fromExplicitMonthlyTarget;
+  final double? seasonalitySharePct;
 
   double get gapRevenue => actualRevenue - targetRevenue;
 
@@ -73,14 +75,17 @@ class TargetCumulativePoint {
   final String labelAr;
   final double cumulativeTarget;
   final double cumulativeActual;
+
+  /// True only for months that themselves have actuals (chart stops at last true).
   final bool hasActuals;
 }
 
 /// Builds the 12-month view for a Sell-Out target.
 ///
-/// Monthly target = yearly / 12 unless explicit monthly targets exist for the
-/// same chain/year (and branch/category scope). Actuals prefer explicit monthly
-/// target rows, then [TargetComparisonModel.monthlyPhasing] from the API.
+/// Monthly targets prefer API [TargetComparisonModel.monthlyPhasing] (prior-year
+/// seasonal weights). Fallback is equal 1/12 when phasing is missing. Explicit
+/// monthly target rows still override. Optional [phasingOverride] rebuilds the
+/// series from a branch-filtered breakdown response.
 class TargetMonthlySeries {
   const TargetMonthlySeries({
     required this.months,
@@ -109,6 +114,7 @@ class TargetMonthlySeries {
   factory TargetMonthlySeries.build({
     required TargetComparisonModel target,
     List<TargetComparisonModel> siblings = const [],
+    List<TargetMonthBreakdownModel>? phasingOverride,
     DateTime? asOf,
   }) {
     final now = asOf ?? DateTime.now();
@@ -124,7 +130,8 @@ class TargetMonthlySeries {
     }
 
     final phasingByMonth = <int, TargetMonthBreakdownModel>{};
-    for (final m in target.monthlyPhasing) {
+    final phasingSource = phasingOverride ?? target.monthlyPhasing;
+    for (final m in phasingSource) {
       if (m.month >= 1 && m.month <= 12) phasingByMonth[m.month] = m;
     }
 
@@ -137,7 +144,7 @@ class TargetMonthlySeries {
       final phasing = phasingByMonth[month];
       final label = monthLabelsAr[month - 1];
 
-      if (explicit != null) {
+      if (explicit != null && phasingOverride == null) {
         months.add(TargetMonthPoint(
           year: year,
           month: month,
@@ -156,8 +163,9 @@ class TargetMonthlySeries {
           (phasing != null && phasing.targetRevenueEgp > 0) ? phasing.targetRevenueEgp : equalRev;
       final targetUnits =
           (phasing != null && phasing.targetUnits > 0) ? phasing.targetUnits : equalUnits;
-      final hasActuals = phasing != null &&
-          (phasing.actualRevenueEgp > 0 || phasing.actualUnits > 0);
+      final hasActuals = phasing != null
+          ? phasing.hasActuals
+          : false;
 
       months.add(TargetMonthPoint(
         year: year,
@@ -169,31 +177,32 @@ class TargetMonthlySeries {
         actualUnits: phasing?.actualUnits ?? 0,
         hasActuals: hasActuals,
         fromExplicitMonthlyTarget: false,
+        seasonalitySharePct: phasing?.seasonalitySharePct,
       ));
     }
 
     final cumulative = <TargetCumulativePoint>[];
     var cumT = 0.0;
     var cumA = 0.0;
-    var anyActual = false;
     for (final m in months) {
       cumT += m.targetRevenue;
       if (m.hasActuals) {
         cumA += m.actualRevenue;
-        anyActual = true;
       }
       cumulative.add(TargetCumulativePoint(
         month: m.month,
         labelAr: m.labelAr,
         cumulativeTarget: cumT,
         cumulativeActual: cumA,
-        hasActuals: anyActual,
+        hasActuals: m.hasActuals,
       ));
     }
 
     final monthlyTargets = months.map((m) => m.targetRevenue).toList();
     final ttd = TargetAchievementStatus.targetToDate(
-      yearlyTarget: target.targetRevenueEgp,
+      yearlyTarget: phasingOverride != null
+          ? months.fold<double>(0, (s, m) => s + m.targetRevenue)
+          : target.targetRevenueEgp,
       year: year,
       asOf: now,
       monthlyTargets: monthlyTargets,

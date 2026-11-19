@@ -509,3 +509,24 @@ func TestBuildMergesGroupedRowsPerSKU(t *testing.T) {
 		t.Errorf("%+v", k)
 	}
 }
+
+func TestFilterToBranchScopesSummary(t *testing.T) {
+	rows := []Row{
+		row("b1", "فرع 1", "s1", "A", 600, 6, 400, 4),
+		row("b2", "فرع 2", "s1", "A", 400, 4, 200, 2),
+	}
+	r := Build(input(1000, rows))
+	filtered := FilterToBranch(r, "b1")
+	if len(filtered.Branches) != 1 || filtered.Branches[0].BranchKey != "b1" {
+		t.Fatalf("branches %+v", filtered.Branches)
+	}
+	if filtered.TargetRevenueEGP != 600 {
+		t.Errorf("target %v want 600", filtered.TargetRevenueEGP)
+	}
+	if filtered.ActualRevenueEGP != 400 {
+		t.Errorf("actual %v want 400", filtered.ActualRevenueEGP)
+	}
+	if filtered.AppliedBranch != "b1" {
+		t.Errorf("applied %q", filtered.AppliedBranch)
+	}
+}

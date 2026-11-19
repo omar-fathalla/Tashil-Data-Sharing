@@ -9944,10 +9944,24 @@ class ApiClient {
   }
 
   /// Raw JSON of `GET /api/v1/sellout/targets/{id}/breakdown` (parsed by the
-  /// Targets repository). Throws on any non-200 answer.
-  Future<Map<String, dynamic>> getTargetBreakdownJson(String id) async {
+  /// Targets repository). Optional [branch] (store key) and [month] (1..12) filters.
+  /// Throws on any non-200 answer.
+  Future<Map<String, dynamic>> getTargetBreakdownJson(
+    String id, {
+    String? branch,
+    int? month,
+  }) async {
+    final params = <String, String>{};
+    final b = branch?.trim();
+    if (b != null && b.isNotEmpty) params['branch'] = b;
+    if (month != null && month >= 1 && month <= 12) {
+      params['month'] = '$month';
+    }
+    final uri = Uri.parse(ApiEndpoints.targetBreakdown(id)).replace(
+      queryParameters: params.isEmpty ? null : params,
+    );
     final response = await BackendHttp
-        .get(Uri.parse(ApiEndpoints.targetBreakdown(id)), headers: _headers)
+        .get(uri, headers: _headers)
         .timeout(const Duration(seconds: 30));
     if (response.statusCode == 200) {
       return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
@@ -14192,6 +14206,7 @@ class TargetMonthBreakdownModel {
   final double expectedRevenueEgp;
   final double varianceRevenueEgp;
   final double achievementPct;
+  final bool hasActuals;
 
   const TargetMonthBreakdownModel({
     required this.year,
@@ -14207,6 +14222,7 @@ class TargetMonthBreakdownModel {
     required this.expectedRevenueEgp,
     required this.varianceRevenueEgp,
     required this.achievementPct,
+    this.hasActuals = false,
   });
 
   factory TargetMonthBreakdownModel.fromJson(Map<String, dynamic> json) {
@@ -14224,6 +14240,9 @@ class TargetMonthBreakdownModel {
       expectedRevenueEgp: (json['expected_revenue_egp'] as num?)?.toDouble() ?? 0.0,
       varianceRevenueEgp: (json['variance_revenue_egp'] as num?)?.toDouble() ?? 0.0,
       achievementPct: (json['achievement_pct'] as num?)?.toDouble() ?? 0.0,
+      hasActuals: json['has_actuals'] as bool? ??
+          (((json['actual_revenue_egp'] as num?)?.toDouble() ?? 0) > 0 ||
+              ((json['actual_units'] as num?)?.toDouble() ?? 0) > 0),
     );
   }
 }
