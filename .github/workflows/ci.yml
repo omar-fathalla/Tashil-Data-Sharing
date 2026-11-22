@@ -1,18 +1,14 @@
-# Consolidated CI.
+# Consolidated CI: portable jobs on GitHub-hosted ubuntu-latest.
 #
-# TODO(billing): TEMPORARY — ALL jobs use Mac self-hosted until GitHub billing is
-# fixed (hosted jobs fail ~2s with runner_id=0 / payment failed). Single expression
-# below; revert by restoring hybrid CI_HOSTED_RUNNER (ubuntu-latest) for light jobs
-# and CI_RUNS_ON only for heavy Flutter. See docs/ci-self-hosted.md.
-# TEMP default labels: ["self-hosted","tashil-mac"] (never macos-latest).
+# Default: CI_HOSTED_RUNNER → ubuntu-latest (path detect, gates, Go, Flutter
+# analyze/test, PR comment). NEVER macos-latest / larger / paid runners.
+# Prefer leaving CI_HOSTED_RUNNER unset while the repo is public.
 #
-# tashil-mac … tashil-mac-4 are four runners on one Mac — over-parallel heavy jobs
-# thrash Setup Node / flutter build. Heavy jobs queue natively on the runners (no
-# shared concurrency group — GitHub pending-slot eviction cancels the second waiter).
-# Deploys use tashil-deploy only. Prefer MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
+# Public-repo safety: every job refuses self-hosted for fork PRs (defense if
+# CI_HOSTED_RUNNER is pointed at Mac). Mac lock steps no-op on hosted ubuntu.
 #
 # merge_group: required checks must run in the GitHub merge queue. Deploy stays on
-# push-to-main only (see deploy.yml) — never on merge_group.
+# workflow_run after CI green on main (see deploy.yml) — never on merge_group.
 name: CI tests
 
 # No workflow-level paths-ignore: docs-only PRs still start the workflow so required
@@ -36,23 +32,30 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.41.2"
-  # Opt-in shared Mac directory lock (cross-repo). Set repo variable MAC_SHARED_LOCK=1
-  # while multiple runners share one physical Mac — see docs/ci-self-hosted.md.
+  # Opt-in shared Mac directory lock (cross-repo). No-ops unless MAC_SHARED_LOCK=1
+  # and a self-hosted budget fallback is in use — see docs/ci-self-hosted.md.
   MAC_SHARED_LOCK: ${{ vars.MAC_SHARED_LOCK }}
 
 jobs:
   # Path filter so backend / Flutter / pin can skip while required-check gates still report.
-  # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
   # Any .github/workflows/** change sets every filter true ("workflow changes run everything").
   changes:
     name: Detect path changes
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       flutter: ${{ steps.filter.outputs.flutter }}
       pin: ${{ steps.filter.outputs.pin }}
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
@@ -87,13 +90,21 @@ jobs:
   # Required check name is the gate job below (success when path-skipped).
   # Pin assert: always join the graph after `changes` succeeds so the gate
   # never sees needs.*.result=abandoned from a conditional job dropping out.
-  # Path skip is a successful no-op. TODO(billing): TEMP — was hosted ubuntu.
+  # Path skip is a successful no-op.
   guard-cloud-run-one-instance:
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - name: Path filter
         id: want
         run: |
@@ -114,10 +125,17 @@ jobs:
     name: Cloud Run one-instance pin
     needs: [changes, guard-cloud-run-one-instance]
     if: always() && !cancelled()
-    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - name: Evaluate pin path filter / run result
         run: |
           set -euo pipefail
@@ -150,17 +168,24 @@ jobs:
   # required-check gate cannot observe needs.test-backend.result=abandoned when a
   # job-level path `if:` drops the node (seen on main push db5888d / #71). Path
   # skip is a successful no-op.
-  # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest (hybrid split).
   test-backend:
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
-    # Mac timeout policy: test jobs ≤45m (#96 raised 25→40 for contention; take 45).
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    # Timeout ≤45m (#96 headroom for emulator + contention).
     timeout-minutes: 45
     defaults:
       run:
         working-directory: backend-go
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - name: Path filter
         id: want
         working-directory: .
@@ -195,17 +220,15 @@ jobs:
           chmod +x scripts/mac_lock_ci.sh
           bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "backend-go+firestore-emulator" 15 10
 
-      # On self-hosted Mac, GOMODCACHE/GOCACHE already live on the shared home disk.
-      # Remote actions/cache for setup-go was ~880MB and stalled (~10m at 0 B/s).
       - uses: actions/setup-go@v5
         if: steps.want.outputs.run == 'true'
         with:
           go-version-file: backend-go/go.mod
-          cache: ${{ runner.environment != 'self-hosted' }}
+          cache: true
           cache-dependency-path: backend-go/go.sum
 
       - name: Cache Go build
-        if: steps.want.outputs.run == 'true' && runner.environment != 'self-hosted'
+        if: steps.want.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -238,24 +261,8 @@ jobs:
         with:
           node-version: "20"
 
-      # Prefer the Mac's preinstalled Java 21 — setup-java downloads have 504'd from Adoptium.
-      - name: Detect preinstalled Java 21
-        if: steps.want.outputs.run == 'true'
-        id: java_pre
-        working-directory: .
-        run: |
-          set -euo pipefail
-          if command -v java >/dev/null 2>&1 && java -version 2>&1 | grep -Eq 'version "?21([.]|$)'; then
-            echo "use_action=false" >> "$GITHUB_OUTPUT"
-            echo "Reusing preinstalled Java 21:"
-            java -version
-            exit 0
-          fi
-          echo "use_action=true" >> "$GITHUB_OUTPUT"
-          echo "Preinstalled Java 21 not found; will use setup-java"
-
       - name: Setup Java (Firestore emulator)
-        if: steps.want.outputs.run == 'true' && steps.java_pre.outputs.use_action == 'true'
+        if: steps.want.outputs.run == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -289,7 +296,6 @@ jobs:
         run: |
           # Per-job free ports + unique demo project + PID-only cleanup.
           # Never assumes 8080/4000/4400/9150; never kills by process name.
-          # Safe alongside other bots/runners on the same Mac (ubuntu fallback OK).
           chmod +x scripts/run_firestore_emulator_tests.sh
           GOMAXPROCS=2 bash scripts/run_firestore_emulator_tests.sh
 
@@ -324,10 +330,17 @@ jobs:
     name: Backend Go tests
     needs: [changes, test-backend]
     if: always() && !cancelled()
-    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - name: Evaluate backend path filter / run result
         run: |
           set -euo pipefail
@@ -362,26 +375,28 @@ jobs:
 
   test-flutter:
     # Heavy run only when Flutter/web/CI paths change. Required check is the gate job below.
-    # No job concurrency group: GitHub keeps only one pending slot per group and
-    # cancels the rest (pending-slot eviction). Let the 4 tashil-mac runners queue
-    # natively instead. Cross-repo: MAC_SHARED_LOCK=1. See docs/ci-self-hosted.md.
-    # Matrix shards split flutter test so each job stays under timeout under Mac load;
-    # --total-shards/--shard-index partition the suite with no gaps/overlap.
+    # Hosted ubuntu by default. Matrix shards split flutter test; --concurrency=2 kept.
     needs: changes
     if: needs.changes.outputs.flutter == 'true'
-    # TODO(billing): TEMP — same Mac expression as light jobs (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     strategy:
       fail-fast: false
       matrix:
         shard: [0, 1]
-    # Per-shard budget: lock wait + pub/analyze/test under concurrent Mac load
-    # (was 45m single job; shards + raised margin avoid cancel).
+    # Per-shard budget: pub/analyze/test + lock wait headroom.
     timeout-minutes: 70
     defaults:
       run:
         working-directory: tashil_web
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - uses: actions/checkout@v4
 
       - name: Per-runner toolchain / ADB env
@@ -406,44 +421,15 @@ jobs:
           chmod +x scripts/mac_lock_ci.sh
           bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "flutter-analyze-test-shard-${{ matrix.shard }}" 18 20
 
-      # Prefer $HOME/toolchains/flutter-arm64 (Apple Silicon) then flutter; never flutter-action on self-hosted.
-      # PUB_CACHE is forced to $RUNNER_TEMP/pub-cache by scripts/ci_runner_env.sh (ignores presets).
-      - name: Detect preinstalled Flutter
-        id: flutter_pre
-        working-directory: .
-        env:
-          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
-        run: |
-          chmod +x scripts/ci_detect_flutter.sh scripts/ci_flutter_arch.sh
-          bash scripts/ci_detect_flutter.sh
-
-      - name: Require preinstalled Flutter on self-hosted
-        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
-        run: |
-          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install native arm64 at \$HOME/toolchains/flutter-arm64 via scripts/ci_install_flutter_macos_arm64.sh — do not download via flutter-action (drops Mac runners)."
-          exit 1
-
-      - name: Require native arm64 Flutter on Apple Silicon
-        if: steps.flutter_pre.outputs.use_action == 'false' && runner.environment == 'self-hosted'
-        working-directory: .
-        env:
-          RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: |
-          chmod +x scripts/ci_assert_flutter_arm64.sh scripts/ci_flutter_arch.sh
-          bash scripts/ci_assert_flutter_arm64.sh
-
+      # Hosted ubuntu: pin Flutter via flutter-action (no Mac toolchain paths).
       - uses: subosito/flutter-action@v2
-        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
         timeout-minutes: 15
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: false
 
-      # Self-hosted: local PUB_CACHE only (skip remote actions/cache — stalls / races on Mac).
-      # GitHub-hosted: cache the same isolated path ci_runner_env.sh sets (never ~/.pub-cache).
       - name: Cache pub dependencies
-        if: runner.environment != 'self-hosted'
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/pub-cache
@@ -456,7 +442,7 @@ jobs:
       - name: flutter analyze
         if: matrix.shard == 0
         run: flutter analyze
-      # Cap concurrency so Go/Flutter/Playwright jobs sharing the Mac don't thrash.
+      # Cap concurrency (preference: keep --concurrency=2).
       # Shards 0..1 with total-shards=2 cover the full suite exactly once.
       - name: flutter test (shard ${{ matrix.shard }}/2)
         id: flutter_test
@@ -491,10 +477,17 @@ jobs:
     name: Flutter analyze & test
     needs: [changes, test-flutter]
     if: always() && !cancelled()
-    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - name: Evaluate Flutter path filter / run result
         run: |
           set -euo pipefail
@@ -531,10 +524,17 @@ jobs:
     name: Comment PR when tests fail
     needs: [test-backend, test-flutter]
     if: always() && github.event_name == 'pull_request' && (needs.test-backend.result == 'failure' || needs.test-flutter.result == 'failure')
-    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - name: Post failure comment
         uses: actions/github-script@v7
         with:
