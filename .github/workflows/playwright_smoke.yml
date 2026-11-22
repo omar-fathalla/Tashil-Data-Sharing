@@ -1,14 +1,11 @@
 name: Playwright Semantics Smoke
 
-# TODO(billing): TEMPORARY — ALL jobs use Mac self-hosted until GitHub billing is
-# fixed (hosted jobs fail ~2s with runner_id=0 / payment failed). Single expression
-# CI_RUNS_ON || ["self-hosted","tashil-mac"]; revert by restoring hybrid
-# CI_HOSTED_RUNNER (ubuntu-latest) for path detect / wait / gate.
-# NEVER use GitHub-hosted macOS runners.
-# Mac contention: smoke-run does NOT join a shared concurrency group (GitHub
-# pending-slot eviction cancels waiters). Queue natively on tashil-mac runners;
+# Portable smoke on GitHub-hosted ubuntu-latest (CI_HOSTED_RUNNER).
+# Path detect / wait / smoke-run / required gate all hosted by default.
+# NEVER macos-latest / larger / paid runners.
+#
+# Prefer leaving CI_HOSTED_RUNNER unset while public. Fork PRs refuse self-hosted.
 # wait-ci-flutter still yields to same-SHA Flutter before smoke starts.
-# Deploys use tashil-deploy only. Prefer MAC_SHARED_LOCK=1.
 
 #
 # No workflow-level paths-ignore: required check flutter-web-semantics-smoke always reports.
@@ -38,12 +35,19 @@ env:
 jobs:
   changes:
     name: Detect path changes
-    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     outputs:
       smoke: ${{ steps.filter.outputs.smoke }}
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
@@ -66,18 +70,25 @@ jobs:
 
   # Wait: always join after `changes` succeeds so the smoke gate never sees
   # needs.wait-ci-flutter.result=abandoned (main #72 / PR #73). Path skip is a
-  # cheap no-op; output run_smoke drives whether Mac smoke-run is scheduled.
-  # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
+  # cheap no-op; output run_smoke drives whether smoke-run is scheduled.
   wait-ci-flutter:
-    name: Wait for CI Flutter before Mac smoke
+    name: Wait for CI Flutter before smoke
     needs: changes
     if: always() && !cancelled() && needs.changes.result == 'success'
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
-    # Mac timeout policy: never hold a runner for hours (was 100m busy-wait).
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    # Never hold a runner for hours (was 100m Mac busy-wait).
     timeout-minutes: 45
     outputs:
       run_smoke: ${{ steps.want.outputs.run }}
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - name: Path filter
         id: want
         run: |
@@ -101,20 +112,26 @@ jobs:
           chmod +x scripts/wait_ci_flutter_before_smoke.sh
           bash scripts/wait_ci_flutter_before_smoke.sh
 
-  # Mac smoke: schedule only when wait-ci-flutter said run_smoke=true (keeps
-  # docs-only PRs off Mac). Depend on wait result/output — not a sibling path
-  # `if:` on changes.outputs — so the job cannot drop out as abandoned while
+  # Smoke run: schedule only when wait-ci-flutter said run_smoke=true (keeps
+  # docs-only PRs off heavy work). Depend on wait result/output — not a sibling
+  # path `if:` on changes.outputs — so the job cannot drop out as abandoned while
   # the always() gate still runs (seen on #73 tip b3b9ca5).
   smoke-run:
     needs: [wait-ci-flutter]
     if: always() && !cancelled() && needs.wait-ci-flutter.result == 'success' && needs.wait-ci-flutter.outputs.run_smoke == 'true'
-    # No job concurrency group: pending-slot eviction cancels waiters. Native
-    # runner queue never cancels. Cross-repo: MAC_SHARED_LOCK=1.
-    # TODO(billing): TEMP — same Mac expression as light jobs (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    # No job concurrency group (unchanged). Hosted ubuntu by default.
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     # Build web + Playwright (~15–25m healthy) + lock wait; acquire step < job.
     timeout-minutes: 45
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - uses: actions/checkout@v4
 
       - name: Per-runner toolchain / ADB env
@@ -136,45 +153,15 @@ jobs:
           chmod +x scripts/mac_lock_ci.sh
           bash scripts/mac_lock_ci.sh acquire "$AGENT" "omar-fathalla/Tashil-Data-Sharing" "playwright-semantics-smoke" 25 15
 
-      # Prefer $HOME/toolchains/flutter-arm64 then flutter (see ci_detect_flutter.sh). Falling through
-      # to flutter-action+cache has caused self-hosted Mac runners to lose GitHub communication.
-      # PUB_CACHE is forced to $RUNNER_TEMP/pub-cache by scripts/ci_runner_env.sh (ignores presets).
-      - name: Detect preinstalled Flutter
-        id: flutter_pre
-        env:
-          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
-        run: |
-          chmod +x scripts/ci_detect_flutter.sh scripts/ci_flutter_arch.sh
-          bash scripts/ci_detect_flutter.sh
-
-      # Fail fast on Mac: downloading the SDK via flutter-action has disconnected runners.
-      - name: Require preinstalled Flutter on self-hosted
-        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
-        run: |
-          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install native arm64 at \$HOME/toolchains/flutter-arm64 via scripts/ci_install_flutter_macos_arm64.sh — do not download via flutter-action (drops Mac runners)."
-          exit 1
-
-      - name: Require native arm64 Flutter on Apple Silicon
-        if: steps.flutter_pre.outputs.use_action == 'false' && runner.environment == 'self-hosted'
-        env:
-          RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: |
-          chmod +x scripts/ci_assert_flutter_arm64.sh scripts/ci_flutter_arch.sh
-          bash scripts/ci_assert_flutter_arm64.sh
-
+      # Hosted ubuntu: pin Flutter via flutter-action (no Mac toolchain paths).
       - uses: subosito/flutter-action@v2
-        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
         timeout-minutes: 15
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
-          # Cache restore/download of the full SDK has starved tashil-mac (lost communication).
           cache: false
 
-      # Self-hosted: local PUB_CACHE only (skip remote actions/cache — stalls / races on Mac).
-      # GitHub-hosted: cache the same isolated path ci_runner_env.sh sets (never ~/.pub-cache).
       - name: Cache pub dependencies
-        if: runner.environment != 'self-hosted'
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/pub-cache
@@ -211,7 +198,7 @@ jobs:
         working-directory: e2e
         run: |
           npm ci
-          # Linux (ubuntu-latest fallback) needs OS deps; macOS self-hosted does not.
+          # Linux (ubuntu-latest) needs OS deps; macOS does not.
           if [ "${{ runner.os }}" = "Linux" ]; then
             npx playwright install --with-deps chromium
           else
@@ -219,8 +206,7 @@ jobs:
           fi
 
       # SPA fallback so /adeco serves index.html (path URL strategy).
-      # Prefer python3 (always on Mac self-hosted) over npx serve@14, which has
-      # failed with `ERROR invalid addKeywords parameters` and never bound :5600+.
+      # Prefer python3 over npx serve@14 (invalid addKeywords / bind failures).
       # Per-run free port in 5600+ (never hardcode 4173; avoid other bot 5570–5580).
       - name: Start static server
         id: smoke_server
@@ -295,7 +281,6 @@ jobs:
               kill -9 "$serve_pid" 2>/dev/null || true
             fi
           fi
-          # Drop large local build/report dirs so the persistent runner disk stays lean.
           rm -rf tashil_web/build/web e2e/test-results e2e/playwright-report \
             "$RUNNER_TEMP/playwright-smoke" 2>/dev/null || true
 
@@ -310,10 +295,17 @@ jobs:
   flutter-web-semantics-smoke:
     needs: [changes, wait-ci-flutter, smoke-run]
     if: always() && !cancelled()
-    # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety). Portable CI must stay on ubuntu-latest."
+          exit 1
       - name: Evaluate smoke path filter / run result
         run: |
           set -euo pipefail
