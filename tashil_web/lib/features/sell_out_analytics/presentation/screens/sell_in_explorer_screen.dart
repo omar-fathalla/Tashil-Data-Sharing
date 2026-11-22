@@ -1014,7 +1014,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
   int get _recordsTotalPages {
     if (_records.isEmpty) return 1;
-    return ((_records.length + _recordsPageSize - 1) / _recordsPageSize).ceil();
+    // Integer ceil-division — do NOT use `/).ceil()` (doubles inflate page count).
+    return (_records.length + _recordsPageSize - 1) ~/ _recordsPageSize;
   }
 
   int get _recordsSafePage =>
@@ -1023,6 +1024,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   List<SellInRecordItem> get _recordsPageSlice {
     if (_records.isEmpty) return const [];
     final start = _recordsSafePage * _recordsPageSize;
+    if (start >= _records.length) return const [];
     final end = math.min(start + _recordsPageSize, _records.length);
     return _records.sublist(start, end);
   }
@@ -1087,14 +1089,18 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              key: const ValueKey('sellin_records_page_label'),
-              'عرض $startIndex–$endIndex من $totalCount · صفحة ${totalCount == 0 ? 0 : safePage + 1} من $totalPages',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+            child: Tooltip(
+              message:
+                  'عرض $startIndex–$endIndex من $totalCount · صفحة ${totalCount == 0 ? 0 : safePage + 1} من $totalPages',
+              child: Text(
+                key: const ValueKey('sellin_records_page_label'),
+                'عرض $startIndex–$endIndex من $totalCount · صفحة ${totalCount == 0 ? 0 : safePage + 1} من $totalPages',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
           navBtn(
@@ -1273,12 +1279,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     SellInRecordItem record, {
     required int absoluteIndex,
   }) {
-    final item = KeyedSubtree(
-      key: ValueKey('sellin_record_item_$absoluteIndex'),
-      child: _sellInItemCell(context, colorScheme, record),
-    );
     final cells = <Widget>[
-      item,
+      _sellInItemCell(context, colorScheme, record),
       ..._sellInRowCells(context, colorScheme, record),
     ];
     return Material(
@@ -1301,19 +1303,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (var c = 0; c < cells.length; c++)
-                  _sellInCell(
-                    c,
-                    cells[c],
-                    alignment: c == 0
-                        ? AlignmentDirectional.topStart
-                        : (c == 3 ||
-                                c == 4 ||
-                                c == 5 ||
-                                c == 6 ||
-                                c == 7 ||
-                                c == 10)
-                            ? AlignmentDirectional.topEnd
-                            : AlignmentDirectional.topCenter,
+                  _keyedSellInRowCell(
+                    absoluteIndex: absoluteIndex,
+                    column: c,
+                    child: cells[c],
                   ),
               ],
             ),
@@ -1323,6 +1316,34 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     );
   }
 
+
+  /// Column 0 carries [sellin_record_item_*] on the padded cell so its top
+  /// aligns with [sellin_record_row_*] (not the inner content under padding).
+  Widget _keyedSellInRowCell({
+    required int absoluteIndex,
+    required int column,
+    required Widget child,
+  }) {
+    final cell = _sellInCell(
+      column,
+      child,
+      alignment: column == 0
+          ? AlignmentDirectional.topStart
+          : (column == 3 ||
+                  column == 4 ||
+                  column == 5 ||
+                  column == 6 ||
+                  column == 7 ||
+                  column == 10)
+              ? AlignmentDirectional.topEnd
+              : AlignmentDirectional.topCenter,
+    );
+    if (column != 0) return cell;
+    return KeyedSubtree(
+      key: ValueKey('sellin_record_item_$absoluteIndex'),
+      child: cell,
+    );
+  }
 
   Widget _sellInItemCell(BuildContext context, ColorScheme colorScheme, SellInRecordItem r) {
     final theme = Theme.of(context);
@@ -1432,7 +1453,8 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         maxLines: maxLines,
         overflow: TextOverflow.ellipsis,
         textAlign: textAlign,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        // bodySmall (12) — density sub-lines stay >= 12px for readability tests.
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
               fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
             ),
@@ -1941,6 +1963,7 @@ onChanged: m3Legacy<int>((v) {
                     hintStyle: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w300),
                     width: 220.0,
                     child: TextField(
+                      key: const ValueKey('sellin_records_search_field'),
                       decoration: InputDecoration(
                         hintText: 'ابحث بالصنف أو الكود أو الباركود',
                         hintStyle: theme.textTheme.bodyMedium?.copyWith(

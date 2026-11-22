@@ -263,10 +263,8 @@ void main() {
       // KPI card shows full-set total_count (45), not the page size (20).
       expect(find.textContaining('صف'), findsWidgets);
 
-      final search = find.descendant(
-        of: find.byKey(const ValueKey('sellin_data_filter_bar')),
-        matching: find.byType(TextField),
-      );
+      final search =
+          find.byKey(const ValueKey('sellin_records_search_field'));
       await tester.enterText(search, 'صنف توريد رقم 3');
       await tester.pumpAndSettle();
 

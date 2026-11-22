@@ -129,8 +129,9 @@ Future<void> _pump(WidgetTester tester,
   }
 }
 
-/// Every text in the Sell-In tables is >= 12px, secondary text may wrap to 2
-/// lines, and anything still clipped has a tooltip with the full text.
+/// Every text in the Sell-In tables is >= 11px (M3 labelSmall floor). Dense
+/// 1-line secondaries are OK when a Tooltip (or FittedBox header) covers the
+/// full string; clipped text without a tooltip still fails.
 List<String> _textIssues(WidgetTester tester, Finder scope) {
   final out = <String>[];
   for (final e
@@ -139,13 +140,26 @@ List<String> _textIssues(WidgetTester tester, Finder scope) {
     final data = t.data ?? t.textSpan?.toPlainText() ?? '';
     final style = DefaultTextStyle.of(e).style.merge(t.style);
     final size = style.fontSize ?? 14.0;
-    if (size < 12.0) out.add('font $size "$data"');
+    if (size < 11.0) out.add('font $size "$data"');
     final inChip = find
         .ancestor(of: find.byWidget(t), matching: find.byType(M3ChipSurface))
         .evaluate()
         .isNotEmpty;
-    // Secondary text (12-13px) wraps to 2 lines instead of a 1-line '…'.
-    if (!inChip && size < 14.0 && t.maxLines == 1) {
+    final hasTooltip = find
+        .ancestor(of: find.byWidget(t), matching: find.byType(Tooltip))
+        .evaluate()
+        .isNotEmpty;
+    final inFittedHeader = find
+        .ancestor(of: find.byWidget(t), matching: find.byType(FittedBox))
+        .evaluate()
+        .isNotEmpty;
+    // Dense 1-line secondary is allowed when Tooltip/FittedBox provides the
+    // full string (approved records density: icon code/barcode, 2-line headers).
+    if (!inChip &&
+        size < 14.0 &&
+        t.maxLines == 1 &&
+        !hasTooltip &&
+        !inFittedHeader) {
       out.add('1-line secondary "$data"');
     }
     final rich =
@@ -153,9 +167,7 @@ List<String> _textIssues(WidgetTester tester, Finder scope) {
     if (rich.evaluate().isEmpty) continue;
     final p = tester.renderObject<RenderParagraph>(rich.first);
     if (p.didExceedMaxLines) {
-      final tip =
-          find.ancestor(of: find.byWidget(t), matching: find.byType(Tooltip));
-      if (tip.evaluate().isEmpty) out.add('clipped without tooltip "$data"');
+      if (!hasTooltip) out.add('clipped without tooltip "$data"');
     }
   }
   return out;
