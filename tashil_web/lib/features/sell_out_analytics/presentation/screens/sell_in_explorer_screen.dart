@@ -1273,7 +1273,6 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     SellInRecordItem record, {
     required int absoluteIndex,
   }) {
-    final theme = Theme.of(context);
     final item = KeyedSubtree(
       key: ValueKey('sellin_record_item_$absoluteIndex'),
       child: _sellInItemCell(context, colorScheme, record),
@@ -2009,7 +2008,7 @@ onChanged: m3Legacy<int>((v) {
                     )
                   : LayoutBuilder(builder: (context, constraints) {
                       // All 12 columns share the full width — no horizontal scroll.
-                      final pad = M3Spacing.sm;
+                      const pad = M3Spacing.sm;
                       _layoutSellInColumns(constraints.maxWidth - pad * 2);
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(
