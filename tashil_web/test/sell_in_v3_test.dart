@@ -352,15 +352,14 @@ void main() {
     }, _client);
   });
 
-  testWidgets('A6. long item names wrap to 3 lines (tooltip only as fallback)',
+  testWidgets('A6. SKU name is 1 titleSmall line; code/barcode make 3-line cell',
       (tester) async {
     await http.runWithClient(() async {
       await _pump(tester);
       final name = find.byKey(const ValueKey('sellin_record_item_name')).first;
-      expect(tester.widget<Text>(name).maxLines, 3);
-      final p = tester.renderObject<RenderParagraph>(
-          find.descendant(of: name, matching: find.byType(RichText)));
-      expect(_lines(p), 3);
+      expect(tester.widget<Text>(name).maxLines, 1);
+      final tip = find.ancestor(of: name, matching: find.byType(Tooltip));
+      expect(tester.widget<Tooltip>(tip.first).message, isNotEmpty);
       await tester
           .tap(find.textContaining(RegExp('^المخزون وإعادة الطلب')).first);
       await tester.pumpAndSettle();

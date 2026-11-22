@@ -283,11 +283,12 @@ void main() {
       final net = tester
           .widget<Text>(find.byKey(const ValueKey('sellin_record_net')).first);
       expect(net.data, contains('K'));
-      // Item cell tops align with their row (unified table, no separate panes).
+      // Item cell tops sit inside the row (8dp vertical cell padding).
       for (var i = 0; i < 4; i++) {
         final a = tester.getRect(find.byKey(ValueKey('sellin_record_item_$i')));
         final b = tester.getRect(find.byKey(ValueKey('sellin_record_row_$i')));
-        expect((a.top - b.top).abs(), lessThan(2.0));
+        expect(a.top, greaterThanOrEqualTo(b.top - 0.5));
+        expect(a.top - b.top, lessThan(12.0));
       }
     }, _client);
   });

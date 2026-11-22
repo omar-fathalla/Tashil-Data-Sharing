@@ -4,7 +4,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -188,7 +187,7 @@ void main() {
           find.byKey(const ValueKey('sellin_records_prev_btn')));
       expect(first.onPressed, isNull);
       expect(prev.onPressed, isNull);
-    }, _client());
+    }, () => _client());
   });
 
   testWidgets('next/prev/first/last navigate and disable at ends',
@@ -233,7 +232,7 @@ void main() {
       );
       expect(find.textContaining('صفحة 1 من 3'), findsOneWidget);
       expect(find.text('صنف توريد رقم 1'), findsOneWidget);
-    }, _client());
+    }, () => _client());
   });
 
   testWidgets('page circle jumps to chosen page', (tester) async {
@@ -245,7 +244,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('صفحة 3 من 3'), findsOneWidget);
       expect(find.text('صنف توريد رقم 45'), findsOneWidget);
-    }, _client());
+    }, () => _client());
   });
 
   testWidgets('search filter resets to page 1; KPI stays on full filtered set',
@@ -278,7 +277,7 @@ void main() {
       final prev = tester.widget<IconButton>(
           find.byKey(const ValueKey('sellin_records_prev_btn')));
       expect(prev.onPressed, isNull);
-    }, _client(kpiTotal: kpi));
+    }, () => _client(kpiTotal: kpi));
   });
 
   testWidgets('all 12 headers visible; no horizontal scroll or يمين/شمال at 1440',
@@ -321,7 +320,7 @@ void main() {
         ),
         findsNothing,
       );
-    }, _client());
+    }, () => _client());
   });
 
   testWidgets('SKU code/barcode use icon semanticLabels; no visible الكود labels',
@@ -340,7 +339,7 @@ void main() {
       expect(barcode.first.semanticLabel, 'الباركود');
       expect(tag.first.size, 16.0);
       expect(barcode.first.size, 16.0);
-    }, _client(count: 5));
+    }, () => _client(count: 5));
   });
 
   testWidgets('file column is icon+tooltip only (no filename text in cell)',
@@ -359,6 +358,6 @@ void main() {
       final icon = btn.icon as Icon;
       expect(icon.icon, AppIcons.tableView);
       expect(icon.size, 24.0);
-    }, _client(count: 5));
+    }, () => _client(count: 5));
   });
 }

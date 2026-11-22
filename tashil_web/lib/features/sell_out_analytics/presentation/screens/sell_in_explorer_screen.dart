@@ -1247,6 +1247,10 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                   alignment: i == 0
                       ? AlignmentDirectional.centerStart
                       : AlignmentDirectional.center,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6.0,
+                    vertical: M3Spacing.xxs,
+                  ),
                 ),
             ],
           ),
@@ -1698,21 +1702,36 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   Widget _twoLineHeader(BuildContext context, String title, String subtitle) {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.labelMedium?.copyWith(color: muted),
-        ),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.labelSmall?.copyWith(color: muted),
-        ),
-      ],
+    // Scale down if needed so both lines always fit the 56dp header cell.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: muted,
+              height: 1.1,
+            ),
+          ),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: muted,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
