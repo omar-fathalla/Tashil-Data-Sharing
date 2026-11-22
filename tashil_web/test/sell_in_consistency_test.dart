@@ -335,7 +335,7 @@ void main() {
     expect(s.contains('M3Shape.radiusFull'), isFalse);
     expect(s.contains('StadiumBorder'), isFalse);
     expect(s.contains('CircleAvatar'), isFalse);
-    expect(s.contains('surfaceContainerLowest'), isFalse);
+    // surfaceContainerLowest is the approved records-table surface (22 Nov redesign).
     expect(s.contains('M3ToolbarButtonTheme('), isTrue);
   });
 }

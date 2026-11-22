@@ -60,7 +60,7 @@ class SellActionButtons {
     );
   }
 
-  /// Upload (tonal) + Print (tonal) + Export (outlined) as [M3ButtonGroup].
+  /// Upload (filled) + Print/Export (outlined) as [M3ButtonGroup].
   static Widget row(
     BuildContext context, {
     required String uploadLabel,
@@ -79,7 +79,7 @@ class SellActionButtons {
             icon: AppIcons.uploadFile,
             onPressed: onUpload,
             isLoading: isUploading,
-            kind: M3GroupItemKind.tonal,
+            kind: M3GroupItemKind.filled,
           ),
         if (onExportPdf != null)
           M3GroupItem(
@@ -87,7 +87,7 @@ class SellActionButtons {
             label: 'طباعة',
             icon: AppIcons.print,
             onPressed: onExportPdf,
-            kind: M3GroupItemKind.tonal,
+            kind: M3GroupItemKind.outlined,
           ),
         M3GroupItem(
           key: const ValueKey('export_excel_button'),

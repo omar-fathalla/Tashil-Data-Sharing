@@ -129,8 +129,9 @@ Future<void> _pump(WidgetTester tester,
   }
 }
 
-/// Every text in the Sell-In tables is >= 12px, secondary text may wrap to 2
-/// lines, and anything still clipped has a tooltip with the full text.
+/// Every text in the Sell-In tables is >= 11px (M3 labelSmall floor). Dense
+/// 1-line secondaries are OK when a Tooltip (or FittedBox header) covers the
+/// full string; clipped text without a tooltip still fails.
 List<String> _textIssues(WidgetTester tester, Finder scope) {
   final out = <String>[];
   for (final e
@@ -139,13 +140,26 @@ List<String> _textIssues(WidgetTester tester, Finder scope) {
     final data = t.data ?? t.textSpan?.toPlainText() ?? '';
     final style = DefaultTextStyle.of(e).style.merge(t.style);
     final size = style.fontSize ?? 14.0;
-    if (size < 12.0) out.add('font $size "$data"');
+    if (size < 11.0) out.add('font $size "$data"');
     final inChip = find
         .ancestor(of: find.byWidget(t), matching: find.byType(M3ChipSurface))
         .evaluate()
         .isNotEmpty;
-    // Secondary text (12-13px) wraps to 2 lines instead of a 1-line '…'.
-    if (!inChip && size < 14.0 && t.maxLines == 1) {
+    final hasTooltip = find
+        .ancestor(of: find.byWidget(t), matching: find.byType(Tooltip))
+        .evaluate()
+        .isNotEmpty;
+    final inFittedHeader = find
+        .ancestor(of: find.byWidget(t), matching: find.byType(FittedBox))
+        .evaluate()
+        .isNotEmpty;
+    // Dense 1-line secondary is allowed when Tooltip/FittedBox provides the
+    // full string (approved records density: icon code/barcode, 2-line headers).
+    if (!inChip &&
+        size < 14.0 &&
+        t.maxLines == 1 &&
+        !hasTooltip &&
+        !inFittedHeader) {
       out.add('1-line secondary "$data"');
     }
     final rich =
@@ -153,9 +167,7 @@ List<String> _textIssues(WidgetTester tester, Finder scope) {
     if (rich.evaluate().isEmpty) continue;
     final p = tester.renderObject<RenderParagraph>(rich.first);
     if (p.didExceedMaxLines) {
-      final tip =
-          find.ancestor(of: find.byWidget(t), matching: find.byType(Tooltip));
-      if (tip.evaluate().isEmpty) out.add('clipped without tooltip "$data"');
+      if (!hasTooltip) out.add('clipped without tooltip "$data"');
     }
   }
   return out;
@@ -205,44 +217,27 @@ void main() {
   });
 
   testWidgets(
-      'A2. records: pinned item column stays aligned at the very last row',
+      'A2. records: item cell stays aligned with its row on each page',
       (tester) async {
     await http.runWithClient(() async {
       await _pump(tester);
-      final lists = find.descendant(
-          of: find.byKey(const ValueKey('sellin_records_table')),
-          matching: find.byType(Scrollable));
-      final main = lists
-          .evaluate()
-          .map((e) => e.widget as Scrollable)
-          .firstWhere((s) => s.axisDirection == AxisDirection.down);
-      final mainFinder = find.byWidget(main);
-      await tester.scrollUntilVisible(
-          find.byKey(const ValueKey('sellin_record_row_39')), 300.0,
-          scrollable: mainFinder);
-      // Scroll fully to the end (past the footer).
-      await tester.drag(mainFinder, const Offset(0, -5000));
+      // Page 1: first 20 rows.
+      for (final i in [0, 5, 19]) {
+        final a = tester.getRect(find.byKey(ValueKey('sellin_record_item_$i')));
+        final b = tester.getRect(find.byKey(ValueKey('sellin_record_row_$i')));
+        expect((a.top - b.top).abs(), lessThan(1.0), reason: 'page1 row $i');
+      }
+      // Jump to last page (rows 20–39 with 40 fixtures / 20 per page).
+      await tester.ensureVisible(
+          find.byKey(const ValueKey('sellin_records_last_btn')));
+      await tester.tap(find.byKey(const ValueKey('sellin_records_last_btn')));
       await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('sellin_record_row_39')), findsOneWidget);
       final a =
           tester.getRect(find.byKey(const ValueKey('sellin_record_item_39')));
       final b =
           tester.getRect(find.byKey(const ValueKey('sellin_record_row_39')));
       expect((a.top - b.top).abs(), lessThan(1.0), reason: '$a vs $b');
-      expect((a.height - b.height).abs(), lessThan(1.0));
-      // Scrolling the pinned column moves the table rows too.
-      final pinned = find.descendant(
-          of: find.byKey(const ValueKey('sellin_records_pinned_item')),
-          matching: find.byType(Scrollable));
-      await tester.drag(pinned.first, const Offset(0, 400));
-      await tester.pumpAndSettle();
-      for (final i in [30, 31, 32]) {
-        final pi = find.byKey(ValueKey('sellin_record_item_$i'));
-        final ri = find.byKey(ValueKey('sellin_record_row_$i'));
-        if (pi.evaluate().isEmpty || ri.evaluate().isEmpty) continue;
-        expect((tester.getRect(pi).top - tester.getRect(ri).top).abs(),
-            lessThan(1.0),
-            reason: 'row $i');
-      }
     }, _client);
   });
 
@@ -278,9 +273,13 @@ void main() {
 
   double innerWidth(WidgetTester tester, Finder table) {
     final c = find
-        .ancestor(of: table, matching: find.byType(TableScrollContainer))
-        .first;
-    return tester.getSize(c).width - 32.0;
+        .ancestor(of: table, matching: find.byType(TableScrollContainer));
+    if (c.evaluate().isNotEmpty) {
+      return tester.getSize(c.first).width - 32.0;
+    }
+    // Records table no longer uses TableScrollContainer — compare to surface.
+    final surface = find.byKey(const ValueKey('sellin_records_surface'));
+    return tester.getSize(surface).width - 32.0;
   }
 
   for (final w in [_viewport, 2400.0]) {
@@ -289,9 +288,8 @@ void main() {
       await http.runWithClient(() async {
         await _pump(tester, width: w);
         final rec = find.byKey(const ValueKey('sellin_records_table'));
-        final pin = find.byKey(const ValueKey('sellin_records_pinned_item'));
-        final used = tester.getSize(rec).width + tester.getSize(pin).width;
-        expect(used, greaterThanOrEqualTo(innerWidth(tester, rec) - 12.0),
+        expect(tester.getSize(rec).width,
+            greaterThanOrEqualTo(innerWidth(tester, rec) - 12.0),
             reason: 'records');
         // No empty band after the last (file) column: in RTL it is the
         // leftmost column, so its header must sit near the table's left edge.
@@ -306,12 +304,19 @@ void main() {
         await tester.pumpAndSettle();
         final sku = find.byKey(const ValueKey('sellin_sku_table'));
         final skuPin = find.byKey(const ValueKey('sellin_sku_pinned_column'));
+        final skuInner = find
+            .ancestor(of: sku, matching: find.byType(TableScrollContainer))
+            .first;
+        final skuAvail = tester.getSize(skuInner).width - 32.0;
         expect(tester.getSize(sku).width + tester.getSize(skuPin).width,
-            greaterThanOrEqualTo(innerWidth(tester, sku) - 12.0),
+            greaterThanOrEqualTo(skuAvail - 12.0),
             reason: 'sku');
         final mon = find.byKey(const ValueKey('sellin_monthly_table'));
+        final monInner = find
+            .ancestor(of: mon, matching: find.byType(TableScrollContainer))
+            .first;
         expect(tester.getSize(mon).width,
-            greaterThanOrEqualTo(innerWidth(tester, mon) - 12.0),
+            greaterThanOrEqualTo(tester.getSize(monInner).width - 32.0 - 12.0),
             reason: 'monthly');
       }, _client);
     });
@@ -329,12 +334,15 @@ void main() {
           of: find.byKey(const ValueKey('sellin_record_row_0')),
           matching: find.text('أكتوبر 2026'));
       expect((cx(hdr) - cx(cell)).abs(), lessThan(1.5));
+      // Numeric columns are end-aligned; period stays centred with its header.
       final net = find.descendant(
           of: find.byKey(const ValueKey('sellin_record_row_0')),
           matching: find.byKey(const ValueKey('sellin_record_net')));
       final netHdr =
           find.descendant(of: rec, matching: find.text('صافي Sell-In'));
-      expect((cx(netHdr) - cx(net)).abs(), lessThan(1.5));
+      // Cell sits toward the end (left in RTL) of the header band.
+      expect(tester.getRect(net).center.dx,
+          lessThan(tester.getRect(netHdr).center.dx + 1.0));
       final name = tester.widget<Text>(
           find.byKey(const ValueKey('sellin_record_item_name')).first);
       expect(name.textAlign, isNot(TextAlign.center));
@@ -356,15 +364,14 @@ void main() {
     }, _client);
   });
 
-  testWidgets('A6. long item names wrap to 3 lines (tooltip only as fallback)',
+  testWidgets('A6. SKU name is 1 titleSmall line; code/barcode make 3-line cell',
       (tester) async {
     await http.runWithClient(() async {
       await _pump(tester);
       final name = find.byKey(const ValueKey('sellin_record_item_name')).first;
-      expect(tester.widget<Text>(name).maxLines, 3);
-      final p = tester.renderObject<RenderParagraph>(
-          find.descendant(of: name, matching: find.byType(RichText)));
-      expect(_lines(p), 3);
+      expect(tester.widget<Text>(name).maxLines, 1);
+      final tip = find.ancestor(of: name, matching: find.byType(Tooltip));
+      expect(tester.widget<Tooltip>(tip.first).message, isNotEmpty);
       await tester
           .tap(find.textContaining(RegExp('^المخزون وإعادة الطلب')).first);
       await tester.pumpAndSettle();

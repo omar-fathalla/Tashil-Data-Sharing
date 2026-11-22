@@ -54,6 +54,8 @@ class AppIcons {
   // Navigation affordances (auto-mirrored in RTL by Flutter)
   static const IconData chevronStart = Icons.chevron_left_rounded;
   static const IconData chevronEnd = Icons.chevron_right_rounded;
+  static const IconData firstPage = Icons.first_page_rounded;
+  static const IconData lastPage = Icons.last_page_rounded;
   static const IconData dropDown = Icons.arrow_drop_down_rounded;
   static const IconData arrowUp = Icons.arrow_upward_rounded;
   static const IconData arrowDown = Icons.arrow_downward_rounded;

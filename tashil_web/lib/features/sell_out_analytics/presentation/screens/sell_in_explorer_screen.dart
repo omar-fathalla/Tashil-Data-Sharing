@@ -5,6 +5,7 @@ import '../../../../core/widgets/m3_equal_height_grid.dart';
 import '../../../../core/widgets/m3_summary_kpi_card.dart';
 import '../../../../core/widgets/m3_table_surface.dart';
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:tashil_web/core/utils/sheet_name_utils.dart';
 import 'package:tashil_web/core/widgets/m3_states.dart';
 import 'package:flutter/material.dart';
@@ -81,8 +82,12 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   int _selectedYear = AvailableYears.current.defaultYear; // latest year with data
   bool _yearTouched = false;
   int _selectedMonth = 0; // 0 = All Months
-  static const int _pageSize = 25;
-  List<SellInRecordItem> _records = const []; // accumulated rows (infinite scroll)
+  /// Client-side display page size for the Sell-In records table.
+  static const int _recordsPageSize = 20;
+  /// API batch size when hydrating the full filtered set for client paging.
+  static const int _fetchPageSize = 250;
+  int _recordsPageIndex = 0;
+  List<SellInRecordItem> _records = const []; // full filtered set (client-paged)
 
   Map<String, String> get _locationDisplay {
     final names = <String>{
@@ -94,7 +99,6 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
   String _displayLocation(String raw) => _locationDisplay[raw] ?? raw;
 
-  bool _isLoadingMore = false;
   String _searchQuery = '';
   bool _isLoading = true;
   String? _loadError;
@@ -142,9 +146,6 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   late String _lastTenantId;
   late SellInExplorerRepository _repo;
 
-  late final ScrollController _recordsTableScrollController;
-  late final ScrollController _recordsListScrollController;
-  late final ScrollController _recordsPinnedListScrollController;
   late final ScrollController _monthlyLedgerScrollController;
   late final ScrollController _skuStockScrollController;
   late final ScrollController _archiveSheetsScrollController;
@@ -153,14 +154,6 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   void initState() {
     super.initState();
     _skuSearchController = TextEditingController();
-    _recordsTableScrollController = ScrollController();
-    _recordsListScrollController = ScrollController();
-    _recordsPinnedListScrollController = ScrollController();
-    // Keep the pinned item column and the scrolling columns on the same rows.
-    _recordsListScrollController.addListener(
-        () => _syncRecordLists(_recordsListScrollController, _recordsPinnedListScrollController));
-    _recordsPinnedListScrollController.addListener(
-        () => _syncRecordLists(_recordsPinnedListScrollController, _recordsListScrollController));
     _monthlyLedgerScrollController = ScrollController();
     _skuStockScrollController = ScrollController();
     _archiveSheetsScrollController = ScrollController();
@@ -183,9 +176,6 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   @override
   void dispose() {
     _skuSearchController.dispose();
-    _recordsTableScrollController.dispose();
-    _recordsListScrollController.dispose();
-    _recordsPinnedListScrollController.dispose();
     _monthlyLedgerScrollController.dispose();
     _skuStockScrollController.dispose();
     _archiveSheetsScrollController.dispose();
@@ -216,6 +206,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       _yearTouched = false;
       _selectedMonth = 0;
       _searchQuery = '';
+      _recordsPageIndex = 0;
       _loadAllData();
     }
   }
@@ -228,86 +219,73 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     ]);
   }
 
-  SellInExplorerQuery _sellInQuery({int page = 0, int? limit}) => SellInExplorerQuery(
+  SellInExplorerQuery _sellInQuery({int limit = _fetchPageSize, int offset = 0}) =>
+      SellInExplorerQuery(
         chain: _selectedChain == 'all' ? null : _selectedChain,
         year: _selectedYear > 0 ? _selectedYear : null,
         month: _selectedMonth > 0 ? _selectedMonth : null,
         query: _searchQuery,
-        limit: limit ?? _pageSize,
-        offset: limit == null ? page * _pageSize : 0,
+        limit: limit,
+        offset: offset,
       );
 
-  bool _sellInExhausted = false;
-  bool get _hasMoreSellIn => !_sellInExhausted && _records.length < _data.totalCount;
   int _sellInGeneration = 0; // bumps on every filter reset to drop stale appends
 
-  /// Loads the first 25 rows (any filter change resets here) and prefetches
-  /// the next batch into the repository cache.
+  void _resetRecordsPage() {
+    _recordsPageIndex = 0;
+  }
+
+  /// Hydrates the full filtered Sell-In set for client-side paging.
+  /// KPI totals come from the API response (full filtered set), not the page.
   Future<void> _loadSellInRecords() async {
     final gen = ++_sellInGeneration;
-    if (mounted) setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _resetRecordsPage();
+      });
+    }
     final loaded = await _repo.load(_sellInQuery());
     if (gen != _sellInGeneration) return;
     if (loaded case Failure(:final error)) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _isLoadingMore = false;
           _loadError = error.toString();
         });
         M3Feedback.showError(context, 'تعذّر تحميل بيانات Sell-In. حاول مرة أخرى.');
       }
       return;
     }
-    final res = loaded.valueOrNull!;
-    if (mounted) {
-      setState(() {
-        _data = res;
-        _records = List.of(res.records);
-        _sellInExhausted = false;
-        _isLoading = false;
-        _isLoadingMore = false;
-        _loadError = null;
-      });
-      if (_recordsListScrollController.hasClients) {
-        _recordsListScrollController.jumpTo(0);
-      }
+    final first = loaded.valueOrNull!;
+    final all = <SellInRecordItem>[...first.records];
+    var offset = all.length;
+    // Pull remaining pages (display-only; no backend changes) up to totalCount.
+    while (offset < first.totalCount && gen == _sellInGeneration) {
+      final next = await _repo.load(_sellInQuery(offset: offset));
+      if (gen != _sellInGeneration) return;
+      final batch = next.valueOrNull;
+      if (batch == null || batch.records.isEmpty) break;
+      all.addAll(batch.records);
+      offset = all.length;
+      if (batch.records.length < _fetchPageSize) break;
     }
-    if (_pageSize < res.totalCount) {
-      unawaited(_repo.load(_sellInQuery(page: 1)));
-    }
-  }
-
-  /// Appends the next 25 rows (usually already prefetched), then prefetches
-  /// the batch after it.
-  Future<void> _loadMoreSellInRecords() async {
-    if (!mounted || _isLoading || _isLoadingMore || !_hasMoreSellIn) return;
-    final gen = _sellInGeneration;
-    final page = (_records.length + _pageSize - 1) ~/ _pageSize;
-    setState(() => _isLoadingMore = true);
-    final loaded = await _repo.load(_sellInQuery(page: page));
     if (!mounted || gen != _sellInGeneration) return;
-    final res = loaded.valueOrNull;
-    if (res == null || res.records.isEmpty) {
-      setState(() {
-        _isLoadingMore = false;
-        // Stop asking on failure/empty batch so we don't loop.
-        _sellInExhausted = true;
-      });
-      return;
-    }
     setState(() {
-      _records = [..._records, ...res.records];
-      _isLoadingMore = false;
+      _data = first;
+      _records = all;
+      _isLoading = false;
+      _loadError = null;
+      _resetRecordsPage();
     });
-    if ((page + 1) * _pageSize < _data.totalCount) {
-      unawaited(_repo.load(_sellInQuery(page: page + 1)));
-    }
   }
 
-  /// Rows for exports: same 250-row scope the table used before paging.
+  /// Rows for exports/print: full filtered set already held for client paging.
   Future<List<SellInRecordItem>> _exportRecords() async {
-    final loaded = await _repo.load(_sellInQuery(limit: 250));
+    if (_records.length >= _data.totalCount && _records.isNotEmpty) {
+      return _records;
+    }
+    final loaded = await _repo.load(_sellInQuery(limit: math.max(_data.totalCount, _fetchPageSize)));
     return loaded.valueOrNull?.records ?? _records;
   }
 
@@ -964,45 +942,30 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   }
 
 
-  // Virtualized Sell-In records table. The item column is pinned at the
-  // reading start; the rest scroll. Main columns (item, period, chain,
-  // cases, net, gross) fit in a 1030dp viewport (1280 minus the sidebar).
-  static const double _sellInItemColWidth = 248.0;
-  // Flex widths: the base widths below are stretched to fill the available
-  // width (no empty space on wide screens); recomputed on every layout.
-  List<double> _sellInWidths = _sellInColWidths;
-  double _sellInItemWidth = _sellInItemColWidth;
+  // Sell-In records table: all 12 columns fit the viewport (no horizontal
+  // scroll / no يمين·شمال). Client-side pagination shows 20 rows per page.
+  static const double _sellInHeaderHeight = 56.0;
+  static const double _sellInRowMinHeight = 64.0;
+  // Flex weights (RTL visual order): item, period, chain/branch, cases/units,
+  // net, gross, carton price, expected, brand/category, rep, weight, file.
+  static const List<double> _sellInColFlex = [
+    2.4, 0.75, 1.15, 1.05, 1.0, 1.0, 1.15, 1.2, 1.25, 0.95, 0.55, 0.5,
+  ];
+  List<double> _sellInWidths = const [];
 
   void _layoutSellInColumns(double available) {
-    final item = (available * 0.24).clamp(_sellInItemColWidth, 380.0);
-    final base = _sellInColWidths.fold<double>(0, (a, b) => a + b);
-    final rest = available - item - 1.0;
-    final scale = rest > base ? rest / base : 1.0;
-    _sellInItemWidth = item;
-    _sellInWidths = [for (final w in _sellInColWidths) (w * scale).floorToDouble()];
-  }
-  static const double _sellInHeaderHeight = 56.0;
-  static const double _sellInRowHeight = 132.0;
-  // Scrolling columns (RTL order): period, chain/branch, cases/units, net,
-  // gross, carton price, expected carton price, brand/category, sales rep,
-  // weight, file. Item + the first seven stay within 1030dp.
-  static const List<double> _sellInColWidths = [
-    80, 120, 116, 104, 104, 128, 120, 160, 120, 84, 112,
-  ];
-
-  bool _syncingRecordLists = false;
-
-  void _syncRecordLists(ScrollController from, ScrollController to) {
-    if (_syncingRecordLists || !from.hasClients || !to.hasClients) return;
-    final target = from.offset.clamp(0.0, to.position.maxScrollExtent);
-    if ((to.offset - target).abs() < 0.5) return;
-    _syncingRecordLists = true;
-    to.jumpTo(target);
-    _syncingRecordLists = false;
+    final totalFlex = _sellInColFlex.fold<double>(0, (a, b) => a + b);
+    final unit = available / totalFlex;
+    _sellInWidths = [
+      for (final f in _sellInColFlex) (f * unit).floorToDouble(),
+    ];
+    // Absorb rounding remainder into the item column so the row fills exactly.
+    final used = _sellInWidths.fold<double>(0, (a, b) => a + b);
+    if (_sellInWidths.isNotEmpty) {
+      _sellInWidths[0] += (available - used);
+    }
   }
 
-  // Every scrolling column is centred (header and content); only the pinned
-  // item column stays start-aligned for multi-line names.
   // Monthly / stock DataTables: cap each column's width so long compact
   // numbers wrap onto 2 lines (centred) instead of widening the table past
   // 1030dp; TableScrollContainer still stretches the table on wider screens.
@@ -1010,8 +973,6 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   static const double _skuCellMaxWidth = 88.0;
   static const double _monthlyStatusMaxWidth = 112.0;
 
-  // Monthly cell text: at most 2 centred lines (row height stays bounded),
-  // full text in a tooltip if still clipped.
   // Long stock-table headers wrap onto 2 centred lines so the columns fit 1030dp.
   static Widget _wrapHeader(String text) => ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 56.0),
@@ -1036,136 +997,351 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         ),
       );
 
-  Widget _sellInCell(int i, Widget child) => SizedBox(
+  Widget _sellInCell(
+    int i,
+    Widget child, {
+    AlignmentGeometry alignment = AlignmentDirectional.topCenter,
+    EdgeInsetsGeometry? padding,
+  }) =>
+      SizedBox(
         width: _sellInWidths[i],
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs, vertical: M3Spacing.xxs),
-          child: Align(
-            alignment: AlignmentDirectional.center,
-            child: child,
-          ),
+          padding: padding ??
+              const EdgeInsets.symmetric(horizontal: 6.0, vertical: M3Spacing.xs),
+          child: Align(alignment: alignment, child: child),
         ),
       );
 
-  /// Header row + ListView.builder: only rows on screen are built. Rows are
-  /// appended 25 at a time as the user nears the end of the list.
-  Widget _buildVirtualSellInTable(BuildContext context, ColorScheme colorScheme) {
-    final theme = Theme.of(context);
-    final totalWidth = _sellInWidths.fold<double>(0, (a, b) => a + b);
-    final headers = <Widget>[
-      const Text('الفترة', textAlign: TextAlign.center),
-      const Text('السلسلة / الفرع', textAlign: TextAlign.center),
-      const Text('كرتونة / وحدة', textAlign: TextAlign.center),
-      _twoLineHeader(context, 'صافي Sell-In', 'بدون الضريبة'),
-      _twoLineHeader(context, 'الإجمالي', 'شامل الضريبة'),
-      _twoLineHeader(context, 'سعر الكرتونة', 'الفعلي / القائمة'),
-      const Tooltip(
-        message: 'سعر القائمة × (1 − خصم الفاتورة) × (1 − الخصم الإضافي) بإعدادات سلسلة الصف\nالفرق = الفعلي − المتوقع',
-        child: Text('سعر الكرتونة المتوقع', key: ValueKey('sellin_expected_carton_header'), maxLines: 2, textAlign: TextAlign.center),
+  int get _recordsTotalPages {
+    if (_records.isEmpty) return 1;
+    // Integer ceil-division — do NOT use `/).ceil()` (doubles inflate page count).
+    return (_records.length + _recordsPageSize - 1) ~/ _recordsPageSize;
+  }
+
+  int get _recordsSafePage =>
+      _recordsPageIndex.clamp(0, math.max(0, _recordsTotalPages - 1));
+
+  List<SellInRecordItem> get _recordsPageSlice {
+    if (_records.isEmpty) return const [];
+    final start = _recordsSafePage * _recordsPageSize;
+    if (start >= _records.length) return const [];
+    final end = math.min(start + _recordsPageSize, _records.length);
+    return _records.sublist(start, end);
+  }
+
+  /// Visible page numbers with ellipsis sentinels (-1) for long ranges.
+  List<int> _pageWindow(int current, int total) {
+    if (total <= 7) return [for (var i = 0; i < total; i++) i];
+    final pages = <int>{0, total - 1, current};
+    for (var i = current - 1; i <= current + 1; i++) {
+      if (i > 0 && i < total - 1) pages.add(i);
+    }
+    final sorted = pages.toList()..sort();
+    final out = <int>[];
+    for (var i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) out.add(-1);
+      out.add(sorted[i]);
+    }
+    return out;
+  }
+
+  Widget _buildRecordsPaginationBar(ThemeData theme, ColorScheme colorScheme) {
+    final totalCount = _records.length;
+    final totalPages = _recordsTotalPages;
+    final safePage = _recordsSafePage;
+    final startIndex = totalCount == 0 ? 0 : safePage * _recordsPageSize + 1;
+    final endIndex = totalCount == 0
+        ? 0
+        : math.min((safePage + 1) * _recordsPageSize, totalCount);
+    final canPrev = safePage > 0;
+    final canNext = safePage < totalPages - 1;
+
+    Widget navBtn({
+      required Key key,
+      required IconData icon,
+      required String tooltip,
+      required bool enabled,
+      required VoidCallback onPressed,
+    }) {
+      return SizedBox(
+        width: 40.0,
+        height: 40.0,
+        child: IconButton(
+          key: key,
+          icon: Icon(icon, size: 20.0),
+          tooltip: tooltip,
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          onPressed: enabled ? onPressed : null,
+        ),
+      );
+    }
+
+    return Container(
+      key: const ValueKey('sellin_records_pagination'),
+      height: 56.0,
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: colorScheme.outlineVariant),
+        ),
       ),
-      const Text('العلامة التجارية / الفئة', textAlign: TextAlign.center),
-      const Text('مندوب المبيعات', textAlign: TextAlign.center),
-      const Text('الوزن (طن)', textAlign: TextAlign.center),
-      const Text('الملف', textAlign: TextAlign.center),
-    ];
-    final records = _records;
-    return SizedBox(
-      key: const ValueKey('sellin_records_table'),
-      width: totalWidth,
-      height: 600.0,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs),
+      child: Row(
         children: [
-          Container(
-            height: _sellInHeaderHeight,
-            color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
-            child: DefaultTextStyle.merge(
-              style: theme.dataTableTheme.headingTextStyle ?? theme.textTheme.titleSmall,
-              child: Row(
-                children: [
-                  for (var i = 0; i < headers.length; i++) _sellInCell(i, headers[i]),
-                ],
+          Expanded(
+            child: Tooltip(
+              message:
+                  'عرض $startIndex–$endIndex من $totalCount · صفحة ${totalCount == 0 ? 0 : safePage + 1} من $totalPages',
+              child: Text(
+                key: const ValueKey('sellin_records_page_label'),
+                'عرض $startIndex–$endIndex من $totalCount · صفحة ${totalCount == 0 ? 0 : safePage + 1} من $totalPages',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
-          Expanded(
-            child: DefaultTextStyle.merge(
-              style: theme.dataTableTheme.dataTextStyle ?? theme.textTheme.bodyMedium,
-              child: ListView.builder(
-                controller: _recordsListScrollController,
-                itemExtent: _sellInRowHeight,
-                itemCount: records.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == records.length) {
-                    return _buildSellInListFooter(theme, colorScheme);
-                  }
-                  final cells = _sellInRowCells(context, colorScheme, records[index]);
-                  return Container(
-                    key: ValueKey('sellin_record_row_$index'),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: theme.dividerColor),
+          navBtn(
+            key: const ValueKey('sellin_records_first_btn'),
+            icon: AppIcons.firstPage,
+            tooltip: 'الصفحة الأولى',
+            enabled: canPrev,
+            onPressed: () => setState(() => _recordsPageIndex = 0),
+          ),
+          navBtn(
+            key: const ValueKey('sellin_records_prev_btn'),
+            icon: AppIcons.chevronStart,
+            tooltip: 'الصفحة السابقة',
+            enabled: canPrev,
+            onPressed: () => setState(() => _recordsPageIndex = safePage - 1),
+          ),
+          for (final p in _pageWindow(safePage, totalPages))
+            if (p < 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                child: Text(
+                  '…',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                child: SizedBox(
+                  width: 40.0,
+                  height: 40.0,
+                  child: Material(
+                    color: p == safePage
+                        ? colorScheme.secondaryContainer
+                        : colorScheme.surface.withValues(alpha: 0),
+                    shape: const CircleBorder(),
+                    child: InkWell(
+                      key: ValueKey('sellin_records_page_circle_$p'),
+                      customBorder: const CircleBorder(),
+                      onTap: p == safePage
+                          ? null
+                          : () => setState(() => _recordsPageIndex = p),
+                      child: Center(
+                        child: Text(
+                          '${p + 1}',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: p == safePage
+                                ? colorScheme.onSecondaryContainer
+                                : colorScheme.onSurfaceVariant,
+                            fontWeight:
+                                p == safePage ? FontWeight.w700 : FontWeight.w500,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        for (var i = 0; i < cells.length; i++) _sellInCell(i, cells[i]),
-                      ],
-                    ),
-                  );
-                },
+                  ),
+                ),
               ),
-            ),
+          navBtn(
+            key: const ValueKey('sellin_records_next_btn'),
+            icon: AppIcons.chevronEnd,
+            tooltip: 'الصفحة التالية',
+            enabled: canNext,
+            onPressed: () => setState(() => _recordsPageIndex = safePage + 1),
+          ),
+          navBtn(
+            key: const ValueKey('sellin_records_last_btn'),
+            icon: AppIcons.lastPage,
+            tooltip: 'الصفحة الأخيرة',
+            enabled: canNext,
+            onPressed: () =>
+                setState(() => _recordsPageIndex = totalPages - 1),
           ),
         ],
       ),
     );
   }
 
-  /// Pinned item column for the records table (same header/row heights).
-  Widget _buildSellInPinnedItemColumn(BuildContext context, ColorScheme colorScheme) {
+  /// Header + current page of rows + pagination footer. No horizontal scroll.
+  Widget _buildVirtualSellInTable(BuildContext context, ColorScheme colorScheme) {
     final theme = Theme.of(context);
-    final records = _records;
-    return SizedBox(
-      key: const ValueKey('sellin_records_pinned_item'),
-      width: _sellInItemWidth,
-      height: 600.0,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: BorderDirectional(end: BorderSide(color: colorScheme.outlineVariant)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              height: _sellInHeaderHeight,
-              alignment: AlignmentDirectional.centerStart,
-              padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs),
-              color: colorScheme.surfaceContainerHigh.withOpacity(0.5),
-              child: Text('الصنف', style: theme.dataTableTheme.headingTextStyle ?? theme.textTheme.titleSmall),
-            ),
-            Expanded(
-              child: ListView.builder(
-                controller: _recordsPinnedListScrollController,
-                itemExtent: _sellInRowHeight,
-                itemCount: records.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == records.length) return const SizedBox.shrink();
-                  return Container(
-                    key: ValueKey('sellin_record_item_$index'),
-                    padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xs),
-                    alignment: AlignmentDirectional.centerStart,
-                    decoration: BoxDecoration(
-                      border: Border(bottom: BorderSide(color: theme.dividerColor)),
-                    ),
-                    child: _sellInItemCell(context, colorScheme, records[index]),
-                  );
-                },
-              ),
-            ),
-          ],
+    final headers = <Widget>[
+      Text('الصنف',
+          key: const ValueKey('sellin_records_pinned_item'),
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+      Text('الفترة',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+      Text('السلسلة / الفرع',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+      Text('كرتونة / وحدة',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+      _twoLineHeader(context, 'صافي Sell-In', 'بدون الضريبة'),
+      _twoLineHeader(context, 'الإجمالي', 'شامل الضريبة'),
+      _twoLineHeader(context, 'سعر الكرتونة', 'الفعلي / القائمة'),
+      Tooltip(
+        message:
+            'سعر القائمة × (1 − خصم الفاتورة) × (1 − الخصم الإضافي) بإعدادات سلسلة الصف\nالفرق = الفعلي − المتوقع',
+        child: Text(
+          'السعر المتوقع',
+          key: const ValueKey('sellin_expected_carton_header'),
+          maxLines: 2,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant),
         ),
       ),
+      Text('العلامة التجارية / الفئة',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+      Text('المندوب',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+      Text('الوزن (طن)',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+      Text('الملف',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium
+              ?.copyWith(color: colorScheme.onSurfaceVariant)),
+    ];
+    final pageRecords = _recordsPageSlice;
+    final pageBase = _recordsSafePage * _recordsPageSize;
+
+    return Column(
+      key: const ValueKey('sellin_records_table'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          height: _sellInHeaderHeight,
+          color: colorScheme.surfaceContainer,
+          child: Row(
+            children: [
+              for (var i = 0; i < headers.length; i++)
+                _sellInCell(
+                  i,
+                  headers[i],
+                  alignment: i == 0
+                      ? AlignmentDirectional.centerStart
+                      : AlignmentDirectional.center,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6.0,
+                    vertical: M3Spacing.xxs,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        for (var i = 0; i < pageRecords.length; i++)
+          _buildSellInRecordRow(
+            context,
+            colorScheme,
+            pageRecords[i],
+            absoluteIndex: pageBase + i,
+          ),
+        _buildRecordsPaginationBar(theme, colorScheme),
+      ],
+    );
+  }
+
+  Widget _buildSellInRecordRow(
+    BuildContext context,
+    ColorScheme colorScheme,
+    SellInRecordItem record, {
+    required int absoluteIndex,
+  }) {
+    final cells = <Widget>[
+      _sellInItemCell(context, colorScheme, record),
+      ..._sellInRowCells(context, colorScheme, record),
+    ];
+    return Material(
+      color: colorScheme.surfaceContainerLowest,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: _sellInRowMinHeight),
+        child: InkWell(
+          hoverColor: colorScheme.onSurface.withValues(alpha: 0.08),
+          // Hover affordance only — SKU opens via the item cell InkWell.
+          onTap: () {},
+          mouseCursor: SystemMouseCursors.basic,
+          child: Container(
+            key: ValueKey('sellin_record_row_$absoluteIndex'),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: colorScheme.outlineVariant),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var c = 0; c < cells.length; c++)
+                  _keyedSellInRowCell(
+                    absoluteIndex: absoluteIndex,
+                    column: c,
+                    child: cells[c],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  /// Column 0 carries [sellin_record_item_*] on the padded cell so its top
+  /// aligns with [sellin_record_row_*] (not the inner content under padding).
+  Widget _keyedSellInRowCell({
+    required int absoluteIndex,
+    required int column,
+    required Widget child,
+  }) {
+    final cell = _sellInCell(
+      column,
+      child,
+      alignment: column == 0
+          ? AlignmentDirectional.topStart
+          : (column == 3 ||
+                  column == 4 ||
+                  column == 5 ||
+                  column == 6 ||
+                  column == 7 ||
+                  column == 10)
+              ? AlignmentDirectional.topEnd
+              : AlignmentDirectional.topCenter,
+    );
+    if (column != 0) return cell;
+    return KeyedSubtree(
+      key: ValueKey('sellin_record_item_$absoluteIndex'),
+      child: cell,
     );
   }
 
@@ -1180,25 +1356,28 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         skuName: r.itemName,
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 14px name on up to 2 lines; the full name is in the tooltip.
           Tooltip(
             message: r.itemName,
             child: Text(
               r.itemName,
               key: const ValueKey('sellin_record_item_name'),
-              maxLines: 3,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           if (hasIdCard) ...[
+            const SizedBox(height: 2.0),
             _HoverCopyCode(
               icon: AppIcons.tag,
-              label: 'كود',
+              label: 'الكود',
               value: r.itemCode,
             ),
             _HoverCopyCode(
@@ -1226,58 +1405,99 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     }
   }
 
-  // Primary (14px) and secondary (12px, muted) cell text wrap to 2 lines;
-  // anything still clipped shows its full text in a tooltip.
-  Widget _primary(BuildContext context, String text, {Color? color, FontWeight weight = FontWeight.w600, String? tooltip, Key? key}) {
+  // Primary (bodyMedium) and secondary (labelSmall/bodySmall muted) cell text.
+  Widget _primary(
+    BuildContext context,
+    String text, {
+    Color? color,
+    FontWeight weight = FontWeight.w500,
+    String? tooltip,
+    Key? key,
+    int maxLines = 2,
+    TextAlign textAlign = TextAlign.center,
+    bool tabular = false,
+    bool isolateLtr = false,
+  }) {
+    final display = isolateLtr ? ltrIsolate(text) : text;
     return Tooltip(
       message: tooltip ?? text,
       child: Text(
-        text,
+        display,
         key: key,
-        maxLines: 2,
+        maxLines: maxLines,
         overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: weight, color: color),
+        textAlign: textAlign,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontWeight: weight,
+              color: color ?? Theme.of(context).colorScheme.onSurface,
+              fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
+            ),
       ),
     );
   }
 
-  Widget _secondary(BuildContext context, String text, {Color? color}) => Tooltip(
-        message: text,
-        child: Text(
-          text,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-      );
+  Widget _secondary(
+    BuildContext context,
+    String text, {
+    Color? color,
+    TextAlign textAlign = TextAlign.center,
+    int maxLines = 2,
+    bool tabular = false,
+    bool isolateLtr = false,
+  }) {
+    final display = isolateLtr ? ltrIsolate(text) : text;
+    return Tooltip(
+      message: text,
+      child: Text(
+        display,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+        textAlign: textAlign,
+        // bodySmall (12) — density sub-lines stay >= 12px for readability tests.
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: color ?? Theme.of(context).colorScheme.onSurfaceVariant,
+              fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
+            ),
+      ),
+    );
+  }
 
-  List<Widget> _sellInRowCells(BuildContext context, ColorScheme colorScheme, SellInRecordItem r) {
+  List<Widget> _sellInRowCells(
+    BuildContext context,
+    ColorScheme colorScheme,
+    SellInRecordItem r,
+  ) {
     final unitsSupplied = r.totalUnitsSupplied > 0
         ? r.totalUnitsSupplied
         : (r.netQtyCases * (r.unitsPerCarton > 0 ? r.unitsPerCarton : 12)).round();
-    final grossInclVat = r.grossValueInclVatEgp > 0
-        ? r.grossValueInclVatEgp
-        : r.netValueEgp * 1.14;
-    final vatAmount = r.vatAmountEgp > 0
-        ? r.vatAmountEgp
-        : r.netValueEgp * 0.14;
+    final grossInclVat =
+        r.grossValueInclVatEgp > 0 ? r.grossValueInclVatEgp : r.netValueEgp * 1.14;
+    final vatAmount =
+        r.vatAmountEgp > 0 ? r.vatAmountEgp : r.netValueEgp * 0.14;
     final actualCasePrice = r.actualCasePriceExclEgp > 0
         ? r.actualCasePriceExclEgp
         : (r.netQtyCases > 0 ? r.netValueEgp / r.netQtyCases : 0.0);
     final wave = pricingWaveLabelAr(r.pricingWaveStatus);
-    Widget col(List<Widget> c, {bool end = false}) => Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+    Widget col(List<Widget> c) => Column(
+          mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: c,
         );
+    Widget endCol(List<Widget> c) => Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: c,
+        );
+
+    final period = '${r.monthAr.isNotEmpty ? r.monthAr : r.monthNum} ${r.year}';
+    final fileTip = r.sourceFilename.isEmpty
+        ? '—'
+        : '${r.sourceFilename}·$period';
 
     return [
-      _primary(context, '${r.monthAr.isNotEmpty ? r.monthAr : r.monthNum} ${r.year}'),
+      _primary(context, period, weight: FontWeight.w400, maxLines: 1),
       col([
         M3ChipSurface(
           color: colorScheme.surfaceContainerHigh,
@@ -1289,40 +1509,63 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                 ),
           ),
         ),
-        if (r.governorate.isNotEmpty) _secondary(context, _displayLocation(r.governorate)),
+        if (r.governorate.isNotEmpty)
+          _secondary(context, _displayLocation(r.governorate)),
       ]),
-      col([
-        _primary(context, '${CurrencyFormatter.formatNumber(r.netQtyCases.round())} كرتونة'),
+      endCol([
+        _primary(
+          context,
+          '${CurrencyFormatter.formatNumber(r.netQtyCases.round())} كرتونة',
+          weight: FontWeight.w500,
+          textAlign: TextAlign.end,
+          tabular: true,
+          maxLines: 1,
+        ),
         _secondary(
           context,
           r.unitsPerCarton > 0
               ? '${CurrencyFormatter.formatNumber(unitsSupplied)} وحدة • ${r.unitsPerCarton}/كرتونة'
               : '${CurrencyFormatter.formatNumber(unitsSupplied)} وحدة',
+          textAlign: TextAlign.end,
+          tabular: true,
         ),
-      ], end: true),
-      // Compact money; the exact value is in the tooltip.
+      ]),
       _primary(
         context,
         CurrencyFormatter.formatCompactEGP(r.netValueEgp),
         key: const ValueKey('sellin_record_net'),
-        color: colorScheme.primary,
-        weight: FontWeight.w700,
+        weight: FontWeight.w500,
         tooltip: CurrencyFormatter.formatEGP(r.netValueEgp),
+        textAlign: TextAlign.end,
+        tabular: true,
+        maxLines: 1,
       ),
-      col([
+      endCol([
         _primary(
           context,
           CurrencyFormatter.formatCompactEGP(grossInclVat),
           tooltip: CurrencyFormatter.formatEGP(grossInclVat),
+          textAlign: TextAlign.end,
+          tabular: true,
+          maxLines: 1,
         ),
-        _secondary(context, 'الضريبة: ${CurrencyFormatter.formatCompactEGP(vatAmount)}'),
-      ], end: true),
-      col([
+        _secondary(
+          context,
+          'الضريبة: ${CurrencyFormatter.formatCompactEGP(vatAmount)}',
+          textAlign: TextAlign.end,
+          tabular: true,
+        ),
+      ]),
+      endCol([
         _primary(
           context,
           CurrencyFormatter.formatEGP(actualCasePrice, showDecimals: true),
           key: const ValueKey('sellin_record_actual_carton'),
-          tooltip: 'الفعلي: ${CurrencyFormatter.formatEGP(actualCasePrice, showDecimals: true)}',
+          tooltip:
+              'الفعلي: ${CurrencyFormatter.formatEGP(actualCasePrice, showDecimals: true)}',
+          textAlign: TextAlign.end,
+          tabular: true,
+          maxLines: 1,
         ),
         if (r.officialCartonExclVatEgp > 0)
           Tooltip(
@@ -1332,120 +1575,184 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             child: _secondary(
               context,
               'القائمة: ${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp, showDecimals: true)}',
+              textAlign: TextAlign.end,
+              tabular: true,
             ),
           ),
-        if (r.officialCartonExclVatEgp > 0 && r.effectiveDiscountPct <= 0 && wave != null)
-          _secondary(context, wave),
-      ], end: true),
+        if (r.officialCartonExclVatEgp > 0 &&
+            r.effectiveDiscountPct <= 0 &&
+            wave != null)
+          _secondary(context, wave, textAlign: TextAlign.end),
+      ]),
       _expectedCartonCell(context, colorScheme, r, actualCasePrice),
       col([
         Tooltip(
           message: '${r.brand} • ${r.subCategory}',
           child: Text(
             '${r.brand} • ${r.subCategory}',
-            maxLines: 3,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  color: colorScheme.onSurface,
+                ),
           ),
         ),
         if (r.departmentAr.isNotEmpty) _secondary(context, r.departmentAr),
       ]),
-      _primary(context, r.salesRep, weight: FontWeight.w400, tooltip: r.salesRep),
-      _primary(context, r.weightTons.toStringAsFixed(2), weight: FontWeight.w400),
-      Tooltip(
-        message: r.sourceFilename.isNotEmpty ? r.sourceFilename : '—',
-        child: _secondary(context, r.sourceFilename.isNotEmpty ? sheetShortName(r.sourceFilename) : '—'),
+      _primary(
+        context,
+        r.salesRep,
+        weight: FontWeight.w400,
+        tooltip: r.salesRep,
+        maxLines: 1,
+      ),
+      _primary(
+        context,
+        r.weightTons.toStringAsFixed(2),
+        weight: FontWeight.w400,
+        textAlign: TextAlign.end,
+        tabular: true,
+        maxLines: 1,
+      ),
+      SizedBox(
+        width: 48.0,
+        height: 40.0,
+        child: IconButton(
+          key: const ValueKey('sellin_record_file_btn'),
+          icon: Icon(
+            AppIcons.tableView,
+            size: 24.0,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          tooltip: fileTip,
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          onPressed: r.sourceFilename.isEmpty ? null : () {},
+        ),
       ),
     ];
   }
 
   /// سعر الكرتونة المتوقع with this row's chain terms, and actual − expected below it.
-  Widget _expectedCartonCell(BuildContext context, ColorScheme colorScheme, SellInRecordItem r, double actual) {
+  Widget _expectedCartonCell(
+    BuildContext context,
+    ColorScheme colorScheme,
+    SellInRecordItem r,
+    double actual,
+  ) {
     final expected = r.expectedCartonExclVatEgp;
     if (expected <= 0) {
-      return Column(mainAxisSize: MainAxisSize.min, children: [
-        _primary(context, '—', key: const ValueKey('sellin_record_expected_carton')),
-        _secondary(context, 'بلا سعر رسمي'),
-      ]);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _primary(
+            context,
+            '—',
+            key: const ValueKey('sellin_record_expected_carton'),
+            textAlign: TextAlign.end,
+          ),
+          _secondary(context, 'بلا سعر رسمي', textAlign: TextAlign.end),
+        ],
+      );
     }
-    final ac = M3StatusColors.of(context).accents;
     final diff = actual > 0 ? actual - expected : 0.0;
     final diffPct = diff / expected * 100;
-    final String diffText;
-    final Color diffColor;
-    if (actual <= 0 || diff.abs() < 0.005) {
-      diffText = 'مطابق';
-      diffColor = colorScheme.onSurfaceVariant;
+    final match = actual <= 0 || diff.abs() < 0.005;
+    final Widget tag;
+    if (match) {
+      tag = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(AppIcons.success, size: 16.0, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 4.0),
+          Text(
+            'مطابق',
+            key: const ValueKey('sellin_record_expected_carton_diff'),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      );
     } else {
       final sign = diff > 0 ? '+' : '\u2212';
-      diffText = '\u2066$sign${CurrencyFormatter.formatEGP(diff.abs(), showDecimals: true)} ($sign${diffPct.abs().toStringAsFixed(1)}%)\u2069';
-      diffColor = diff < 0 ? ac.cautionStrong : ac.tealStrong;
-    }
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      _primary(
-        context,
-        CurrencyFormatter.formatEGP(expected, showDecimals: true),
-        key: const ValueKey('sellin_record_expected_carton'),
-        tooltip: '${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp, showDecimals: true)} × (1 − ${SellInPriceWaterfallCard.pct(r.invoiceDiscountPct)}) × (1 − ${SellInPriceWaterfallCard.pct(r.extraDiscountPct)})',
-      ),
-      Tooltip(
-        message: 'الفعلي − المتوقع',
+      final diffText =
+          '\u2066$sign${CurrencyFormatter.formatEGP(diff.abs(), showDecimals: true)} ($sign${diffPct.abs().toStringAsFixed(1)}%)\u2069';
+      final below = diff < 0;
+      tag = M3ChipSurface(
+        color: below ? colorScheme.errorContainer : colorScheme.tertiaryContainer,
         child: Text(
           diffText,
           key: const ValueKey('sellin_record_expected_carton_diff'),
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: diffColor, fontWeight: FontWeight.w600),
-        ),
-      ),
-    ]);
-  }
-
-  Widget _buildSellInListFooter(ThemeData theme, ColorScheme colorScheme) {
-    if (_hasMoreSellIn) {
-      // Footer is built only when it is (nearly) on screen: fetch next batch.
-      if (!_isLoadingMore) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _loadMoreSellInRecords());
-      }
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Center(
-          child: SizedBox(
-            width: 24.0,
-            height: 24.0,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
-          ),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: below
+                    ? colorScheme.onErrorContainer
+                    : colorScheme.onTertiaryContainer,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
         ),
       );
     }
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Center(
-        child: Text(
-          'تم تحميل كل الصفوف (${CurrencyFormatter.formatNumber(_data.totalCount)})',
-          style: theme.textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        _primary(
+          context,
+          CurrencyFormatter.formatEGP(expected, showDecimals: true),
+          key: const ValueKey('sellin_record_expected_carton'),
+          tooltip:
+              '${CurrencyFormatter.formatEGP(r.officialCartonExclVatEgp, showDecimals: true)} × (1 − ${SellInPriceWaterfallCard.pct(r.invoiceDiscountPct)}) × (1 − ${SellInPriceWaterfallCard.pct(r.extraDiscountPct)})',
+          textAlign: TextAlign.end,
+          tabular: true,
+          maxLines: 1,
         ),
-      ),
+        const SizedBox(height: 2.0),
+        Tooltip(message: 'الفعلي − المتوقع', child: tag),
+      ],
     );
   }
 
   Widget _twoLineHeader(BuildContext context, String title, String subtitle) {
     final theme = Theme.of(context);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(title),
-        Text(
-          subtitle,
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w400,
-            color: theme.colorScheme.onSurfaceVariant,
+    final muted = theme.colorScheme.onSurfaceVariant;
+    // Scale down if needed so both lines always fit the 56dp header cell.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: muted,
+              height: 1.1,
+            ),
           ),
-        ),
-      ],
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: muted,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1590,7 +1897,10 @@ options: m3OptionsFromMenuItems<String>([
                       ]),
 onChanged: m3Legacy<String>((v) {
                         if (v != null) {
-                          setState(() => _selectedChain = v);
+                          setState(() {
+                            _selectedChain = v;
+                            _resetRecordsPage();
+                          });
                           _loadSellInRecords();
                           _loadStockReconciliationReport();
                         }
@@ -1611,6 +1921,7 @@ onChanged: m3Legacy<int>((v) {
                           setState(() {
                             _selectedYear = v;
                             _yearTouched = true;
+                            _resetRecordsPage();
                           });
                           _loadSellInRecords();
                           _loadStockReconciliationReport();
@@ -1639,7 +1950,10 @@ options: m3OptionsFromMenuItems<int>([
                       ]),
 onChanged: m3Legacy<int>((v) {
                         if (v != null) {
-                          setState(() => _selectedMonth = v);
+                          setState(() {
+                            _selectedMonth = v;
+                            _resetRecordsPage();
+                          });
                           _loadSellInRecords();
                         }
                       }),
@@ -1649,6 +1963,7 @@ onChanged: m3Legacy<int>((v) {
                     hintStyle: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w300),
                     width: 220.0,
                     child: TextField(
+                      key: const ValueKey('sellin_records_search_field'),
                       decoration: InputDecoration(
                         hintText: 'ابحث بالصنف أو الكود أو الباركود',
                         hintStyle: theme.textTheme.bodyMedium?.copyWith(
@@ -1667,6 +1982,7 @@ onChanged: m3Legacy<int>((v) {
                       ),
                       onChanged: (val) {
                         _searchQuery = val;
+                        _resetRecordsPage();
                         _loadSellInRecords();
                       },
                     ),
@@ -1689,13 +2005,13 @@ onChanged: m3Legacy<int>((v) {
 
         // 3. Sell-In Records Table
         Container(
+          key: const ValueKey('sellin_records_surface'),
           decoration: BoxDecoration(
-            color: M3TableSurface.color(colorScheme),
-            borderRadius: M3Shape.radiusLg,
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.5),
-            ),
+            color: colorScheme.surfaceContainerLowest,
+            borderRadius: M3Shape.radiusMd,
+            border: Border.all(color: colorScheme.outlineVariant),
           ),
+          clipBehavior: Clip.antiAlias,
           child: _isLoading
               ? const Padding(
                   padding: EdgeInsets.all(48.0),
@@ -1714,14 +2030,16 @@ onChanged: m3Legacy<int>((v) {
                       ),
                     )
                   : LayoutBuilder(builder: (context, constraints) {
-                      // Fill the full width: 16dp padding on each side.
-                      _layoutSellInColumns(constraints.maxWidth - 32.0);
-                      return TableScrollContainer(
-                        controller: _recordsTableScrollController,
-                        showSwipeHint: true,
-                        padding: const EdgeInsets.all(16.0),
-                        // Item column stays on screen; the rest scroll.
-                        pinnedStart: _buildSellInPinnedItemColumn(context, colorScheme),
+                      // All 12 columns share the full width — no horizontal scroll.
+                      const pad = M3Spacing.sm;
+                      _layoutSellInColumns(constraints.maxWidth - pad * 2);
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          M3Spacing.sm,
+                          M3Spacing.xs,
+                          M3Spacing.sm,
+                          0,
+                        ),
                         child: _buildVirtualSellInTable(context, colorScheme),
                       );
                     }),
@@ -3896,8 +4214,8 @@ bool matchesSellInMarginFilter(SKUBranchInventoryModel i, String filter) {
 }
 
 
-/// One code line (icon on the reading-start side, label, value). Hovering the
-/// line reveals a copy action; clicking it copies the value.
+/// One code/barcode line: 16dp icon (semanticLabel) + 4dp gap + LTR tabular value.
+/// No visible «الكود»/«الباركود» text labels. Hover reveals copy; tap copies.
 class _HoverCopyCode extends StatefulWidget {
   const _HoverCopyCode({
     required this.icon,
@@ -3920,12 +4238,12 @@ class _HoverCopyCodeState extends State<_HoverCopyCode> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final hasValue = widget.value.isNotEmpty;
-    final style = Theme.of(context).textTheme.bodyMedium!.merge(TextStyle(
-          fontFamily: 'monospace',
-          fontSize: M3FontSize.bodySmall,
-          fontWeight: FontWeight.w500,
+    final display = hasValue ? ltrIsolate(widget.value) : '—';
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
           color: cs.onSurfaceVariant,
-        ));
+          fontFeatures: const [FontFeature.tabularFigures()],
+          fontFamily: 'monospace',
+        );
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -3942,14 +4260,19 @@ class _HoverCopyCodeState extends State<_HoverCopyCode> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, size: 18.0, color: cs.onSurfaceVariant),
+              Icon(
+                widget.icon,
+                size: 16.0,
+                color: cs.onSurfaceVariant,
+                semanticLabel: widget.label,
+              ),
               const SizedBox(width: 4.0),
               Flexible(
                 child: Tooltip(
                   message: '${widget.label}: ${hasValue ? widget.value : "-"}',
                   child: Text(
-                    '${widget.label}: ${hasValue ? widget.value : "-"}',
-                    maxLines: 2,
+                    display,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: style,
                   ),
@@ -3959,7 +4282,7 @@ class _HoverCopyCodeState extends State<_HoverCopyCode> {
                 const SizedBox(width: 4.0),
                 Tooltip(
                   message: 'نسخ',
-                  child: Icon(AppIcons.copy, size: 18.0, color: cs.primary),
+                  child: Icon(AppIcons.copy, size: 16.0, color: cs.primary),
                 ),
               ],
             ],

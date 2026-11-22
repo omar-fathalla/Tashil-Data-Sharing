@@ -153,7 +153,13 @@ void main() {
           texts.where((t) =>
               t.contains('current_list') || t.contains('some_internal_key')),
           isEmpty);
-      expect(texts.where((t) => t.startsWith('الباركود: ')), isNotEmpty);
+      // Spec: no visible «الباركود» text label — icon semanticLabel instead.
+      expect(texts.where((t) => t.startsWith('الباركود: ')), isEmpty);
+      expect(
+        tester.widgetList<Icon>(find.byType(Icon)).any(
+          (i) => i.icon == Icons.qr_code_2_rounded && i.semanticLabel == 'الباركود'),
+        isTrue,
+      );
       expect(find.text('سعر القائمة الحالي'), findsWidgets);
     }, _client);
   });
@@ -212,33 +218,37 @@ void main() {
   });
 
   testWidgets(
-      '4. density: 14px names on 3 lines + tooltip, 12px muted secondary, tall rows',
+      '4. density: titleSmall name + icon code/barcode lines, ~64dp rows',
       (tester) async {
     await http.runWithClient(() async {
       await _pump(tester);
       final cs = Theme.of(tester.element(find.byType(SellInExplorerScreen)))
           .colorScheme;
       final names = find.byKey(const ValueKey('sellin_record_item_name'));
-      expect(names, findsNWidgets(4));
-      for (final e in names.evaluate()) {
+      // Client page shows 20 rows; assert a sample of visible names.
+      expect(names.evaluate().length, greaterThanOrEqualTo(4));
+      for (final e in names.evaluate().take(4)) {
         final t = e.widget as Text;
-        expect(t.maxLines, 3);
+        expect(t.maxLines, 1);
         final style = DefaultTextStyle.of(e).style.merge(t.style);
-        expect(style.fontSize, 14.0);
+        expect(style.fontSize, 14.0); // titleSmall
         final tip =
             find.ancestor(of: find.byWidget(t), matching: find.byType(Tooltip));
         expect(tester.widget<Tooltip>(tip.first).message, t.data);
       }
-      final code = find.byWidgetPredicate(
-          (w) => w is Text && (w.data ?? '').startsWith('الباركود: '));
-      final ct = tester.widget<Text>(code.first);
-      expect(ct.style?.fontSize, 12.0);
-      expect(ct.style?.color, cs.onSurfaceVariant);
+      final barcodeIcons = tester
+          .widgetList<Icon>(find.byType(Icon))
+          .where((i) =>
+              i.icon == Icons.qr_code_2_rounded && i.semanticLabel == 'الباركود')
+          .toList();
+      expect(barcodeIcons, isNotEmpty);
+      expect(barcodeIcons.first.size, 16.0);
+      expect(barcodeIcons.first.color, cs.onSurfaceVariant);
       expect(
           tester
               .getSize(find.byKey(const ValueKey('sellin_record_row_0')))
               .height,
-          greaterThanOrEqualTo(72.0));
+          greaterThanOrEqualTo(64.0));
       await tester
           .tap(find.textContaining(RegExp('^المخزون وإعادة الطلب')).first);
       await tester.pumpAndSettle();
@@ -273,12 +283,12 @@ void main() {
       final net = tester
           .widget<Text>(find.byKey(const ValueKey('sellin_record_net')).first);
       expect(net.data, contains('K'));
-      // Pinned rows line up with the scrolling rows.
+      // Item cell tops sit inside the row (8dp vertical cell padding).
       for (var i = 0; i < 4; i++) {
         final a = tester.getRect(find.byKey(ValueKey('sellin_record_item_$i')));
         final b = tester.getRect(find.byKey(ValueKey('sellin_record_row_$i')));
-        expect((a.top - b.top).abs(), lessThan(1.0));
-        expect((a.height - b.height).abs(), lessThan(1.0));
+        expect(a.top, greaterThanOrEqualTo(b.top - 0.5));
+        expect(a.top - b.top, lessThan(12.0));
       }
     }, _client);
   });
