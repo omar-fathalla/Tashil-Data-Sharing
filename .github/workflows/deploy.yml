@@ -1,29 +1,22 @@
 # Production deploy after CI tests succeed on main (backend → Cloud Run, web → Firebase Hosting).
 #
 # Trigger: workflow_run of "CI tests" completed successfully on main (no runner busy-wait).
-# Also workflow_dispatch for manual redeploys. Intentionally NO merge_group / push trigger —
-# one deploy per green main CI run. Merge-queue required checks live in ci.yml /
-# playwright_smoke.yml only.
+# Also workflow_dispatch for manual redeploys. Intentionally NO merge_group / push /
+# pull_request / pull_request_target — one deploy per green main CI run. Merge-queue
+# required checks live in ci.yml / playwright_smoke.yml only.
 #
 # Why not push + await-ci: after #95 routed all jobs to tashil-mac, await-ci busy-waited
-# ~2.5h on a Mac runner while CI gate jobs queued behind it (deadlock). workflow_run
-# waits in GitHub's event bus — zero runner minutes held.
+# ~2.5h on a Mac runner while CI gate jobs queued behind it (deadlock). #97 workflow_run
+# waits in GitHub's event bus — zero runner minutes held. Keep that pattern.
 #
-# TODO(billing): TEMPORARY — ALL jobs use Mac self-hosted until GitHub billing is fixed.
-# Single expression CI_RUNS_ON || ["self-hosted","tashil-mac"].
-# Revert: restore light/gate jobs to CI_HOSTED_RUNNER / ubuntu-latest (hybrid #56).
-# NEVER use GitHub-hosted macOS runners.
-# See docs/ci-self-hosted.md / #41 / #55 / #56.
-#
-# Note: tashil-mac … tashil-mac-4 share one physical Mac. Workflow concurrency queues
-# deploys; deploy-backend/web also join job group tashil-deploy (deploy-only — not
-# shared with Flutter/smoke, which queue natively to avoid pending-slot eviction).
-# Prefer MAC_SHARED_LOCK=1 for cross-repo Mac overlap. See docs/ci-self-hosted.md.
+# Hosted ubuntu by default (CI_HOSTED_RUNNER → ubuntu-latest). NEVER macos-latest /
+# larger / paid runners. Public repo: no PR triggers; jobs require same-repo main
+# workflow_run (or workflow_dispatch). gcloud via setup-gcloud; Flutter via flutter-action.
 #
 # Auth: Workload Identity Federation, no JSON keys. The provider only accepts tokens from
 # omar-fathalla/Tashil-Data-Sharing on refs/heads/main, impersonating tashil-gh-deployer.
 #
-# Tests: do not duplicate ci.yml go/flutter on Mac — workflow_run only fires after CI green.
+# Tests: do not duplicate ci.yml go/flutter — workflow_run only fires after CI green.
 # Smoke: hard-fail /api/v1/version + /livez + /api/v1/health (public probes; not /healthz).
 #
 # Skip: deploy-gate ignores docs/md/LICENSE/.gitignore and .github/workflows/** so CI-only
@@ -61,20 +54,36 @@ env:
 
 jobs:
   # Tiny gate: confirm CI success context + skip ignored paths. No busy-wait.
-  # TODO(billing): TEMP — was CI_HOSTED_RUNNER / ubuntu-latest.
+  # Trusted events only (same-repo main workflow_run / dispatch).
   deploy-gate:
     name: Deploy gate
     if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+      github.repository == 'omar-fathalla/Tashil-Data-Sharing' &&
+      github.event_name != 'pull_request' &&
+      github.event_name != 'pull_request_target' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository
+        )
+      )
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 5
     outputs:
       should_deploy: ${{ steps.decide.outputs.should_deploy }}
       sha: ${{ steps.decide.outputs.sha }}
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety)."
+          exit 1
       - uses: actions/checkout@v4
         with:
           # workflow_run: deploy the CI-green commit, not whatever tip holds this YAML.
@@ -96,7 +105,7 @@ jobs:
           fi
 
           # Mirror former push paths-ignore + .github/workflows/** (workflow_run has no paths filter).
-          # Avoid mapfile — macOS /bin/bash is 3.2.
+          # Avoid mapfile — portable across bash versions.
           if git rev-parse --verify -q HEAD^ >/dev/null; then
             file_list="$(git diff --name-only --diff-filter=ACDMRTUXB HEAD^ HEAD)"
           else
@@ -134,16 +143,22 @@ jobs:
   deploy-backend:
     needs: [deploy-gate]
     if: needs.deploy-gate.outputs.should_deploy == 'true'
-    # Stay on Mac/self-hosted where gcloud WIF + toolchains work (#41 / #55 / #56).
     # Deploy-only concurrency (not shared with Flutter/smoke). Never cancel.
     concurrency:
       group: tashil-deploy
       cancel-in-progress: false
-    # TODO(billing): TEMP — same Mac expression as other jobs (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
     # Observed ~4.5m; Cloud Run source deploy can spike — 30m ceiling.
     timeout-minutes: 30
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety)."
+          exit 1
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.deploy-gate.outputs.sha }}
@@ -219,31 +234,8 @@ jobs:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.DEPLOYER_SA }}
 
-      # Prefer $HOME/toolchains/google-cloud-sdk (tashil-ci); no apt.
-      - name: Ensure gcloud on PATH
-        id: gcloud_path
+      - name: Setup gcloud
         if: steps.backend_paths.outputs.deploy == 'true'
-        run: |
-          set -euo pipefail
-          SDK="${HOME}/toolchains/google-cloud-sdk"
-          if [ -x "${SDK}/bin/gcloud" ]; then
-            echo "${SDK}/bin" >> "$GITHUB_PATH"
-            echo "Using preinstalled gcloud at ${SDK}"
-            "${SDK}/bin/gcloud" version
-            echo "need_setup_gcloud=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if command -v gcloud >/dev/null 2>&1; then
-            echo "Using gcloud already on PATH: $(command -v gcloud)"
-            gcloud version
-            echo "need_setup_gcloud=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "Preinstalled gcloud not found; installing via setup-gcloud action"
-          echo "need_setup_gcloud=true" >> "$GITHUB_OUTPUT"
-
-      - name: Setup gcloud (fallback)
-        if: steps.backend_paths.outputs.deploy == 'true' && steps.gcloud_path.outputs.need_setup_gcloud == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Record git commit for /api/v1/version
@@ -282,11 +274,18 @@ jobs:
     concurrency:
       group: tashil-deploy
       cancel-in-progress: false
-    # TODO(billing): TEMP — same Mac expression as other jobs (was already Mac).
-    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["self-hosted", "tashil-mac"]') }}
-    # Observed ~3m (flutter build + Firebase Hosting); 30m ceiling (Mac timeout policy).
+    runs-on: ${{ fromJSON(vars.CI_HOSTED_RUNNER || '"ubuntu-latest"') }}
+    # Flutter build + Firebase Hosting; 30m ceiling.
     timeout-minutes: 30
     steps:
+      - name: Refuse self-hosted for untrusted PRs
+        if: >-
+          runner.environment == 'self-hosted' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Refusing self-hosted/Mac runner for fork PR (public-repo safety)."
+          exit 1
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.deploy-gate.outputs.sha }}
@@ -307,30 +306,7 @@ jobs:
           mkdir -p "$cfg"
           echo "CLOUDSDK_CONFIG=${cfg}" >> "$GITHUB_ENV"
 
-      - name: Detect preinstalled Flutter
-        id: flutter_pre
-        env:
-          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
-        run: |
-          chmod +x scripts/ci_detect_flutter.sh scripts/ci_flutter_arch.sh
-          bash scripts/ci_detect_flutter.sh
-
-      - name: Require preinstalled Flutter on self-hosted
-        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment == 'self-hosted'
-        run: |
-          echo "::error::Preinstalled Flutter ${{ env.FLUTTER_VERSION }} missing on self-hosted runner. Install native arm64 at \$HOME/toolchains/flutter-arm64 via scripts/ci_install_flutter_macos_arm64.sh — do not download via flutter-action (drops Mac runners)."
-          exit 1
-
-      - name: Require native arm64 Flutter on Apple Silicon
-        if: steps.flutter_pre.outputs.use_action == 'false' && runner.environment == 'self-hosted'
-        env:
-          RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: |
-          chmod +x scripts/ci_assert_flutter_arm64.sh scripts/ci_flutter_arch.sh
-          bash scripts/ci_assert_flutter_arm64.sh
-
       - uses: subosito/flutter-action@v2
-        if: steps.flutter_pre.outputs.use_action == 'true' && runner.environment != 'self-hosted'
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -352,6 +328,9 @@ jobs:
         with:
           workload_identity_provider: ${{ env.WIF_PROVIDER }}
           service_account: ${{ env.DEPLOYER_SA }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy to Firebase Hosting
         run: npx --yes firebase-tools@14 deploy --only hosting --project "$PROJECT_ID" --non-interactive
