@@ -61,10 +61,14 @@ class SellInExplorerScreen extends StatefulWidget {
   /// Optional injected repository (tests); defaults to one wrapping [apiClient].
   final SellInExplorerRepository? repository;
 
+  /// Opens the Sell-Out targets tab: Sell-In targets are derived from them.
+  final VoidCallback? onOpenSellOutTargets;
+
   const SellInExplorerScreen({
     super.key,
     required this.apiClient,
     this.repository,
+    this.onOpenSellOutTargets,
   });
 
   @override
@@ -943,6 +947,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                 key: ValueKey('sell_in_targets_${widget.apiClient.tenantId}'),
                 apiClient: widget.apiClient,
                 targetType: 'sell_in',
+                onOpenSellOutTargets: widget.onOpenSellOutTargets,
               )
             else if (_activeTab == 1)
               _buildRemainingStockAndReportsTab(context, theme, colorScheme)

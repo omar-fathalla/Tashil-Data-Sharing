@@ -104,9 +104,13 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  void _selectPage(int index) {
+  /// Tab the Sell-Out explorer opens on (0 data, 2 targets).
+  int _sellOutInitialTab = 0;
+
+  void _selectPage(int index, {int sellOutTab = 0}) {
     setState(() {
       _selectedIndex = index;
+      _sellOutInitialTab = sellOutTab;
       _unknownSlug = null;
     });
     SessionStorage.replaceBrowserUrl(
@@ -323,10 +327,12 @@ class _AppShellState extends State<AppShell> {
       SellOutExplorerScreen(
         key: ValueKey('sellout_$stateKey'),
         apiClient: widget.apiClient,
+        initialTab: _sellOutInitialTab,
       ),
       SellInExplorerScreen(
         key: ValueKey('sellin_$stateKey'),
         apiClient: widget.apiClient,
+        onOpenSellOutTargets: () => _selectPage(1, sellOutTab: 2),
       ),
       SellInReturnsScreen(
         key: ValueKey('returns_$stateKey'),

@@ -37,6 +37,26 @@ class TargetRepository {
         ));
   }
 
+  /// Sell-In targets derived from Sell-Out targets, optionally filtered by
+  /// Product Master [brands]. Cached per chain + year + sorted brand set; any
+  /// Sell-Out target change goes through [invalidateAll], which refreshes it.
+  Future<Result<TargetsSummaryModel>> loadDerivedSellInSummary({
+    String? chain,
+    int? year,
+    List<String> brands = const [],
+    bool forceRefresh = false,
+  }) {
+    final brandKey = ([...brands]..sort()).join('|');
+    final k = CacheStore.key(api.tenantId, feature,
+        ['derived-sell-in', ..._userParts, chain, year, brandKey]);
+    if (forceRefresh) cache.invalidate(k);
+    return Result.guard(() => cache.getOrLoad<TargetsSummaryModel>(
+          k,
+          () => api.getDerivedSellInTargets(
+              chain: chain, year: year, brands: brands),
+        ));
+  }
+
   Future<Result<List<RetailChainModel>>> loadChains({bool forceRefresh = false}) {
     final k = CacheStore.key(api.tenantId, feature, ['chains', ..._userParts]);
     if (forceRefresh) cache.invalidate(k);
