@@ -522,7 +522,7 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
         void toggle() =>
             controller.isOpen ? controller.close() : controller.open();
         const icon =
-            Icon(Icons.sell_outlined, size: M3ToolbarButton.iconSize);
+            Icon(Icons.sell_rounded, size: M3ToolbarButton.iconSize);
         return active
             ? FilledButton.tonalIcon(
                 key: const ValueKey('sellin_brand_filter_button'),

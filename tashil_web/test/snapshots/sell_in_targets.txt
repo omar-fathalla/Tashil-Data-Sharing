@@ -101,13 +101,13 @@ Sell-In | 14.0 | FontWeight.w400 | ff43483f | 0.25 | 1.4285714285714286
 󰁘 | 20.0 | null | ff303f9f | null | 1.0
 󰂚 | 20.0 | null | ff43483f | null | 1.0
 󰃩 | 18.0 | null | ffffffff | null | 1.0
+󰅅 | 18.0 | null | ff426834 | null | 1.0
 󰈑 | 18.0 | null | 61191d17 | null | 1.0
 󰉈 | 20.0 | null | ff3d4b36 | null | 1.0
 󰌏 | 18.0 | null | 61191d17 | null | 1.0
 󰌜 | 20.0 | null | ff426834 | null | 1.0
 󰌞 | 20.0 | null | ff43483f | null | 1.0
 󰎲 | 20.0 | null | ff43483f | null | 1.0
- | 18.0 | null | ff426834 | null | 1.0
  | 18.0 | null | ff43483f | null | 1.0
  | 18.0 | null | ff43483f | null | 1.0
  | 24.0 | null | ff43483f | null | 1.0

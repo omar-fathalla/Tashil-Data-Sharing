@@ -348,12 +348,16 @@ void main() {
           .readAsStringSync();
       for (final t in const [
         "'المستهدف مقابل المحقق'",
-        "M3SectionTitle('أصناف السلسلة",
-        "M3SectionTitle('المستهدف حسب الفرع",
-        "M3SectionTitle('التوزيع الشهري",
       ]) {
         expect(panel, contains(t), reason: t);
       }
+      // Sell-In targets are a derived, read-only view with its own header.
+      final sellInView = File(
+              'lib/features/sell_out_analytics/presentation/widgets/sell_in_derived_targets_view.dart')
+          .readAsStringSync();
+      expect(
+          RegExp(r"M3SectionTitle\(\s*'مستهدف Sell-In").hasMatch(sellInView),
+          isTrue);
       expect(
           RegExp(r"'[^'\n]*',\n\s*style: theme\.textTheme\.titleMedium\?\.copyWith\(\n\s*fontWeight: FontWeight\.w900")
               .hasMatch(panel),
