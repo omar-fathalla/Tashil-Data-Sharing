@@ -169,13 +169,8 @@ func TestTargetBreakdownErrors(t *testing.T) {
 		t.Errorf("read-only endpoint: HTTP %d", rec.Code)
 	}
 
-	bq := h.bqRepo
-	in, err := bq.UpsertTarget(context.Background(), "tenant-bd", domain.TargetRecord{TargetType: "sell_in", RetailerChain: "fathalla", Year: 2026, TargetRevenueEGP: 10})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rec := getBreakdown(h, "tenant-bd", in.ID); rec.Code != http.StatusBadRequest {
-		t.Errorf("sell-in targets have no sell-out breakdown: HTTP %d", rec.Code)
+	if rec := getBreakdown(h, "tenant-bd", "derived_si_from_"+id26); rec.Code != http.StatusBadRequest {
+		t.Errorf("derived sell-in targets have no sell-out breakdown: HTTP %d", rec.Code)
 	}
 }
 

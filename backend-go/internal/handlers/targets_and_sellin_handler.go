@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 	"github.com/tashil/data-sharing/backend/internal/middleware"
 	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/gemini"
+	"github.com/tashil/data-sharing/backend/internal/service/targetalloc"
 )
 
 // PaginatedSellInRecordsResponse formats the Sell-In Explorer table payload and summary metrics,
@@ -146,7 +149,63 @@ func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Re
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// HandleTargets serves GET, POST, and DELETE /api/v1/analytics/targets for Sell-Out and Sell-In Target management.
+// sellInTargetsDerivedMessage explains why Sell-In targets cannot be written.
+const sellInTargetsDerivedMessage = "Sell-In targets are derived automatically from Sell-Out targets; create, upload or delete the Sell-Out target instead"
+
+// writeSellInTargetsDerived rejects a write to Sell-In targets with a clear 4xx (they are read-only, computed on read).
+func writeSellInTargetsDerived(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"error":     sellInTargetsDerivedMessage,
+		"code":      "sell_in_targets_are_derived",
+		"error_ar":  "مستهدفات Sell-In تُحسب تلقائياً من مستهدف Sell-Out ولا يمكن إضافتها أو رفعها أو حذفها. عدّل مستهدف Sell-Out بدلاً من ذلك.",
+		"hint_path": "target_type=sell_out",
+	})
+}
+
+// requestedSellInBrands reads the multi-select brand filter: repeated ?brand= and/or comma-separated ?brands=.
+func requestedSellInBrands(q map[string][]string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(v string) {
+		v = strings.TrimSpace(v)
+		if v == "" || seen[v] {
+			return
+		}
+		seen[v] = true
+		out = append(out, v)
+	}
+	for _, v := range q["brand"] {
+		add(v)
+	}
+	for _, v := range q["brands"] {
+		for _, part := range strings.Split(v, ",") {
+			add(part)
+		}
+	}
+	return out
+}
+
+// derivedBreakdownFunc feeds the derived Sell-In targets with the BigQuery Sell-Out allocation when configured.
+func (h *AnalyticsHandler) derivedBreakdownFunc(tenantID string) bigquery.DerivedBreakdownFunc {
+	if h.targetBreakdown == nil {
+		return nil
+	}
+	return func(ctx context.Context, t domain.TargetRecord) (domain.TargetBreakdownResponse, bool) {
+		c, cancel := context.WithTimeout(ctx, targetBreakdownBQTimeout)
+		defer cancel()
+		chain := targetalloc.ChainFilter(t.RetailerChain)
+		resp, found, err := targetalloc.ComputeFiltered(c, h.targetBreakdown.TargetBreakdownSource(tenantID, chain), t, "bigquery", targetalloc.Filters{})
+		if err != nil || !found {
+			return domain.TargetBreakdownResponse{}, false
+		}
+		return resp, true
+	}
+}
+
+// HandleTargets serves GET, POST, and DELETE /api/v1/analytics/targets.
+// Sell-Out targets are managed here; Sell-In targets are derived on read (GET) and read-only (POST/PUT/DELETE are rejected).
 func (h *AnalyticsHandler) HandleTargets(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		if _, ok := requireWriteRole(w, r, ingestWriteRoles); !ok {
@@ -168,11 +227,27 @@ func (h *AnalyticsHandler) HandleTargets(w http.ResponseWriter, r *http.Request)
 		targetType = "sell_out"
 	}
 
+	if r.Method != http.MethodGet && r.Method != http.MethodHead && targetType == "sell_in" {
+		writeSellInTargetsDerived(w)
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		chain := q.Get("chain")
 		year, _ := strconv.Atoi(q.Get("year"))
-		summary, err := h.bqRepo.GetTargetsSummary(r.Context(), tenantID, targetType, chain, year)
+		var summary *domain.TargetsSummaryResponse
+		var err error
+		if targetType == "sell_in" {
+			summary, err = h.bqRepo.GetDerivedSellInTargetsSummary(r.Context(), tenantID, bigquery.DerivedSellInOptions{
+				Chain:     chain,
+				Year:      year,
+				Brands:    requestedSellInBrands(q),
+				Breakdown: h.derivedBreakdownFunc(tenantID),
+			})
+		} else {
+			summary, err = h.bqRepo.GetTargetsSummary(r.Context(), tenantID, targetType, chain, year)
+		}
 		if err != nil {
 			http.Error(w, `{"error":"failed to get targets"}`, http.StatusInternalServerError)
 			return
@@ -194,6 +269,12 @@ func (h *AnalyticsHandler) HandleTargets(w http.ResponseWriter, r *http.Request)
 			var list []domain.TargetRecord
 			if err := json.Unmarshal(b, &list); err == nil {
 				for _, item := range list {
+					if strings.EqualFold(strings.TrimSpace(item.TargetType), "sell_in") {
+						writeSellInTargetsDerived(w)
+						return
+					}
+				}
+				for _, item := range list {
 					if item.TargetType == "" {
 						item.TargetType = targetType
 					}
@@ -203,6 +284,10 @@ func (h *AnalyticsHandler) HandleTargets(w http.ResponseWriter, r *http.Request)
 		} else {
 			var single domain.TargetRecord
 			if err := json.Unmarshal(bodyBytes, &single); err == nil {
+				if strings.EqualFold(strings.TrimSpace(single.TargetType), "sell_in") {
+					writeSellInTargetsDerived(w)
+					return
+				}
 				if single.TargetType == "" {
 					single.TargetType = targetType
 				}
@@ -223,7 +308,19 @@ func (h *AnalyticsHandler) HandleTargets(w http.ResponseWriter, r *http.Request)
 			http.Error(w, `{"error":"missing target id"}`, http.StatusBadRequest)
 			return
 		}
+		if bigquery.IsDerivedSellInTargetID(id) {
+			writeSellInTargetsDerived(w)
+			return
+		}
+		if existing, ok := h.bqRepo.GetTarget(r.Context(), tenantID, id); ok && existing != nil && strings.EqualFold(existing.TargetType, "sell_in") {
+			writeSellInTargetsDerived(w)
+			return
+		}
 		if err := h.bqRepo.DeleteTarget(r.Context(), tenantID, id); err != nil {
+			if errors.Is(err, bigquery.ErrSellInTargetsDerived) {
+				writeSellInTargetsDerived(w)
+				return
+			}
 			http.Error(w, `{"error":"target not found"}`, http.StatusNotFound)
 			return
 		}
@@ -254,9 +351,11 @@ func (h *AnalyticsHandler) HandleUploadTargetsFile(w http.ResponseWriter, r *htt
 
 	q := r.URL.Query()
 	targetType := strings.ToLower(strings.TrimSpace(q.Get("target_type")))
-	if targetType != "sell_in" {
-		targetType = "sell_out"
+	if targetType == "sell_in" {
+		writeSellInTargetsDerived(w)
+		return
 	}
+	targetType = "sell_out"
 	defaultChain := strings.ToLower(strings.TrimSpace(q.Get("chain")))
 	defaultYear, _ := strconv.Atoi(q.Get("year"))
 	filename := strings.TrimSpace(q.Get("filename"))
@@ -265,8 +364,9 @@ func (h *AnalyticsHandler) HandleUploadTargetsFile(w http.ResponseWriter, r *htt
 	contentType := strings.ToLower(r.Header.Get("Content-Type"))
 	if strings.Contains(contentType, "multipart/form-data") {
 		if err := r.ParseMultipartForm(32 << 20); err == nil {
-			if ft := strings.TrimSpace(r.FormValue("target_type")); ft != "" {
-				targetType = strings.ToLower(ft)
+			if ft := strings.ToLower(strings.TrimSpace(r.FormValue("target_type"))); ft == "sell_in" {
+				writeSellInTargetsDerived(w)
+				return
 			}
 			if fc := strings.TrimSpace(r.FormValue("chain")); fc != "" {
 				defaultChain = strings.ToLower(fc)

@@ -53,6 +53,7 @@ type Repository interface {
 	GetCPFRDashboard(ctx context.Context, tenantID string, filter CPFRFilter) (*domain.CPFRDashboardPayload, error)
 	GetSellInRecords(ctx context.Context, tenantID string, filter SellInRecordFilter) ([]domain.SellInRecord, int, error)
 	GetTargetsSummary(ctx context.Context, tenantID, targetType, chain string, year int) (*domain.TargetsSummaryResponse, error)
+	GetDerivedSellInTargetsSummary(ctx context.Context, tenantID string, opts DerivedSellInOptions) (*domain.TargetsSummaryResponse, error)
 	UpsertTarget(ctx context.Context, tenantID string, target domain.TargetRecord) (*domain.TargetRecord, error)
 	DeleteTarget(ctx context.Context, tenantID, targetID string) error
 	GetTarget(ctx context.Context, tenantID, targetID string) (*domain.TargetRecord, bool)

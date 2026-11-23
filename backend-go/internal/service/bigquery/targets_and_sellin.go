@@ -268,6 +268,9 @@ func (c *Client) inferChainUnitPriceAndTonsLocked(normTenant, targetType, chain 
 
 // UpsertTarget creates or updates a Sell-Out or Sell-In target for a tenant and persists it to disk.
 func (c *Client) UpsertTarget(ctx context.Context, tenantID string, target domain.TargetRecord) (*domain.TargetRecord, error) {
+	if strings.EqualFold(strings.TrimSpace(target.TargetType), "sell_in") {
+		return nil, ErrSellInTargetsDerived
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.bumpSourceVersion()
@@ -352,12 +355,21 @@ func (c *Client) UpsertTarget(ctx context.Context, tenantID string, target domai
 
 // DeleteTarget deletes a target record by ID for a tenant and updates disk storage.
 func (c *Client) DeleteTarget(ctx context.Context, tenantID, targetID string) error {
+	if IsDerivedSellInTargetID(targetID) {
+		return ErrSellInTargetsDerived
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.bumpSourceVersion()
 
 	normTenant := normalizeTenantKey(tenantID)
 	existing := c.targets[normTenant]
+	for _, item := range existing {
+		if item.ID == targetID && strings.EqualFold(item.TargetType, "sell_in") {
+			// Legacy manual Sell-In records are kept untouched (ignored on read).
+			return ErrSellInTargetsDerived
+		}
+	}
 	var kept []domain.TargetRecord
 	found := false
 	for _, item := range existing {
@@ -375,17 +387,19 @@ func (c *Client) DeleteTarget(ctx context.Context, tenantID, targetID string) er
 	return nil
 }
 
-// GetTargetsSummary returns all targets for a tenant & targetType ("sell_out" or "sell_in") compared against real Actual data
-// and decomposed into a full 3-tier hierarchy (Chain -> Branch -> SKU) + Chain Total SKUs + Brands + Sales Reps + Monthly Phasing.
+// GetTargetsSummary returns the saved Sell-Out targets of a tenant compared against real Actual data. For targetType
+// "sell_in" it returns the targets DERIVED from the Sell-Out targets (quantity first, then value) instead.
 func (c *Client) GetTargetsSummary(ctx context.Context, tenantID, targetType, chain string, year int) (*domain.TargetsSummaryResponse, error) {
+	tType := strings.ToLower(strings.TrimSpace(targetType))
+	if tType == "sell_in" {
+		// Sell-In targets are derived on read from the Sell-Out targets (see sellin_targets_derived.go).
+		return c.GetDerivedSellInTargetsSummary(ctx, tenantID, DerivedSellInOptions{Chain: chain, Year: year})
+	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	normTenant := normalizeTenantKey(tenantID)
-	tType := strings.ToLower(strings.TrimSpace(targetType))
-	if tType != "sell_in" {
-		tType = "sell_out"
-	}
+	tType = "sell_out"
 	chainFilter := strings.ToLower(strings.TrimSpace(chain))
 	if chainFilter == "all" || chainFilter == "الكل" {
 		chainFilter = ""

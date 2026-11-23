@@ -12,6 +12,7 @@ import (
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
+	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 	"github.com/tashil/data-sharing/backend/internal/service/bqsink"
 	"github.com/tashil/data-sharing/backend/internal/service/targetalloc"
 )
@@ -54,6 +55,10 @@ func (h *AnalyticsHandler) HandleTargetBreakdown(w http.ResponseWriter, r *http.
 	id := strings.TrimSpace(r.PathValue("id"))
 	if id == "" {
 		http.Error(w, `{"error":"missing target id"}`, http.StatusBadRequest)
+		return
+	}
+	if bigquery.IsDerivedSellInTargetID(id) {
+		http.Error(w, `{"error":"breakdown is available for sell-out targets only"}`, http.StatusBadRequest)
 		return
 	}
 	target, ok := h.bqRepo.GetTarget(r.Context(), tenantID, id)

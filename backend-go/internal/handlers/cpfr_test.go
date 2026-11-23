@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -100,9 +101,14 @@ func TestComprehensiveSellInTargetBreakdown(t *testing.T) {
 		_, _ = proc.ProcessSellInPlan(context.Background(), "tenant-adeco", "Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx", cleanBytes, false, "fathalla")
 	}
 
-	// User enters only Chain + Year + Target Revenue (leaving Branch, Category, and Units open)
-	_, err = bqRepo.UpsertTarget(context.Background(), "tenant-adeco", domain.TargetRecord{
-		TargetType:       "sell_in",
+	// Sell-In targets are never entered: they are derived from the Sell-Out target (quantity 1:1).
+	if _, err := bqRepo.UpsertTarget(context.Background(), "tenant-adeco", domain.TargetRecord{
+		TargetType: "sell_in", RetailerChain: "fathalla", Year: 2026, TargetRevenueEGP: 150000000,
+	}); !errors.Is(err, bigquery.ErrSellInTargetsDerived) {
+		t.Fatalf("manual Sell-In target must be rejected, got %v", err)
+	}
+	so, err := bqRepo.UpsertTarget(context.Background(), "tenant-adeco", domain.TargetRecord{
+		TargetType:       "sell_out",
 		RetailerChain:    "fathalla",
 		Year:             2026,
 		Month:            0, // Full year
@@ -117,50 +123,14 @@ func TestComprehensiveSellInTargetBreakdown(t *testing.T) {
 		t.Fatalf("GetTargetsSummary failed: %v", err)
 	}
 	if len(summary.Items) != 1 {
-		t.Fatalf("expected 1 target item, got %d", len(summary.Items))
+		t.Fatalf("expected 1 derived target item, got %d", len(summary.Items))
 	}
-
 	item := summary.Items[0]
-	if item.TargetUnits <= 0 || item.TargetWeightTons <= 0 {
-		t.Errorf("expected auto-calculated TargetUnits and TargetWeightTons > 0, got units=%.2f tons=%.2f", item.TargetUnits, item.TargetWeightTons)
+	if item.ID != "derived_si_from_"+so.ID || !item.Derived || item.SourceTargetID != so.ID {
+		t.Errorf("unexpected derived identity: id=%q derived=%v source=%q", item.ID, item.Derived, item.SourceTargetID)
 	}
-	if len(item.Branches) != 34 {
-		t.Errorf("expected 34 Fathalla branches in breakdown, got %d", len(item.Branches))
-	}
-	if len(item.MonthlyPhasing) != 12 {
-		t.Errorf("expected 12 months in annual phasing, got %d", len(item.MonthlyPhasing))
-	}
-	if len(item.SalesRepQuotas) == 0 {
-		t.Errorf("expected non-empty SalesRepQuotas")
-	}
-
-	var sumBranchRev, sumBranchUnits float64
-	for _, b := range item.Branches {
-		sumBranchRev += b.TargetRevenueEGP
-		sumBranchUnits += b.TargetUnits
-		if len(b.SKUs) == 0 && len(item.ChainSKUTotals) > 0 {
-			t.Errorf("expected SKUs inside branch %s", b.BranchName)
-		}
-	}
-	if diff := sumBranchRev - item.TargetRevenueEGP; diff > 1.0 || diff < -1.0 {
-		t.Errorf("expected sum of branch targets (%.2f) to equal chain target (%.2f)", sumBranchRev, item.TargetRevenueEGP)
-	}
-	if diff := sumBranchUnits - item.TargetUnits; diff > 1.0 || diff < -1.0 {
-		t.Errorf("expected sum of branch target units (%.2f) to equal chain target units (%.2f)", sumBranchUnits, item.TargetUnits)
-	}
-
-	// Verify Product Master 3-way linkage on ChainSKUTotals and Sell-In Explorer Waterfall
-	matchedTargetSkus := 0
-	for _, s := range item.ChainSKUTotals {
-		if s.ItemCode != "" {
-			matchedTargetSkus++
-		}
-		if s.UnitsPerCarton <= 0 {
-			t.Errorf("expected UnitsPerCarton > 0 for SKU %s", s.SKUName)
-		}
-	}
-	if len(item.ChainSKUTotals) > 0 && matchedTargetSkus < 130 {
-		t.Errorf("expected >= 130 Sell-In SKUs matched to Product Master ItemCode, got %d / %d", matchedTargetSkus, len(item.ChainSKUTotals))
+	if item.TargetUnits <= 0 || item.TargetUnits != so.TargetUnits {
+		t.Errorf("derived pieces %.2f must equal Sell-Out target units %.2f", item.TargetUnits, so.TargetUnits)
 	}
 
 	analyticsHandler := NewAnalyticsHandler(bqRepo)

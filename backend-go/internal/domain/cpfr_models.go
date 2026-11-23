@@ -366,6 +366,13 @@ type TargetSKUBreakdown struct {
 	StockStatus              string  `json:"stock_status"`    // "urgent_replenishment" | "optimal" | "overstock"
 	StockStatusAr            string  `json:"stock_status_ar"` // "سحب عالي / أولوية توريد" | "رصيد آمن ومتوازن" | "تكدس مخزني - تهدئة توريد"
 	PromoSharePct            float64 `json:"promo_share_pct"`
+	// Derived Sell-In targets only (TargetUnits/ActualUnits are then PIECES, the primary metric).
+	// TargetCases/ActualCases are nil when the pack size is missing in the Product Master.
+	TargetCases     *float64 `json:"target_cases,omitempty"`
+	ActualCases     *float64 `json:"actual_cases,omitempty"`
+	UnitCostEGP     float64  `json:"unit_cost_egp,omitempty"`
+	CostMissing     bool     `json:"cost_missing,omitempty"`
+	PackSizeMissing bool     `json:"pack_size_missing,omitempty"`
 }
 
 // TargetBranchBreakdown represents the Branch-level target allocation inside a chain, along with all SKUs allocated to that branch.
@@ -394,6 +401,9 @@ type TargetBranchBreakdown struct {
 	Status              string               `json:"status"`
 	StatusAr            string               `json:"status_ar"`
 	SKUs                []TargetSKUBreakdown `json:"skus"`
+	// Derived Sell-In targets only: TargetUnits/ActualUnits are pieces; cases are nil without a pack size.
+	TargetCases *float64 `json:"target_cases,omitempty"`
+	ActualCases *float64 `json:"actual_cases,omitempty"`
 }
 
 // TargetBrandBreakdown summarizes the chain target allocation by Brand & Sector (MT vs CC).
@@ -475,6 +485,9 @@ type TargetRecord struct {
 	Origin string `json:"origin,omitempty"`
 	// ShareMeta is set when Origin is market_share; detail page still uses revenue/units.
 	ShareMeta *ShareTargetMeta `json:"share_meta,omitempty"`
+	// ExplicitUnitPriceEGP optionally overrides the Product Master cost price per piece when a Sell-Out
+	// target is valued for its derived Sell-In target. Zero (default) = use the Product Master cost.
+	ExplicitUnitPriceEGP float64 `json:"explicit_unit_price_egp,omitempty"`
 }
 
 // TargetComparisonItem combines a saved TargetRecord with real-time Actual performance and comprehensive hierarchical drill-down (Chain -> Branch -> SKU).
@@ -522,6 +535,16 @@ type TargetComparisonItem struct {
 	UpdatedAt               string                  `json:"updated_at"`
 	Origin                  string                  `json:"origin,omitempty"`
 	ShareMeta               *ShareTargetMeta        `json:"share_meta,omitempty"`
+	// Derived Sell-In targets (target_type sell_in): computed on read from a Sell-Out target.
+	// TargetUnits/ActualUnits are then PIECES (1:1 with the Sell-Out target); cases = pieces / pack size.
+	Derived                bool     `json:"derived,omitempty"`
+	SourceTargetID         string   `json:"source_target_id,omitempty"`
+	TargetCases            *float64 `json:"target_cases,omitempty"`
+	ActualCases            *float64 `json:"actual_cases,omitempty"`
+	PackSizeMissingSKUs    int      `json:"pack_size_missing_skus,omitempty"`
+	CostMissingSKUs        int      `json:"cost_missing_skus,omitempty"`
+	ExcludedFromTotals     bool     `json:"excluded_from_totals,omitempty"`
+	ExcludedReason         string   `json:"excluded_reason,omitempty"`
 	Branches                []TargetBranchBreakdown `json:"branches"`
 	ChainSKUTotals          []TargetSKUBreakdown    `json:"chain_sku_totals"`
 	Brands                  []TargetBrandBreakdown  `json:"brands"`
@@ -557,6 +580,21 @@ type TargetsSummaryResponse struct {
 	NoDataTargetsCount         int     `json:"no_data_targets_count"`
 	NoDataTargetRevenueEGP     float64 `json:"no_data_target_revenue_egp"`
 	NoDataTargetUnits          float64 `json:"no_data_target_units"`
+	// Derived Sell-In summary (target_type sell_in): quantity (pieces) first, value (EGP) second.
+	Derived                   bool     `json:"derived,omitempty"`
+	QuantityUnit              string   `json:"quantity_unit,omitempty"` // "pieces"
+	TotalTargetCases          *float64 `json:"total_target_cases,omitempty"`
+	TotalActualCases          *float64 `json:"total_actual_cases,omitempty"`
+	TotalVarianceUnits        float64  `json:"total_variance_units,omitempty"`
+	ComparableTargetUnits     float64  `json:"comparable_target_units,omitempty"`
+	ComparableActualUnits     float64  `json:"comparable_actual_units,omitempty"`
+	OverallAchievementRevPct  float64  `json:"overall_achievement_rev_pct,omitempty"`
+	AvailableBrands           []string `json:"available_brands,omitempty"`
+	AppliedBrands             []string `json:"applied_brands,omitempty"`
+	SellOutTargetsCount       int      `json:"sell_out_targets_count,omitempty"`
+	PackSizeMissingSKUsCount  int      `json:"pack_size_missing_skus_count,omitempty"`
+	CostMissingSKUsCount      int      `json:"cost_missing_skus_count,omitempty"`
+	ExcludedFromTotalsCount   int      `json:"excluded_from_totals_count,omitempty"`
 	Items                     []TargetComparisonItem `json:"items"`
 }
 
