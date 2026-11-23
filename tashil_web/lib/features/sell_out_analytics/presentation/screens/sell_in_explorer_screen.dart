@@ -74,7 +74,7 @@ class SellInExplorerScreen extends StatefulWidget {
 class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRefreshMixin<SellInExplorerScreen> {
   @override
   void onBackendDataChanged() {
-    _loadAllData();
+    _loadAllData(recordsPage: _recordsSafePage);
   }
 
   int _activeTab = 0; // 0: Sell-In Explorer, 1: Remaining Stock & Reports, 2: Sell-In Targets, 3: Uploaded Sell-In Sheets Archive
@@ -82,12 +82,11 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   int _selectedYear = AvailableYears.current.defaultYear; // latest year with data
   bool _yearTouched = false;
   int _selectedMonth = 0; // 0 = All Months
-  /// Client-side display page size for the Sell-In records table.
+  /// Rows per Sell-In records page; each page is one server request (limit/offset).
   static const int _recordsPageSize = 20;
-  /// API batch size when hydrating the full filtered set for client paging.
-  static const int _fetchPageSize = 250;
   int _recordsPageIndex = 0;
-  List<SellInRecordItem> _records = const []; // full filtered set (client-paged)
+  List<SellInRecordItem> _records = const []; // rows of the current server page only
+  bool _isPageLoading = false;
 
   Map<String, String> get _locationDisplay {
     final names = <String>{
@@ -175,6 +174,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
   @override
   void dispose() {
+    _sellInGeneration++; // drops any in-flight Sell-In page/export response
     _skuSearchController.dispose();
     _monthlyLedgerScrollController.dispose();
     _skuStockScrollController.dispose();
@@ -211,82 +211,106 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
     }
   }
 
-  Future<void> _loadAllData({bool forceRefresh = false}) async {
+  Future<void> _loadAllData({bool forceRefresh = false, int recordsPage = 0}) async {
     await Future.wait([
-      _loadSellInRecords(),
+      _loadSellInRecords(page: recordsPage),
       _loadStockReconciliationReport(),
       _loadSellInArchive(forceRefresh: forceRefresh),
     ]);
   }
 
-  SellInExplorerQuery _sellInQuery({int limit = _fetchPageSize, int offset = 0}) =>
-      SellInExplorerQuery(
+  SellInExplorerQuery _sellInQuery({int page = 0}) => SellInExplorerQuery(
         chain: _selectedChain == 'all' ? null : _selectedChain,
         year: _selectedYear > 0 ? _selectedYear : null,
         month: _selectedMonth > 0 ? _selectedMonth : null,
         query: _searchQuery,
-        limit: limit,
-        offset: offset,
+        limit: _recordsPageSize,
+        offset: page * _recordsPageSize,
       );
 
-  int _sellInGeneration = 0; // bumps on every filter reset to drop stale appends
+  /// Bumped by every records load and by [dispose]: a response for an older
+  /// filter/page, or one landing after the page closed, is dropped.
+  int _sellInGeneration = 0;
 
   void _resetRecordsPage() {
     _recordsPageIndex = 0;
   }
 
-  /// Hydrates the full filtered Sell-In set for client-side paging.
-  /// KPI totals come from the API response (full filtered set), not the page.
-  Future<void> _loadSellInRecords() async {
+  int _lastRecordsPage(int totalCount) =>
+      totalCount <= 0 ? 0 : (totalCount - 1) ~/ _recordsPageSize;
+
+  /// Loads one server page of Sell-In rows (limit/offset). KPI cards and the
+  /// waterfall use the totals in the same response, which the server computes
+  /// over the whole filter. Page 0 is a filter (re)load and shows skeletons;
+  /// other pages keep the current rows on screen until the new page arrives.
+  Future<void> _loadSellInRecords({int page = 0}) async {
     final gen = ++_sellInGeneration;
     if (mounted) {
       setState(() {
-        _isLoading = true;
-        _resetRecordsPage();
+        if (page == 0) {
+          _isLoading = true;
+          _resetRecordsPage();
+        } else {
+          _isPageLoading = true;
+        }
       });
     }
-    final loaded = await _repo.load(_sellInQuery());
-    if (gen != _sellInGeneration) return;
+    final loaded = await _repo.load(_sellInQuery(page: page));
+    if (!mounted || gen != _sellInGeneration) return;
     if (loaded case Failure(:final error)) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _loadError = error.toString();
-        });
-        M3Feedback.showError(context, 'تعذّر تحميل بيانات Sell-In. حاول مرة أخرى.');
-      }
+      setState(() {
+        _isLoading = false;
+        _isPageLoading = false;
+        _loadError = error.toString();
+      });
+      M3Feedback.showError(context, 'تعذّر تحميل بيانات Sell-In. حاول مرة أخرى.');
       return;
     }
-    final first = loaded.valueOrNull!;
-    final all = <SellInRecordItem>[...first.records];
-    var offset = all.length;
-    // Pull remaining pages (display-only; no backend changes) up to totalCount.
-    while (offset < first.totalCount && gen == _sellInGeneration) {
-      final next = await _repo.load(_sellInQuery(offset: offset));
-      if (gen != _sellInGeneration) return;
-      final batch = next.valueOrNull;
-      if (batch == null || batch.records.isEmpty) break;
-      all.addAll(batch.records);
-      offset = all.length;
-      if (batch.records.length < _fetchPageSize) break;
+    final res = loaded.valueOrNull!;
+    final lastPage = _lastRecordsPage(res.totalCount);
+    if (res.records.isEmpty && page > lastPage) {
+      // The filter shrank since the page buttons were drawn; lastPage < page, so this ends.
+      unawaited(_loadSellInRecords(page: lastPage));
+      return;
     }
-    if (!mounted || gen != _sellInGeneration) return;
     setState(() {
-      _data = first;
-      _records = all;
+      _data = res;
+      _records = res.records.length > _recordsPageSize
+          ? res.records.sublist(0, _recordsPageSize)
+          : res.records;
+      _recordsPageIndex = page;
       _isLoading = false;
+      _isPageLoading = false;
       _loadError = null;
-      _resetRecordsPage();
     });
   }
 
-  /// Rows for exports/print: full filtered set already held for client paging.
-  Future<List<SellInRecordItem>> _exportRecords() async {
-    if (_records.length >= _data.totalCount && _records.isNotEmpty) {
-      return _records;
+  void _goToRecordsPage(int page) {
+    if (_isPageLoading || page == _recordsSafePage) return;
+    _loadSellInRecords(page: page);
+  }
+
+  bool _isCurrentSellInFilter(SellInExplorerQuery q) {
+    final now = _sellInQuery();
+    return q.chain == now.chain && q.year == now.year && q.month == now.month && q.query == now.query;
+  }
+
+  /// Rows for exports/print: the current page when it is the whole filter,
+  /// otherwise a bounded, uncached walk of every page. Null when the export was
+  /// abandoned (page closed, filter changed) or failed.
+  Future<List<SellInRecordItem>?> _exportRecords() async {
+    if (_data.totalCount <= _records.length) return _records;
+    final q = _sellInQuery();
+    final loaded = await _repo.loadAllPages(
+      q,
+      isCancelled: () => !mounted || !_isCurrentSellInFilter(q),
+    );
+    if (!mounted || !_isCurrentSellInFilter(q)) return null;
+    if (loaded case Failure()) {
+      M3Feedback.showError(context, 'تعذّر تجهيز بيانات التصدير. حاول مرة أخرى.');
+      return null;
     }
-    final loaded = await _repo.load(_sellInQuery(limit: math.max(_data.totalCount, _fetchPageSize)));
-    return loaded.valueOrNull?.records ?? _records;
+    return loaded.valueOrNull;
   }
 
   int _stockReportGeneration = 0; // drops responses for an older chain/year/status
@@ -666,7 +690,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       return;
     }
     final records = await _exportRecords();
-    if (!mounted) return;
+    if (records == null || !mounted) return;
     const headers = ExportColumns.sellInRecords;
     final rows = records
         .map(
@@ -717,7 +741,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
       return;
     }
     final records = await _exportRecords();
-    if (!mounted) return;
+    if (records == null || !mounted) return;
     final headers = [
       'الفترة',
       'السلسلة',
@@ -943,7 +967,7 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
 
 
   // Sell-In records table: all 12 columns fit the viewport (no horizontal
-  // scroll / no يمين·شمال). Client-side pagination shows 20 rows per page.
+  // scroll / no يمين·شمال). Server-side pagination: 20 rows per page request.
   static const double _sellInHeaderHeight = 56.0;
   static const double _sellInRowMinHeight = 64.0;
   // Flex weights (RTL visual order): item, period, chain/branch, cases/units,
@@ -1012,22 +1036,18 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
         ),
       );
 
+  /// Server total for the filter (falls back to the page when an old backend omits it).
+  int get _recordsTotalCount => math.max(
+      _data.totalCount, _recordsPageIndex * _recordsPageSize + _records.length);
+
   int get _recordsTotalPages {
-    if (_records.isEmpty) return 1;
+    if (_recordsTotalCount == 0) return 1;
     // Integer ceil-division — do NOT use `/).ceil()` (doubles inflate page count).
-    return (_records.length + _recordsPageSize - 1) ~/ _recordsPageSize;
+    return (_recordsTotalCount + _recordsPageSize - 1) ~/ _recordsPageSize;
   }
 
   int get _recordsSafePage =>
       _recordsPageIndex.clamp(0, math.max(0, _recordsTotalPages - 1));
-
-  List<SellInRecordItem> get _recordsPageSlice {
-    if (_records.isEmpty) return const [];
-    final start = _recordsSafePage * _recordsPageSize;
-    if (start >= _records.length) return const [];
-    final end = math.min(start + _recordsPageSize, _records.length);
-    return _records.sublist(start, end);
-  }
 
   /// Visible page numbers with ellipsis sentinels (-1) for long ranges.
   List<int> _pageWindow(int current, int total) {
@@ -1046,15 +1066,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
   }
 
   Widget _buildRecordsPaginationBar(ThemeData theme, ColorScheme colorScheme) {
-    final totalCount = _records.length;
+    final totalCount = _recordsTotalCount;
     final totalPages = _recordsTotalPages;
     final safePage = _recordsSafePage;
     final startIndex = totalCount == 0 ? 0 : safePage * _recordsPageSize + 1;
     final endIndex = totalCount == 0
         ? 0
-        : math.min((safePage + 1) * _recordsPageSize, totalCount);
-    final canPrev = safePage > 0;
-    final canNext = safePage < totalPages - 1;
+        : math.min(safePage * _recordsPageSize + _records.length, totalCount);
+    final canPrev = safePage > 0 && !_isPageLoading;
+    final canNext = safePage < totalPages - 1 && !_isPageLoading;
 
     Widget navBtn({
       required Key key,
@@ -1108,14 +1128,14 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             icon: AppIcons.firstPage,
             tooltip: 'الصفحة الأولى',
             enabled: canPrev,
-            onPressed: () => setState(() => _recordsPageIndex = 0),
+            onPressed: () => _goToRecordsPage(0),
           ),
           navBtn(
             key: const ValueKey('sellin_records_prev_btn'),
             icon: AppIcons.chevronStart,
             tooltip: 'الصفحة السابقة',
             enabled: canPrev,
-            onPressed: () => setState(() => _recordsPageIndex = safePage - 1),
+            onPressed: () => _goToRecordsPage(safePage - 1),
           ),
           for (final p in _pageWindow(safePage, totalPages))
             if (p < 0)
@@ -1142,9 +1162,9 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
                     child: InkWell(
                       key: ValueKey('sellin_records_page_circle_$p'),
                       customBorder: const CircleBorder(),
-                      onTap: p == safePage
+                      onTap: p == safePage || _isPageLoading
                           ? null
-                          : () => setState(() => _recordsPageIndex = p),
+                          : () => _goToRecordsPage(p),
                       child: Center(
                         child: Text(
                           '${p + 1}',
@@ -1167,15 +1187,14 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
             icon: AppIcons.chevronEnd,
             tooltip: 'الصفحة التالية',
             enabled: canNext,
-            onPressed: () => setState(() => _recordsPageIndex = safePage + 1),
+            onPressed: () => _goToRecordsPage(safePage + 1),
           ),
           navBtn(
             key: const ValueKey('sellin_records_last_btn'),
             icon: AppIcons.lastPage,
             tooltip: 'الصفحة الأخيرة',
             enabled: canNext,
-            onPressed: () =>
-                setState(() => _recordsPageIndex = totalPages - 1),
+            onPressed: () => _goToRecordsPage(totalPages - 1),
           ),
         ],
       ),
@@ -1234,13 +1253,15 @@ class _SellInExplorerScreenState extends State<SellInExplorerScreen> with DataRe
           style: theme.textTheme.labelMedium
               ?.copyWith(color: colorScheme.onSurfaceVariant)),
     ];
-    final pageRecords = _recordsPageSlice;
+    final pageRecords = _records;
     final pageBase = _recordsSafePage * _recordsPageSize;
 
     return Column(
       key: const ValueKey('sellin_records_table'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_isPageLoading)
+          const LinearProgressIndicator(key: ValueKey('sellin_records_page_loading'), year2023: false),
         Container(
           height: _sellInHeaderHeight,
           color: colorScheme.surfaceContainer,
