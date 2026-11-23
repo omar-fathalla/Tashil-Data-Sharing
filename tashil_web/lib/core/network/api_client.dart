@@ -9641,7 +9641,8 @@ class ApiClient {
     );
   }
 
-  /// Fetches paginated Supplier Sell-In records and summary totals for the Sell-In Explorer screen.
+  /// Fetches one page of Supplier Sell-In records plus the full-filter summary totals.
+  /// [cacheable] false skips the shared HTTP cache (bulk export pages must not evict other screens).
   Future<SellInExplorerResponse> getSellInRecords({
     String? chain,
     int? year,
@@ -9652,6 +9653,7 @@ class ApiClient {
     String? query,
     int limit = 250,
     int offset = 0,
+    bool cacheable = true,
   }) async {
     Object? failure;
     try {
@@ -9682,9 +9684,11 @@ class ApiClient {
       }
 
       final uri = Uri.parse(ApiEndpoints.sellInRecords).replace(queryParameters: params);
-      final response = await BackendHttp
-          .get(uri, headers: _headers)
-          .timeout(const Duration(seconds: 60));
+      final response = cacheable
+          ? await BackendHttp.get(uri, headers: _headers).timeout(const Duration(seconds: 60))
+          : await http.Response.fromStream(await BackendHttp.send(
+                  http.Request('GET', uri)..headers.addAll(_headers))
+              .timeout(const Duration(seconds: 60)));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;

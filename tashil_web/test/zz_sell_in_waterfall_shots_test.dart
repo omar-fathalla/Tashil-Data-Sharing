@@ -34,6 +34,7 @@ class _DemoApi extends ApiClient {
     String? query,
     int limit = 250,
     int offset = 0,
+    bool cacheable = true,
   }) async =>
       response;
 }
