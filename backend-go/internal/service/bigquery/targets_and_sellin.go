@@ -179,7 +179,11 @@ func (c *Client) GetSellInRecords(ctx context.Context, tenantID string, filter S
 		if matched[i].MonthNum != matched[j].MonthNum {
 			return matched[i].MonthNum > matched[j].MonthNum
 		}
-		return matched[i].NetValueEGP > matched[j].NetValueEGP
+		if matched[i].NetValueEGP != matched[j].NetValueEGP {
+			return matched[i].NetValueEGP > matched[j].NetValueEGP
+		}
+		// Unique last key (same as the BigQuery page ORDER BY) so limit/offset pages never overlap or skip rows.
+		return matched[i].RecordID < matched[j].RecordID
 	})
 
 	total := len(matched)

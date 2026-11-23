@@ -59,6 +59,10 @@ type PaginatedSellInRecordsResponse struct {
 	ByBrand                 []SellInBreakdownItem  `json:"by_brand,omitempty"`
 }
 
+// maxSellInRecordsLimit caps one sell-in-records page; larger requests are clamped (the effective
+// value is echoed in the response "limit") so a client paging by it still reaches total_count.
+const maxSellInRecordsLimit = 1000
+
 // HandleSellInRecords serves GET /api/v1/analytics/sell-in-records for the Sell-In Explorer page.
 func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := middleware.EnforceTenantRLS(r)
@@ -69,8 +73,11 @@ func (h *AnalyticsHandler) HandleSellInRecords(w http.ResponseWriter, r *http.Re
 
 	q := r.URL.Query()
 	limit, _ := strconv.Atoi(q.Get("limit"))
-	if limit <= 0 || limit > 1000 {
+	if limit <= 0 {
 		limit = 250
+	}
+	if limit > maxSellInRecordsLimit {
+		limit = maxSellInRecordsLimit
 	}
 	offset, _ := strconv.Atoi(q.Get("offset"))
 	if offset < 0 {
