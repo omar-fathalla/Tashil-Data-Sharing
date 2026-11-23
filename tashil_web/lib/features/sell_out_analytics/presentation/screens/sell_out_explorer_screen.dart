@@ -62,10 +62,15 @@ class SellOutExplorerScreen extends StatefulWidget {
   /// Optional injected repository (tests); defaults to one wrapping [apiClient].
   final SellOutExplorerRepository? repository;
 
+  /// Tab shown first (2 = Sell-Out targets, used when jumping from the
+  /// derived Sell-In targets). Defaults to the data tab.
+  final int initialTab;
+
   const SellOutExplorerScreen({
     super.key,
     required this.apiClient,
     this.repository,
+    this.initialTab = 0,
   });
 
   @override
@@ -283,6 +288,7 @@ class _SellOutExplorerScreenState extends State<SellOutExplorerScreen> with Data
   @override
   void initState() {
     super.initState();
+    _activeTab = widget.initialTab.clamp(0, 3);
     _perfSearchController = TextEditingController();
     _branchChartScrollController = ScrollController();
     _branchTableScrollController = ScrollController();
