@@ -72,6 +72,32 @@ abstract final class TargetTableFormat {
     return '\u2066\u2212$out\u2069';
   }
 
+  /// Compact count without a unit: `1.53M`, `250K`, `820`.
+  static String count(double value) {
+    if (value.abs() < 0.5) return '0';
+    final out = _scaled(value.abs(), millionsDecimals: 2);
+    return value < 0 ? '\u2066\u2212$out\u2069' : out;
+  }
+
+  /// [count] with an explicit `+` for gains (variance columns).
+  static String signedCount(double value) {
+    if (value.abs() < 0.5) return '0';
+    return value > 0 ? '\u2066+${count(value)}\u2069' : count(value);
+  }
+
+  /// Money without the currency suffix, for narrow table cells.
+  static String moneyNumber(double amount) {
+    if (amount.abs() < 0.5) return '0';
+    final out = _scaled(amount.abs(), millionsDecimals: 1);
+    return amount < 0 ? '\u2066\u2212$out\u2069' : out;
+  }
+
+  /// [moneyNumber] with an explicit `+` for gains.
+  static String signedMoneyNumber(double amount) {
+    if (amount.abs() < 0.5) return '0';
+    return amount > 0 ? '\u2066+${moneyNumber(amount)}\u2069' : moneyNumber(amount);
+  }
+
   /// Exact money for the tooltip, e.g. `127,135,120 ج.م`.
   static String moneyExact(double amount) =>
       CurrencyFormatter.formatEGP(amount);

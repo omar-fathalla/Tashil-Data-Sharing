@@ -9808,6 +9808,33 @@ class ApiClient {
     return TargetsSummaryModel.empty(targetType);
   }
 
+  /// Sell-In targets derived from the Sell-Out targets (read-only).
+  ///
+  /// [brands] filters on the Product Master brand; the no-brand group is the
+  /// literal «بدون براند». Throws on a failed request so the screen can
+  /// show an error instead of an empty (and misleading) targets list.
+  Future<TargetsSummaryModel> getDerivedSellInTargets({
+    String? chain,
+    int? year,
+    List<String> brands = const [],
+  }) async {
+    final uri = Uri.parse(ApiEndpoints.targets).replace(queryParameters: {
+      'target_type': 'sell_in',
+      if (chain != null && chain.isNotEmpty && chain != 'all') 'chain': chain,
+      if (year != null && year > 0) 'year': year.toString(),
+      if (brands.isNotEmpty) 'brand': brands,
+    });
+    final response = await BackendHttp
+        .get(uri, headers: _headers)
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode == 200) {
+      final data =
+          jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      return TargetsSummaryModel.fromJson(data);
+    }
+    throw Exception('تعذر تحميل مستهدفات Sell-In (HTTP ${response.statusCode})');
+  }
+
   /// Baseline categories/branches for the market-share Sell-Out wizard (one chain).
   Future<ShareTargetBaseline> getShareTargetBaseline({
     required String chain,
@@ -13921,6 +13948,14 @@ class TargetSKUBreakdownModel {
   final String stockStatusAr;
   final double promoSharePct;
 
+  /// Derived Sell-In rows only: `targetUnits` / `actualUnits` are pieces, and
+  /// the case figures are null when the Product Master has no pack size.
+  final double? targetCases;
+  final double? actualCases;
+  final double unitCostEgp;
+  final bool costMissing;
+  final bool packSizeMissing;
+
   const TargetSKUBreakdownModel({
     this.itemCode = '',
     this.barcode = '',
@@ -13951,6 +13986,11 @@ class TargetSKUBreakdownModel {
     required this.stockStatus,
     required this.stockStatusAr,
     required this.promoSharePct,
+    this.targetCases,
+    this.actualCases,
+    this.unitCostEgp = 0.0,
+    this.costMissing = false,
+    this.packSizeMissing = false,
   });
 
   factory TargetSKUBreakdownModel.fromJson(Map<String, dynamic> json) {
@@ -13987,6 +14027,11 @@ class TargetSKUBreakdownModel {
       stockStatus: json['stock_status'] as String? ?? 'optimal',
       stockStatusAr: json['stock_status_ar'] as String? ?? 'رصيد آمن ومتوازن',
       promoSharePct: (json['promo_share_pct'] as num?)?.toDouble() ?? 0.0,
+      targetCases: (json['target_cases'] as num?)?.toDouble(),
+      actualCases: (json['actual_cases'] as num?)?.toDouble(),
+      unitCostEgp: (json['unit_cost_egp'] as num?)?.toDouble() ?? 0.0,
+      costMissing: json['cost_missing'] as bool? ?? false,
+      packSizeMissing: json['pack_size_missing'] as bool? ?? false,
     );
   }
 }
@@ -14017,6 +14062,10 @@ class TargetBranchBreakdownModel {
   final String statusAr;
   final List<TargetSKUBreakdownModel> skus;
 
+  /// Derived Sell-In only: null when no SKU of the branch has a pack size.
+  final double? targetCases;
+  final double? actualCases;
+
   const TargetBranchBreakdownModel({
     required this.branchCode,
     required this.branchName,
@@ -14042,6 +14091,8 @@ class TargetBranchBreakdownModel {
     required this.status,
     required this.statusAr,
     required this.skus,
+    this.targetCases,
+    this.actualCases,
   });
 
   factory TargetBranchBreakdownModel.fromJson(Map<String, dynamic> json) {
@@ -14074,6 +14125,8 @@ class TargetBranchBreakdownModel {
       status: json['status'] as String? ?? 'at_risk',
       statusAr: json['status_ar'] as String? ?? 'أقل من المستهدف',
       skus: skusList,
+      targetCases: (json['target_cases'] as num?)?.toDouble(),
+      actualCases: (json['actual_cases'] as num?)?.toDouble(),
     );
   }
 }
@@ -14304,6 +14357,21 @@ class TargetComparisonModel {
   final List<TargetSalesRepQuotaModel> salesRepQuotas;
   final List<TargetMonthBreakdownModel> monthlyPhasing;
 
+  /// Derived Sell-In targets only (computed from a Sell-Out target; `id` is
+  /// `derived_si_from_{sourceTargetId}`). `targetUnits` / `actualUnits` are
+  /// pieces; case figures are null without a Product Master pack size.
+  final bool derived;
+  final String sourceTargetId;
+  final double? targetCases;
+  final double? actualCases;
+  final int packSizeMissingSkus;
+  final int costMissingSkus;
+
+  /// True when an annual Sell-Out target is superseded by monthly ones, so it
+  /// is shown but left out of the totals to avoid double counting.
+  final bool excludedFromTotals;
+  final String excludedReason;
+
   bool get isShareTarget => origin == 'market_share';
 
   const TargetComparisonModel({
@@ -14352,6 +14420,14 @@ class TargetComparisonModel {
     this.brands = const [],
     this.salesRepQuotas = const [],
     this.monthlyPhasing = const [],
+    this.derived = false,
+    this.sourceTargetId = '',
+    this.targetCases,
+    this.actualCases,
+    this.packSizeMissingSkus = 0,
+    this.costMissingSkus = 0,
+    this.excludedFromTotals = false,
+    this.excludedReason = '',
   }) : hasActuals = hasActuals ?? (actualRevenueEgp > 0 || actualUnits > 0);
 
   factory TargetComparisonModel.fromJson(Map<String, dynamic> json) {
@@ -14422,9 +14498,22 @@ class TargetComparisonModel {
       brands: brandsList,
       salesRepQuotas: repsList,
       monthlyPhasing: monthsList,
+      derived: json['derived'] as bool? ?? false,
+      sourceTargetId: json['source_target_id'] as String? ?? '',
+      targetCases: (json['target_cases'] as num?)?.toDouble(),
+      actualCases: (json['actual_cases'] as num?)?.toDouble(),
+      packSizeMissingSkus:
+          (json['pack_size_missing_skus'] as num?)?.toInt() ?? 0,
+      costMissingSkus: (json['cost_missing_skus'] as num?)?.toInt() ?? 0,
+      excludedFromTotals: json['excluded_from_totals'] as bool? ?? false,
+      excludedReason: json['excluded_reason'] as String? ?? '',
     );
   }
 }
+
+List<String> _stringList(Object? raw) => (raw as List<dynamic>? ?? const [])
+    .whereType<String>()
+    .toList(growable: false);
 
 class TargetsSummaryModel {
   final String tenantId;
@@ -14446,6 +14535,21 @@ class TargetsSummaryModel {
   final int totalSkusCovered;
   final List<TargetComparisonModel> items;
 
+  /// Derived Sell-In summary (quantity in pieces first, value second).
+  final bool derived;
+  final double? totalTargetCases;
+  final double? totalActualCases;
+  final double totalVarianceUnits;
+  final double comparableTargetUnits;
+  final double comparableActualUnits;
+  final double overallAchievementRevPct;
+  final List<String> availableBrands;
+  final List<String> appliedBrands;
+  final int sellOutTargetsCount;
+  final int packSizeMissingSkusCount;
+  final int costMissingSkusCount;
+  final int excludedFromTotalsCount;
+
   const TargetsSummaryModel({
     required this.tenantId,
     required this.targetType,
@@ -14465,6 +14569,19 @@ class TargetsSummaryModel {
     this.totalBranchesCovered = 0,
     this.totalSkusCovered = 0,
     required this.items,
+    this.derived = false,
+    this.totalTargetCases,
+    this.totalActualCases,
+    this.totalVarianceUnits = 0.0,
+    this.comparableTargetUnits = 0.0,
+    this.comparableActualUnits = 0.0,
+    this.overallAchievementRevPct = 0.0,
+    this.availableBrands = const [],
+    this.appliedBrands = const [],
+    this.sellOutTargetsCount = 0,
+    this.packSizeMissingSkusCount = 0,
+    this.costMissingSkusCount = 0,
+    this.excludedFromTotalsCount = 0,
   });
 
   factory TargetsSummaryModel.empty(String targetType) => TargetsSummaryModel(
@@ -14503,6 +14620,27 @@ class TargetsSummaryModel {
       totalBranchesCovered: (json['total_branches_covered'] as num?)?.toInt() ?? 0,
       totalSkusCovered: (json['total_skus_covered'] as num?)?.toInt() ?? 0,
       items: list,
+      derived: json['derived'] as bool? ?? false,
+      totalTargetCases: (json['total_target_cases'] as num?)?.toDouble(),
+      totalActualCases: (json['total_actual_cases'] as num?)?.toDouble(),
+      totalVarianceUnits:
+          (json['total_variance_units'] as num?)?.toDouble() ?? 0.0,
+      comparableTargetUnits:
+          (json['comparable_target_units'] as num?)?.toDouble() ?? 0.0,
+      comparableActualUnits:
+          (json['comparable_actual_units'] as num?)?.toDouble() ?? 0.0,
+      overallAchievementRevPct:
+          (json['overall_achievement_rev_pct'] as num?)?.toDouble() ?? 0.0,
+      availableBrands: _stringList(json['available_brands']),
+      appliedBrands: _stringList(json['applied_brands']),
+      sellOutTargetsCount:
+          (json['sell_out_targets_count'] as num?)?.toInt() ?? 0,
+      packSizeMissingSkusCount:
+          (json['pack_size_missing_skus_count'] as num?)?.toInt() ?? 0,
+      costMissingSkusCount:
+          (json['cost_missing_skus_count'] as num?)?.toInt() ?? 0,
+      excludedFromTotalsCount:
+          (json['excluded_from_totals_count'] as num?)?.toInt() ?? 0,
     );
   }
 }
