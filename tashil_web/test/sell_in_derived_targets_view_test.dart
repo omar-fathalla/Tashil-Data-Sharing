@@ -134,7 +134,7 @@ Map<String, dynamic> _branch({
   required String code,
   required String name,
   required List<Map<String, dynamic>> skus,
-  double allocated = 0,
+  bool unassigned = false,
 }) {
   double sum(String k) =>
       skus.fold(0.0, (a, s) => a + ((s[k] as num?)?.toDouble() ?? 0));
@@ -151,18 +151,19 @@ Map<String, dynamic> _branch({
     'actual_revenue_egp': av,
     'achievement_units_pct': tu > 0 ? au / tu * 100 : 0,
     'achievement_rev_pct': tv > 0 ? av / tv * 100 : 0,
-    if (allocated > 0) 'actual_allocated_units': allocated,
+    if (unassigned) 'unassigned': true,
     'skus': skus,
   };
 }
 
 /// A 2026 annual target with two branches whose SKUs carry achievement (the
-/// production «توزيع المستهدف» drill-down), one branch without Sell-In.
+/// production «توزيع المستهدف» drill-down), one branch without Sell-In and
+/// the «غير محدد الفرع» line (Sell-In rows that name no branch).
 Map<String, dynamic> _branchItem() => {
       ..._item(month: 0, pieces: 1000, actualPieces: 600),
       'month_label': '',
       'branches': [
-        _branch(code: 'fat_smouha', name: 'فرع فتح الله - سموحة', allocated: 120, skus: [
+        _branch(code: 'fat_smouha', name: 'فرع فتح الله - سموحة', skus: [
           _sku(
               code: 'FB-2',
               name: 'فيبا صغير',
@@ -204,6 +205,20 @@ Map<String, dynamic> _branchItem() => {
         _branch(code: 'fat_nice', name: 'فرع فتح الله - نيس', skus: [
           _sku(code: 'FB-1', name: 'فيبا كبير', brand: 'فيبا', pieces: 50),
         ]),
+        _branch(
+            code: '__unassigned__',
+            name: 'غير محدد الفرع',
+            unassigned: true,
+            skus: [
+              _sku(
+                  code: 'FB-1',
+                  name: 'فيبا كبير',
+                  brand: 'فيبا',
+                  pieces: 0,
+                  actualPieces: 80,
+                  value: 0,
+                  actualValue: 800),
+            ]),
       ],
     };
 
@@ -599,12 +614,43 @@ void main() {
       // A branch with no Sell-In at all still reads «—».
       expect(_cellText(tester, 'sellin_branch_actual_fat_nice'), '—');
       expect(_cellText(tester, 'sellin_branch_qty_pct_fat_nice'), '—');
-      // The allocated share of regional Sell-In is explained.
-      final tip = tester.widget<Tooltip>(find.ancestor(
-          of: find.byKey(const ValueKey('sellin_branch_actual_fat_smouha')),
-          matching: find.byType(Tooltip)));
-      expect(tip.message, contains('موزعة من مسحوبات الإقليم'));
-      expect(find.textContaining('مسحوبات مجمع الإقليم'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Sell-In without a branch is its own «غير محدد الفرع» line, never distributed',
+        (tester) async {
+      final repo = _FakeRepo((_) => _summaryJson([_branchItem()]));
+      await _pump(tester, repo);
+      await _openBranchDrillDown(tester);
+
+      // Real branches only in the count; the line is last and flagged.
+      expect(find.text('الفروع (3)'), findsOneWidget);
+      final row = find.byKey(
+          const ValueKey('sellin_branch___unassigned___غير محدد الفرع'));
+      expect(row, findsOneWidget);
+      expect(find.byKey(const ValueKey('sellin_branch_unassigned_icon')),
+          findsOneWidget);
+      final ys = [
+        for (final code in ['fat_smouha', 'fat_tanta', 'fat_nice', '__unassigned__'])
+          tester
+              .getTopLeft(find.byKey(ValueKey('sellin_branch_actual_$code')))
+              .dy,
+      ];
+      expect(ys.last, greaterThan(ys.take(3).reduce((a, b) => a > b ? a : b)));
+      expect(_cellText(tester, 'sellin_branch_actual___unassigned__'), '80');
+      expect(_cellText(tester, 'sellin_branch_qty_pct___unassigned__'), '—');
+      expect(_cellText(tester, 'sellin_branch_value_pct___unassigned__'), '—');
+      // Branch actuals are only their own rows (no share of the 80 pieces).
+      expect(_cellText(tester, 'sellin_branch_actual_fat_smouha'), '500');
+      expect(_cellText(tester, 'sellin_branch_actual_fat_nice'), '—');
+      expect(_cellText(tester, 'sellin_branches_hint'),
+          contains('«غير محدد الفرع» ولا توزَّع على الفروع'));
+      expect(find.textContaining('مجمع الإقليم موزعة'), findsNothing);
+
+      await _toggleBranch(tester, '__unassigned__', 'غير محدد الفرع');
+      expect(find.byKey(const ValueKey('sellin_branch_skus___unassigned__')),
+          findsOneWidget);
+      expect(find.text('أصناف غير محدد الفرع (1)'), findsOneWidget);
     });
 
     testWidgets(
@@ -724,6 +770,7 @@ void main() {
       expect(content, contains('سموحة'));
       expect(content, contains('طنطا'));
       expect(content, contains('نيس'));
+      expect(content, contains('غير محدد الفرع'));
     });
 
     testWidgets('load failure shows a retry state, not an empty list',
@@ -868,10 +915,19 @@ void main() {
           'tashil_sell_in_targets_fathalla_كل_الفروع_2026.csv');
     });
 
-    test('parses the allocated part of branch actuals', () {
+    test('parses the «غير محدد الفرع» line and exports it without a code', () {
       final t = item();
-      expect(t.branches.first.actualAllocatedUnits, 120);
-      expect(t.branches[1].actualAllocatedUnits, 0);
+      expect(t.branches.where((b) => b.unassigned).map((b) => b.branchName),
+          ['غير محدد الفرع']);
+      expect(t.branches.first.unassigned, isFalse);
+      final export = SellInTargetsExport.branches(
+          t, t.branches.where((b) => b.unassigned));
+      final h = export.headers;
+      final row = export.rows.single;
+      expect(row[h.indexOf('الفرع')], 'غير محدد الفرع');
+      expect(row[h.indexOf('كود الفرع')], '');
+      expect(row[h.indexOf('المحقق (قطعة)')], 80);
+      expect(row[h.indexOf('ملاحظات')], contains('بدون فرع محدد'));
     });
   });
 

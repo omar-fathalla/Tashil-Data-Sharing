@@ -956,7 +956,8 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
     final shownSkus = _showAllSkus ? skus : skus.take(_skuPreview).toList();
     final skuRows = _skuRows(context, shownSkus,
         hasActuals: t.hasActuals, keyPrefix: 'sellin_sku');
-    final allocated = t.branches.any((b) => b.actualAllocatedUnits > 0);
+    final branchCount = t.branches.where((b) => !b.unassigned).length;
+    final hasUnassigned = t.branches.any((b) => b.unassigned);
 
     return Container(
       key: const ValueKey('sellin_targets_detail'),
@@ -997,7 +998,7 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text('الفروع (${t.branches.length})',
+              Text('الفروع ($branchCount)',
                   style: theme.textTheme.labelLarge
                       ?.copyWith(fontWeight: FontWeight.w800)),
               if (t.branches.isNotEmpty)
@@ -1015,9 +1016,9 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
             Padding(
               padding: const EdgeInsets.only(top: M3Spacing.xxs),
               child: Text(
-                allocated
-                    ? 'اضغط على فرع لعرض أصنافه. المحقق لكل فرع = المسحوبات المسجلة على كود الفرع '
-                        '+ نصيبه من مسحوبات مجمع الإقليم موزعة بنسبة مستهدف كل صنف.'
+                hasUnassigned
+                    ? 'اضغط على فرع لعرض أصنافه. مسحوبات Sell-In التي لا تحمل فرعاً محدداً '
+                        'تظهر في سطر «غير محدد الفرع» ولا توزَّع على الفروع.'
                     : 'اضغط على فرع لعرض أصنافه.',
                 key: const ValueKey('sellin_branches_hint'),
                 style: theme.textTheme.bodySmall
@@ -1168,15 +1169,14 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
     Widget c(int i, String s, {String? tip, TextStyle? style, Key? key}) =>
         _line(_branchCaps, i, s, tooltip: tip, style: style, key: key);
 
-    final direct = b.actualUnits - b.actualAllocatedUnits;
+    final hasTarget = b.targetUnits > 0;
     final actualTip = !has
         ? 'لا توجد مسحوبات Sell-In لهذا الفرع'
-        : b.actualAllocatedUnits > 0
+        : b.unassigned
             ? '${CurrencyFormatter.formatNumber(b.actualUnits.round())} قطعة\n'
-                'مسجلة على كود الفرع: ${CurrencyFormatter.formatNumber(direct.round())} قطعة\n'
-                'موزعة من مسحوبات الإقليم بنسبة المستهدف: '
-                '${CurrencyFormatter.formatNumber(b.actualAllocatedUnits.round())} قطعة'
+                'مسحوبات Sell-In بدون فرع محدد في الملف — لا توزَّع على الفروع'
             : '${CurrencyFormatter.formatNumber(b.actualUnits.round())} قطعة';
+    final muted = TextStyle(color: cs.onSurfaceVariant);
 
     final cells = <Widget>[
       _cap(
@@ -1191,23 +1191,41 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
               color: cs.primary,
             ),
             const SizedBox(width: 2.0),
+            if (b.unassigned) ...[
+              Icon(Icons.help_outline_rounded,
+                  key: const ValueKey('sellin_branch_unassigned_icon'),
+                  size: 16.0,
+                  color: cs.onSurfaceVariant),
+              const SizedBox(width: 2.0),
+            ],
             Flexible(
               child: Tooltip(
-                message: b.branchName,
+                message: b.unassigned
+                    ? 'مسحوبات Sell-In بدون فرع محدد في الملف (مثل «مجمع الإقليم»). '
+                        'تظهر هنا كما هي ولا توزَّع على الفروع.'
+                    : b.branchName,
                 child: Text(
                   b.branchName,
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: b.unassigned
+                      ? TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontStyle: FontStyle.italic,
+                          color: cs.onSurfaceVariant)
+                      : const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
             ),
           ],
         ),
       ),
-      c(1, TargetTableFormat.count(b.targetUnits),
-          tip: '${CurrencyFormatter.formatNumber(b.targetUnits.round())} قطعة'),
+      c(1, b.unassigned ? '—' : TargetTableFormat.count(b.targetUnits),
+          tip: b.unassigned
+              ? 'لا يوجد مستهدف لمسحوبات بدون فرع'
+              : '${CurrencyFormatter.formatNumber(b.targetUnits.round())} قطعة',
+          style: b.unassigned ? muted : null),
       c(2, _casesText(b.targetCases), tip: _casesExact(b.targetCases)),
       c(3, has ? TargetTableFormat.count(b.actualUnits) : '—',
           key: ValueKey('sellin_branch_actual_${b.branchCode}'),
@@ -1215,16 +1233,22 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
           style: has
               ? TextStyle(fontWeight: FontWeight.w800, color: cs.primary)
               : TextStyle(color: cs.onSurfaceVariant)),
-      c(4, has ? '${b.achievementUnitsPct.toStringAsFixed(1)}%' : '—',
+      c(4,
+          has && hasTarget
+              ? '${b.achievementUnitsPct.toStringAsFixed(1)}%'
+              : '—',
           key: ValueKey('sellin_branch_qty_pct_${b.branchCode}'),
-          tip: has ? b.statusAr : null,
-          style: has
+          tip: has && hasTarget ? b.statusAr : null,
+          style: has && hasTarget
               ? TextStyle(
                   fontWeight: FontWeight.w700,
                   color: _pctColor(context, b.achievementUnitsPct))
-              : TextStyle(color: cs.onSurfaceVariant)),
-      c(5, TargetTableFormat.moneyNumber(b.targetRevenueEgp),
-          tip: TargetTableFormat.moneyExact(b.targetRevenueEgp)),
+              : muted),
+      c(5, b.unassigned ? '—' : TargetTableFormat.moneyNumber(b.targetRevenueEgp),
+          tip: b.unassigned
+              ? null
+              : TargetTableFormat.moneyExact(b.targetRevenueEgp),
+          style: b.unassigned ? muted : null),
       c(6, has ? TargetTableFormat.moneyNumber(b.actualRevenueEgp) : '—',
           key: ValueKey('sellin_branch_actual_value_${b.branchCode}'),
           tip: has ? TargetTableFormat.moneyExact(b.actualRevenueEgp) : null,
@@ -1250,7 +1274,9 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
         Material(
           color: open
               ? cs.primaryContainer.withOpacity(0.28)
-              : Colors.transparent,
+              : b.unassigned
+                  ? cs.surfaceContainerHigh.withOpacity(0.35)
+                  : Colors.transparent,
           child: Semantics(
             button: true,
             expanded: open,

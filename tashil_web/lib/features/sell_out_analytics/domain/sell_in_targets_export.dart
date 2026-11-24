@@ -125,7 +125,7 @@ class SellInTargetsExport {
     return [for (final (_, s) in indexed) s];
   }
 
-  /// True when the branch has any actual Sell-In (direct or allocated).
+  /// True when the branch has any actual Sell-In.
   static bool branchHasActuals(TargetBranchBreakdownModel b) =>
       b.actualUnits != 0 || b.actualRevenueEgp != 0;
 
@@ -149,6 +149,7 @@ class SellInTargetsExport {
       final actual = branchHasActuals(b);
       for (final s in branchSkus(b, brands: brands)) {
         final notes = [
+          if (b.unassigned) 'مسحوبات بدون فرع محدد في ملف Sell-In (غير موزعة)',
           if (s.packSizeMissing) 'بدون حجم عبوة في Product Master',
           if (s.costMissing) 'بدون سعر تكلفة (القيمة غير مقدّرة)',
         ];
@@ -157,7 +158,7 @@ class SellInTargetsExport {
           item.year,
           month,
           b.branchName,
-          b.branchCode,
+          b.unassigned ? '' : b.branchCode,
           brandOf(s),
           s.itemCode,
           s.skuName,
