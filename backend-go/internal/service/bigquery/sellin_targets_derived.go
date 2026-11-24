@@ -603,8 +603,8 @@ func (c *Client) putDerivedSellInLocked(normTenant string, rec domain.TargetReco
 	list := c.targets[normTenant]
 	current := false
 	for _, t := range list {
-		if t.TargetType != "sell_in" && t.ID == rec.SourceTargetID && t.UpdatedAt == rec.SourceUpdatedAt {
-			current = true
+		if t.TargetType != "sell_in" && t.ID == rec.SourceTargetID {
+			current = t.UpdatedAt == rec.SourceUpdatedAt
 			break
 		}
 	}
@@ -678,8 +678,13 @@ func (c *Client) derivedSellInPendingLocked(normTenant, chainFilter string, year
 			sources[t.ID] = true
 		}
 	}
+	seen := map[string]bool{}
 	for _, t := range list {
-		if t.TargetType == "sell_in" || !derivedTargetInScope(t, chainFilter, year) {
+		if t.TargetType == "sell_in" || seen[t.ID] {
+			continue
+		}
+		seen[t.ID] = true
+		if !derivedTargetInScope(t, chainFilter, year) {
 			continue
 		}
 		if d, ok := derived[t.ID]; !ok || !derivedRecordCurrent(d, t) {
