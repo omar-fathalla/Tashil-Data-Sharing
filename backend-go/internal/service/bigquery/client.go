@@ -186,6 +186,11 @@ type Client struct {
 	// Known-chain dropdown cache (known_chains.go). Own lock — never taken together with c.mu.
 	knownChainsMu    sync.Mutex
 	knownChainsCache map[string]knownChainCacheEntry
+
+	// Tokenized Product Master for fuzzy matching (product_master_match_cache.go) and the materialized
+	// Sell-In targets state (sellin_targets_derived.go). Own locks — never held while taking c.mu.
+	pmTok     pmTokenCache
+	derivedSI derivedSellInState
 }
 
 func (c *Client) invalidateKPICache() {

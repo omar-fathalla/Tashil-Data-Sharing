@@ -7,20 +7,36 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/service/targetalloc"
 )
 
-// Sell-In targets are never entered: they are derived on read from the Sell-Out targets.
+// Sell-In targets are never entered: the server materializes one derived Sell-In target per Sell-Out target.
 //
-//   - Quantity (pieces) is the primary metric: derived pieces = the Sell-Out target pieces, 1:1, for the
-//     same chain / branch / SKU / period. Cases = pieces / pack size from the Product Master.
-//   - Value is secondary: pieces x cost price from the Product Master (or the Sell-Out target's explicit
-//     unit price when one is set).
-//   - Achievement compares the actual Sell-In quantity first, then the actual Sell-In value.
+//   - Quantity (pieces) is the primary metric: derived pieces = the Sell-Out target pieces, 1:1, split over
+//     the same chain / branch / SKU / period. Only these pieces are stored (TargetRecord.DerivedLines).
+//   - Value is secondary and computed on read: pieces x the current Product Master cost price (or the
+//     Sell-Out target's explicit unit price). Cases = pieces / the current Product Master pack size.
+//   - Achievement compares the actual Sell-In quantity first, then the actual Sell-In value. Sell-In rows
+//     are matched to the Product Master once, when they are loaded; reads only look item codes up.
 //
-// Legacy manually-entered sell_in records stay in the tenant JSON untouched but are ignored on read.
+// Saving a Sell-Out target replaces its derived record in the same write and deleting it removes it. A
+// Sell-Out target without a current derived record (older data, bulk imports) is materialized once on the
+// next read. Legacy manually-entered sell_in records stay in the tenant JSON untouched but are ignored.
+
+const (
+	// derivedSellInFormatVersion is bumped when the materialized shape changes; older records are rebuilt.
+	derivedSellInFormatVersion  = 1
+	derivedBreakdownParallelism = 4
+	derivedBackfillTimeout      = 2 * time.Minute
+	derivedSummaryCacheMax      = 64
+)
 
 const (
 	// DerivedSellInIDPrefix prefixes the id of a derived Sell-In target: derived_si_from_{sellOutTargetID}.
@@ -106,7 +122,6 @@ type derivedLeaf struct {
 type derivedTarget struct {
 	t        domain.TargetRecord
 	units    int64
-	allocRev float64
 	leaves   []derivedLeaf
 	rows     []*derivedSellInRow
 	excluded bool
@@ -179,13 +194,19 @@ func floatPtr(v float64) *float64 {
 	return &r
 }
 
-// resolveDerivedSKUInfoLocked resolves brand, pack size and cost for one SKU from the Product Master.
-func (c *Client) resolveDerivedSKUInfoLocked(normTenant, code, barcode, name string, cache map[string]derivedSKUInfo) derivedSKUInfo {
-	ck := strings.ToLower(strings.TrimSpace(code)) + "|" + strings.TrimSpace(barcode) + "|" + strings.TrimSpace(name)
-	if v, ok := cache[ck]; ok {
-		return v
+func derivedRawIdentity(code, barcode, name string) string {
+	raw := strings.TrimSpace(code)
+	if raw == "" {
+		raw = strings.TrimSpace(barcode)
 	}
-	pm, ok := c.lookupProductMasterLocked(normTenant, code, barcode, name)
+	if raw == "" {
+		raw = strings.TrimSpace(name)
+	}
+	return "raw:" + strings.ToLower(raw)
+}
+
+// derivedSKUInfoFromPM takes brand, pack size and cost from a Product Master item (ok=false: unmatched).
+func derivedSKUInfoFromPM(pm domain.ProductMasterItem, ok bool, rawIdentity string) derivedSKUInfo {
 	info := derivedSKUInfo{brand: NoBrandLabelAr}
 	if ok {
 		info.identity = "pm:" + domain.NormalizeItemCode(pm.ItemCode)
@@ -198,14 +219,7 @@ func (c *Client) resolveDerivedSKUInfoLocked(normTenant, code, barcode, name str
 			info.upc = pm.UnitsPerCarton
 		}
 	} else {
-		raw := strings.TrimSpace(code)
-		if raw == "" {
-			raw = strings.TrimSpace(barcode)
-		}
-		if raw == "" {
-			raw = strings.TrimSpace(name)
-		}
-		info.identity = "raw:" + strings.ToLower(raw)
+		info.identity = rawIdentity
 	}
 	cost, _, _ := resolveRealFactoryUnitCost(0, pm, ok)
 	if cost > 0 {
@@ -213,32 +227,79 @@ func (c *Client) resolveDerivedSKUInfoLocked(normTenant, code, barcode, name str
 	} else {
 		info.costMissing = true
 	}
+	return info
+}
+
+// derivedRowSKUInfoLocked resolves a Sell-In row by the item code its load-time enrichment assigned
+// (enrichSellInRecordLocked). No name matching happens here: a row unmatched at load stays unmatched.
+func (c *Client) derivedRowSKUInfoLocked(normTenant string, rec *domain.SellInRecord, cache map[string]derivedSKUInfo) derivedSKUInfo {
+	ck := "row\x1f" + rec.ItemCode + "\x1f" + rec.Barcode + "\x1f" + rec.ItemName
+	if v, ok := cache[ck]; ok {
+		return v
+	}
+	pm, ok := c.productMasterByCode[normTenant][domain.NormalizeItemCode(rec.ItemCode)]
+	info := derivedSKUInfoFromPM(pm, ok, derivedRawIdentity(rec.ItemCode, rec.Barcode, rec.ItemName))
 	cache[ck] = info
 	return info
 }
 
-// derivedSellInRowsLocked loads the tenant's Sell-In records once per request as comparable rows.
-func (c *Client) derivedSellInRowsLocked(normTenant string, cache map[string]derivedSKUInfo) []*derivedSellInRow {
+// derivedLineSKUInfoLocked resolves a materialized line by the Product Master item matched when it was
+// written, else by exact code / barcode / name (a later Product Master may know it). No fuzzy matching.
+func (c *Client) derivedLineSKUInfoLocked(normTenant string, l domain.DerivedSellInLine, cache map[string]derivedSKUInfo) derivedSKUInfo {
+	ck := "line\x1f" + l.ItemCode + "\x1f" + l.SKUKey + "\x1f" + l.SKUName
+	if v, ok := cache[ck]; ok {
+		return v
+	}
+	var pm domain.ProductMasterItem
+	ok := false
+	if code := domain.NormalizeItemCode(l.ItemCode); code != "" {
+		pm, ok = c.productMasterByCode[normTenant][code]
+	}
+	if !ok {
+		if code := domain.NormalizeItemCode(l.SKUKey); code != "" {
+			pm, ok = c.productMasterByCode[normTenant][code]
+		}
+	}
+	if !ok {
+		if bc := domain.CleanBarcode(l.SKUKey); bc != "" {
+			pm, ok = c.productMasterByBarcode[normTenant][bc]
+		}
+	}
+	if !ok {
+		if nk := normalizeArabicNameForLookup(l.SKUName); nk != "" {
+			pm, ok = c.productMasterByName[normTenant][nk]
+		}
+	}
+	info := derivedSKUInfoFromPM(pm, ok, derivedRawIdentity(l.SKUKey, l.SKUKey, l.SKUName))
+	cache[ck] = info
+	return info
+}
+
+// derivedSellInRowsLocked copies the tenant's (load-time enriched) Sell-In records that keep accepts into
+// comparable rows. Caller holds c.mu (read).
+func (c *Client) derivedSellInRowsLocked(ctx context.Context, normTenant string, keep func(chain string, year int) bool, cache map[string]derivedSKUInfo) ([]*derivedSellInRow, error) {
 	raw := c.sellInRecords[normTenant]
-	rows := make([]*derivedSellInRow, 0, len(raw))
-	for _, r := range raw {
-		rec := r
-		if rec.TenantID == "" {
-			rec.TenantID = normTenant
+	var slab []derivedSellInRow
+	for i := range raw {
+		if i&4095 == 0 {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 		}
-		if rec.ItemCode == "" || rec.TotalUnitsSupplied == 0 || rec.CanonicalFamilyKey == "" {
-			c.enrichSellInRecordLocked(&rec)
-		}
+		rec := &raw[i]
 		chain := strings.ToLower(strings.TrimSpace(rec.RetailerChain))
 		if chain == "" {
 			chain = "fathalla"
 		}
-		info := c.resolveDerivedSKUInfoLocked(normTenant, rec.ItemCode, rec.Barcode, rec.ItemName, cache)
+		if !keep(chain, rec.Year) {
+			continue
+		}
+		info := c.derivedRowSKUInfoLocked(normTenant, rec, cache)
 		upc := rec.UnitsPerCarton
 		if upc <= 0 {
 			upc = 12
 		}
-		rows = append(rows, &derivedSellInRow{
+		slab = append(slab, derivedSellInRow{
 			chain:        chain,
 			year:         rec.Year,
 			month:        rec.MonthNum,
@@ -259,7 +320,11 @@ func (c *Client) derivedSellInRowsLocked(normTenant string, cache map[string]der
 			itemName:     strings.ToLower(rec.ItemName),
 		})
 	}
-	return rows
+	rows := make([]*derivedSellInRow, len(slab))
+	for i := range slab {
+		rows[i] = &slab[i]
+	}
+	return rows, nil
 }
 
 // derivedRowInScope applies a Sell-Out target's chain / period / branch / category scope to a Sell-In row.
@@ -327,16 +392,416 @@ type derivedBrandAgg struct {
 	actualValue  float64
 }
 
-// GetDerivedSellInTargetsSummary derives the Sell-In targets from the tenant's Sell-Out targets.
+// derivedSellInState holds the Sell-Out allocation provider and the derived summary cache.
+type derivedSellInState struct {
+	mu       sync.Mutex
+	provider func(tenantID string) DerivedBreakdownFunc
+	cache    map[string]derivedSummaryCacheEntry
+	flight   singleflight.Group
+}
+
+type derivedSummaryCacheEntry struct {
+	version string
+	sum     *domain.TargetsSummaryResponse
+}
+
+// SetDerivedSellInBreakdown sets where Sell-Out allocations come from when Sell-In targets are
+// materialized (e.g. BigQuery). nil = the in-memory Sell-Out records.
+func (c *Client) SetDerivedSellInBreakdown(p func(tenantID string) DerivedBreakdownFunc) {
+	c.derivedSI.mu.Lock()
+	c.derivedSI.provider = p
+	c.derivedSI.mu.Unlock()
+}
+
+func (c *Client) derivedBreakdownFor(normTenant string) DerivedBreakdownFunc {
+	c.derivedSI.mu.Lock()
+	p := c.derivedSI.provider
+	c.derivedSI.mu.Unlock()
+	if p == nil {
+		return nil
+	}
+	return p(normTenant)
+}
+
+// derivedSummaryVersionLocked changes with every source write (bumpSourceVersion: Sell-In / Sell-Out
+// uploads, targets) and every Product Master or in-place Sell-In enrichment change.
+func (c *Client) derivedSummaryVersionLocked() string {
+	return strconv.FormatInt(c.precompute.sourceVersion.Load(), 10) + "." + strconv.FormatUint(c.chainDisc.dataGen.Load(), 10)
+}
+
+func (s *derivedSellInState) cached(key, version string) (*domain.TargetsSummaryResponse, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.cache[key]
+	if !ok || e.version != version {
+		return nil, false
+	}
+	cp := *e.sum
+	return &cp, true
+}
+
+func (s *derivedSellInState) store(key, version string, sum *domain.TargetsSummaryResponse) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cache == nil {
+		s.cache = make(map[string]derivedSummaryCacheEntry)
+	}
+	if len(s.cache) >= derivedSummaryCacheMax {
+		for k, e := range s.cache {
+			if e.version != version {
+				delete(s.cache, k)
+			}
+		}
+		if len(s.cache) >= derivedSummaryCacheMax {
+			s.cache = make(map[string]derivedSummaryCacheEntry)
+		}
+	}
+	s.cache[key] = derivedSummaryCacheEntry{version: version, sum: sum}
+}
+
+type deferDerivedSellInKey struct{}
+
+// WithDeferredSellInMaterialization marks bulk Sell-Out target writes: UpsertTarget saves the target and
+// drops its outdated derived Sell-In record, and the caller materializes them all at once afterwards
+// (MaterializeDerivedSellInTargets) instead of computing one allocation per row.
+func WithDeferredSellInMaterialization(ctx context.Context) context.Context {
+	return context.WithValue(ctx, deferDerivedSellInKey{}, true)
+}
+
+func deferredSellInMaterialization(ctx context.Context) bool {
+	v, _ := ctx.Value(deferDerivedSellInKey{}).(bool)
+	return v
+}
+
+func isDerivedSellInRecord(t domain.TargetRecord) bool {
+	return t.TargetType == "sell_in" && t.Derived && IsDerivedSellInTargetID(t.ID)
+}
+
+func derivedRecordCurrent(d, source domain.TargetRecord) bool {
+	return d.SourceUpdatedAt == source.UpdatedAt && d.DerivedVersion == derivedSellInFormatVersion
+}
+
+func derivedTargetInScope(t domain.TargetRecord, chainFilter string, year int) bool {
+	ch := derivedChainKey(t.RetailerChain)
+	if chainFilter != "" && ch != "" && !strings.EqualFold(ch, chainFilter) {
+		return false
+	}
+	return year <= 0 || t.Year == year
+}
+
+// derivedWorkLocked prepares a Sell-Out target for allocation: its quantity (and value, used as the
+// weight when no unit history exists) inferred from the chain's average price when missing.
+func (c *Client) derivedWorkLocked(normTenant string, t domain.TargetRecord) (domain.TargetRecord, int64) {
+	units := t.TargetUnits
+	ch := derivedChainKey(t.RetailerChain)
+	if units <= 0 && t.TargetRevenueEGP > 0 {
+		if avg, _ := c.inferChainUnitPriceAndTonsLocked(normTenant, "sell_out", ch); avg > 0 {
+			units = math.Round(t.TargetRevenueEGP / avg)
+		}
+	}
+	pieces := int64(math.Round(units))
+	allocRev := t.TargetRevenueEGP
+	if allocRev <= 0 && pieces > 0 {
+		if avg, _ := c.inferChainUnitPriceAndTonsLocked(normTenant, "sell_out", ch); avg > 0 {
+			allocRev = math.Round(float64(pieces) * avg)
+		}
+	}
+	work := t
+	work.TargetUnits = float64(pieces)
+	work.TargetRevenueEGP = allocRev
+	return work, pieces
+}
+
+// derivedBreakdowns fetches the Sell-Out branch/SKU allocation of each work target (index-aligned) with
+// bounded parallelism. bd (e.g. BigQuery) is tried first; the in-memory Sell-Out records are the fallback.
+func (c *Client) derivedBreakdowns(ctx context.Context, normTenant string, works []domain.TargetRecord, bd DerivedBreakdownFunc) ([]domain.TargetBreakdownResponse, error) {
+	out := make([]domain.TargetBreakdownResponse, len(works))
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(derivedBreakdownParallelism)
+	for i := range works {
+		g.Go(func() error {
+			if err := gctx.Err(); err != nil {
+				return err
+			}
+			var resp domain.TargetBreakdownResponse
+			found := false
+			if bd != nil {
+				resp, found = bd(gctx, works[i])
+			}
+			// A cancelled request must not persist the fallback allocation in place of the real one.
+			if err := gctx.Err(); err != nil {
+				return err
+			}
+			if !found {
+				src := c.TargetBreakdownSource(normTenant, targetalloc.ChainFilter(works[i].RetailerChain))
+				if r, ok, err := targetalloc.ComputeFiltered(gctx, src, works[i], "memory", targetalloc.Filters{}); err == nil && ok {
+					resp = r
+				}
+			}
+			out[i] = resp
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// materializeDerivedSellIn computes the derived Sell-In record of each Sell-Out target (index-aligned).
+// It takes c.mu itself; the caller must not hold it.
+func (c *Client) materializeDerivedSellIn(ctx context.Context, normTenant string, sources []domain.TargetRecord, bd DerivedBreakdownFunc) ([]domain.TargetRecord, error) {
+	if len(sources) == 0 {
+		return nil, nil
+	}
+	works := make([]domain.TargetRecord, len(sources))
+	pieces := make([]int64, len(sources))
+	c.mu.RLock()
+	for i, t := range sources {
+		works[i], pieces[i] = c.derivedWorkLocked(normTenant, t)
+	}
+	c.mu.RUnlock()
+
+	breakdowns, err := c.derivedBreakdowns(ctx, normTenant, works, bd)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	memo := map[string]string{}
+	out := make([]domain.TargetRecord, len(sources))
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	for i, t := range sources {
+		out[i] = domain.TargetRecord{
+			ID:               DerivedSellInTargetID(t.ID),
+			TenantID:         normTenant,
+			TargetType:       "sell_in",
+			RetailerChain:    t.RetailerChain,
+			ChainDisplayName: t.ChainDisplayName,
+			Year:             t.Year,
+			Month:            t.Month,
+			MonthLabel:       t.MonthLabel,
+			BranchName:       t.BranchName,
+			Category:         t.Category,
+			TargetUnits:      float64(pieces[i]),
+			UpdatedAt:        now,
+			Origin:           t.Origin,
+			Derived:          true,
+			SourceTargetID:   t.ID,
+			SourceUpdatedAt:  t.UpdatedAt,
+			DerivedVersion:   derivedSellInFormatVersion,
+			DerivedLines:     c.derivedLinesLocked(normTenant, pieces[i], breakdowns[i], memo),
+		}
+	}
+	return out, nil
+}
+
+// putDerivedSellInLocked stores rec in place of its previous version, but only while its Sell-Out target
+// is still the version it was computed from. Reports whether the list changed. Caller holds c.mu (write).
+func (c *Client) putDerivedSellInLocked(normTenant string, rec domain.TargetRecord) bool {
+	list := c.targets[normTenant]
+	current := false
+	for _, t := range list {
+		if t.TargetType != "sell_in" && t.ID == rec.SourceTargetID && t.UpdatedAt == rec.SourceUpdatedAt {
+			current = true
+			break
+		}
+	}
+	if !current {
+		return false
+	}
+	for i := range list {
+		if list[i].ID == rec.ID {
+			if !isDerivedSellInRecord(list[i]) {
+				return false
+			}
+			list[i] = rec
+			return true
+		}
+	}
+	c.targets[normTenant] = append(list, rec)
+	return true
+}
+
+// dropDerivedSellInLocked removes the derived record of a Sell-Out target. Caller holds c.mu (write).
+func (c *Client) dropDerivedSellInLocked(normTenant, sourceID string) bool {
+	id := DerivedSellInTargetID(sourceID)
+	list := c.targets[normTenant]
+	kept := list[:0:0]
+	for _, t := range list {
+		if t.ID == id && isDerivedSellInRecord(t) {
+			continue
+		}
+		kept = append(kept, t)
+	}
+	if len(kept) == len(list) {
+		return false
+	}
+	c.targets[normTenant] = kept
+	return true
+}
+
+// dropOrphanDerivedSellInLocked removes derived records whose Sell-Out target no longer exists.
+func (c *Client) dropOrphanDerivedSellInLocked(normTenant string) bool {
+	list := c.targets[normTenant]
+	sources := map[string]bool{}
+	for _, t := range list {
+		if t.TargetType != "sell_in" {
+			sources[t.ID] = true
+		}
+	}
+	kept := list[:0:0]
+	for _, t := range list {
+		if isDerivedSellInRecord(t) && !sources[t.SourceTargetID] {
+			continue
+		}
+		kept = append(kept, t)
+	}
+	if len(kept) == len(list) {
+		return false
+	}
+	c.targets[normTenant] = kept
+	return true
+}
+
+// derivedSellInPendingLocked lists the in-scope Sell-Out targets whose derived record is missing or
+// outdated, and whether orphaned derived records exist.
+func (c *Client) derivedSellInPendingLocked(normTenant, chainFilter string, year int) (todo []domain.TargetRecord, orphans bool) {
+	list := c.targets[normTenant]
+	derived := map[string]domain.TargetRecord{}
+	sources := map[string]bool{}
+	for _, t := range list {
+		if isDerivedSellInRecord(t) {
+			derived[t.SourceTargetID] = t
+		} else if t.TargetType != "sell_in" {
+			sources[t.ID] = true
+		}
+	}
+	for _, t := range list {
+		if t.TargetType == "sell_in" || !derivedTargetInScope(t, chainFilter, year) {
+			continue
+		}
+		if d, ok := derived[t.ID]; !ok || !derivedRecordCurrent(d, t) {
+			todo = append(todo, t)
+		}
+	}
+	for src := range derived {
+		if !sources[src] {
+			orphans = true
+			break
+		}
+	}
+	return todo, orphans
+}
+
+// ensureDerivedSellIn is the idempotent lazy backfill: Sell-Out targets in scope without a current
+// derived record are materialized and saved once. Concurrent reads of the same scope share one run, which
+// is not cancelled when the first reader goes away.
+func (c *Client) ensureDerivedSellIn(ctx context.Context, normTenant, chainFilter string, year int, bd DerivedBreakdownFunc) error {
+	c.mu.RLock()
+	todo, orphans := c.derivedSellInPendingLocked(normTenant, chainFilter, year)
+	c.mu.RUnlock()
+	if len(todo) == 0 && !orphans {
+		return nil
+	}
+	key := normTenant + "|" + chainFilter + "|" + strconv.Itoa(year)
+	ch := c.derivedSI.flight.DoChan(key, func() (interface{}, error) {
+		bctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), derivedBackfillTimeout)
+		defer cancel()
+		return nil, c.backfillDerivedSellIn(bctx, normTenant, chainFilter, year, bd)
+	})
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case r := <-ch:
+		return r.Err
+	}
+}
+
+func (c *Client) backfillDerivedSellIn(ctx context.Context, normTenant, chainFilter string, year int, bd DerivedBreakdownFunc) error {
+	c.mu.RLock()
+	todo, orphans := c.derivedSellInPendingLocked(normTenant, chainFilter, year)
+	c.mu.RUnlock()
+	if len(todo) == 0 && !orphans {
+		return nil
+	}
+	recs, err := c.materializeDerivedSellIn(ctx, normTenant, todo, bd)
+	if err != nil {
+		return err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	changed := false
+	for _, r := range recs {
+		if c.putDerivedSellInLocked(normTenant, r) {
+			changed = true
+		}
+	}
+	if c.dropOrphanDerivedSellInLocked(normTenant) {
+		changed = true
+	}
+	if changed {
+		c.bumpSourceVersion()
+		c.persistTenantTargetsLocked(normTenant)
+	}
+	return nil
+}
+
+// MaterializeDerivedSellInTargets saves the derived Sell-In record of every Sell-Out target of a tenant
+// that has none or an outdated one (idempotent). Used after bulk target imports.
+func (c *Client) MaterializeDerivedSellInTargets(ctx context.Context, tenantID string) error {
+	normTenant := normalizeTenantKey(tenantID)
+	return c.ensureDerivedSellIn(ctx, normTenant, "", 0, c.derivedBreakdownFor(normTenant))
+}
+
+// GetDerivedSellInTargetsSummary reads the tenant's materialized Sell-In targets (backfilling any missing
+// one first) with their actual Sell-In achievement. Results are cached per tenant / chain / year / brands
+// until the next source or Product Master change.
 func (c *Client) GetDerivedSellInTargetsSummary(ctx context.Context, tenantID string, opts DerivedSellInOptions) (*domain.TargetsSummaryResponse, error) {
 	normTenant := normalizeTenantKey(tenantID)
 	chainFilter := derivedChainKey(opts.Chain)
+	bd := opts.Breakdown
+	if bd == nil {
+		bd = c.derivedBreakdownFor(normTenant)
+	}
+	if err := c.ensureDerivedSellIn(ctx, normTenant, chainFilter, opts.Year, bd); err != nil {
+		return nil, err
+	}
 
-	// Phase 1: snapshot the Sell-Out targets in scope (and every monthly scope, for de-duplication).
+	key := normTenant + "|" + chainFilter + "|" + strconv.Itoa(opts.Year) + "|" + strings.Join(opts.Brands, "\x1f")
 	c.mu.RLock()
+	version := c.derivedSummaryVersionLocked()
+	if sum, ok := c.derivedSI.cached(key, version); ok {
+		c.mu.RUnlock()
+		return sum, nil
+	}
+	targets, rows, err := c.derivedSnapshotLocked(ctx, normTenant, chainFilter, opts.Year)
+	c.mu.RUnlock()
+	if err != nil {
+		return nil, err
+	}
+
+	sum, err := c.buildDerivedSummary(ctx, normTenant, targets, rows, opts)
+	if err != nil {
+		return nil, err
+	}
+	c.derivedSI.store(key, version, sum)
+	cp := *sum
+	return &cp, nil
+}
+
+// derivedSnapshotLocked copies what the summary needs out of the store: the Sell-Out targets in scope with
+// their materialized pieces (valued with the current Product Master) and the Sell-In rows they can match.
+// Caller holds c.mu (read); the aggregation then runs without the lock.
+func (c *Client) derivedSnapshotLocked(ctx context.Context, normTenant, chainFilter string, year int) ([]*derivedTarget, []*derivedSellInRow, error) {
 	var all []domain.TargetRecord
+	derived := map[string]domain.TargetRecord{}
 	for _, t := range c.targets[normTenant] {
 		if t.TargetType == "sell_in" {
+			if isDerivedSellInRecord(t) {
+				derived[t.SourceTargetID] = t
+			}
 			continue // legacy manual Sell-In targets are ignored on read, never deleted
 		}
 		all = append(all, t)
@@ -347,78 +812,76 @@ func (c *Client) GetDerivedSellInTargetsSummary(ctx context.Context, tenantID st
 			monthlyScopes[derivedScopeKey(t)] = true
 		}
 	}
+
+	infoCache := map[string]derivedSKUInfo{}
 	var targets []*derivedTarget
+	chains := map[string]bool{}
+	years := map[int]bool{}
+	allChains, allYears := false, false
 	for _, t := range all {
-		if chainFilter != "" && !strings.EqualFold(derivedChainKey(t.RetailerChain), chainFilter) && derivedChainKey(t.RetailerChain) != "" {
-			continue
-		}
-		if opts.Year > 0 && t.Year != opts.Year {
+		if !derivedTargetInScope(t, chainFilter, year) {
 			continue
 		}
 		dt := &derivedTarget{t: t}
-		units := t.TargetUnits
-		ch := derivedChainKey(t.RetailerChain)
-		if units <= 0 && t.TargetRevenueEGP > 0 {
-			if avg, _ := c.inferChainUnitPriceAndTonsLocked(normTenant, "sell_out", ch); avg > 0 {
-				units = math.Round(t.TargetRevenueEGP / avg)
-			}
+		var lines []domain.DerivedSellInLine
+		if d, ok := derived[t.ID]; ok {
+			dt.units = int64(math.Round(d.TargetUnits))
+			lines = d.DerivedLines
+		} else {
+			// Only when the backfill could not save it (the target changed meanwhile): keep the quantity.
+			dt.units = int64(math.Round(t.TargetUnits))
+			lines = []domain.DerivedSellInLine{{SKUName: derivedUnallocatedSKUName, Pieces: dt.units, Unallocated: true}}
 		}
-		dt.units = int64(math.Round(units))
-		dt.allocRev = t.TargetRevenueEGP
-		if dt.allocRev <= 0 && dt.units > 0 {
-			if avg, _ := c.inferChainUnitPriceAndTonsLocked(normTenant, "sell_out", ch); avg > 0 {
-				dt.allocRev = math.Round(float64(dt.units) * avg)
-			}
-		}
+		dt.leaves = c.derivedLeavesLocked(normTenant, t, lines, infoCache)
 		// Avoid double counting: an annual target is superseded by monthly targets of the same scope.
 		if t.Month == 0 && monthlyScopes[derivedScopeKey(t)] {
 			dt.excluded = true
 			dt.reason = derivedExcludedSupersededByMonthly
 		}
 		targets = append(targets, dt)
+		if ch := derivedChainKey(t.RetailerChain); ch == "" {
+			allChains = true
+		} else {
+			chains[ch] = true
+		}
+		if t.Year <= 0 {
+			allYears = true
+		} else {
+			years[t.Year] = true
+		}
 	}
-	c.mu.RUnlock()
+	if len(targets) == 0 {
+		return targets, nil, nil
+	}
+	rows, err := c.derivedSellInRowsLocked(ctx, normTenant, func(chain string, y int) bool {
+		return (allChains || chains[chain]) && (allYears || years[y])
+	}, infoCache)
+	if err != nil {
+		return nil, nil, err
+	}
+	return targets, rows, nil
+}
 
-	// Phase 2: the Sell-Out branch/SKU allocation (takes its own locks; never nested inside ours).
-	breakdowns := make([]domain.TargetBreakdownResponse, len(targets))
-	for i, dt := range targets {
+// buildDerivedSummary matches the Sell-In rows to each target's scope and aggregates the response.
+func (c *Client) buildDerivedSummary(ctx context.Context, normTenant string, targets []*derivedTarget, rows []*derivedSellInRow, opts DerivedSellInOptions) (*domain.TargetsSummaryResponse, error) {
+	byPeriod := map[int][]*derivedSellInRow{}
+	for _, r := range rows {
+		k := r.year*100 + r.month
+		byPeriod[k] = append(byPeriod[k], r)
+	}
+	brandSet := map[string]bool{}
+	for _, dt := range targets {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		work := dt.t
-		work.TargetUnits = float64(dt.units)
-		work.TargetRevenueEGP = dt.allocRev
-		var resp domain.TargetBreakdownResponse
-		found := false
-		if opts.Breakdown != nil {
-			resp, found = opts.Breakdown(ctx, work)
-		}
-		if !found {
-			src := c.TargetBreakdownSource(normTenant, targetalloc.ChainFilter(work.RetailerChain))
-			r, ok, err := targetalloc.ComputeFiltered(ctx, src, work, "memory", targetalloc.Filters{})
-			if err == nil && ok {
-				resp, found = r, true
-			}
-		}
-		if found {
-			breakdowns[i] = resp
-		}
-	}
-
-	// Phase 3: leaves (SKU x branch pieces), Sell-In actuals, aggregation.
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	infoCache := map[string]derivedSKUInfo{}
-	sellInRows := c.derivedSellInRowsLocked(normTenant, infoCache)
-	brandSet := map[string]bool{}
-
-	for i, dt := range targets {
-		dt.leaves = c.derivedLeavesLocked(normTenant, dt, breakdowns[i], infoCache)
 		ch := derivedChainKey(dt.t.RetailerChain)
 		br := normalizeScopeLabel(dt.t.BranchName, "كل الفروع")
 		cat := normalizeScopeLabel(dt.t.Category, "كل الفئات")
-		for _, r := range sellInRows {
+		candidates := rows
+		if dt.t.Year > 0 && dt.t.Month > 0 {
+			candidates = byPeriod[dt.t.Year*100+dt.t.Month]
+		}
+		for _, r := range candidates {
 			if derivedRowInScope(r, dt.t, ch, br, cat) {
 				dt.rows = append(dt.rows, r)
 				brandSet[r.brand] = true
@@ -571,9 +1034,10 @@ func sortedBrands(set map[string]bool) []string {
 	return out
 }
 
-// derivedLeavesLocked splits the Sell-Out target pieces over the Sell-Out branch x SKU allocation.
-// The pieces always add up to the Sell-Out target quantity exactly (largest-remainder apportionment).
-func (c *Client) derivedLeavesLocked(normTenant string, dt *derivedTarget, bd domain.TargetBreakdownResponse, cache map[string]derivedSKUInfo) []derivedLeaf {
+// derivedLinesLocked splits the Sell-Out target pieces over the Sell-Out branch x SKU allocation and
+// matches each SKU to the Product Master once (the stored item code). The pieces always add up to the
+// Sell-Out target quantity exactly (largest-remainder apportionment). Caller holds c.mu (read).
+func (c *Client) derivedLinesLocked(normTenant string, units int64, bd domain.TargetBreakdownResponse, memo map[string]string) []domain.DerivedSellInLine {
 	type ref struct {
 		b domain.TargetBreakdownBranch
 		s domain.TargetBreakdownSKU
@@ -597,28 +1061,58 @@ func (c *Client) derivedLeavesLocked(normTenant string, dt *derivedTarget, bd do
 	if !anyUnits {
 		weights = revWeights
 	}
-	pieces := targetalloc.Apportion(dt.units, weights)
+	pieces := targetalloc.Apportion(units, weights)
 
-	var leaves []derivedLeaf
+	var lines []domain.DerivedSellInLine
 	var placed int64
 	for i, rf := range refs {
 		if pieces[i] <= 0 {
 			continue
 		}
 		placed += pieces[i]
-		info := c.resolveDerivedSKUInfoLocked(normTenant, rf.s.SKUKey, rf.s.SKUKey, rf.s.SKUName, cache)
-		leaves = append(leaves, c.newDerivedLeaf(dt.t, derivedLeaf{
-			branchKey: rf.b.BranchKey, branchName: rf.b.BranchName,
-			skuKey: rf.s.SKUKey, skuName: rf.s.SKUName, category: rf.s.Category,
-			info: info, pieces: pieces[i],
-		}))
+		lines = append(lines, domain.DerivedSellInLine{
+			BranchKey: rf.b.BranchKey, BranchName: rf.b.BranchName,
+			SKUKey: rf.s.SKUKey, SKUName: rf.s.SKUName, Category: rf.s.Category,
+			ItemCode: c.derivedMatchItemCodeLocked(normTenant, rf.s.SKUKey, rf.s.SKUName, memo),
+			Pieces:   pieces[i],
+		})
 	}
-	if placed < dt.units {
+	if placed < units {
 		// No allocation history (or nothing to weight by): keep the full Sell-Out quantity, unallocated.
-		leaves = append(leaves, c.newDerivedLeaf(dt.t, derivedLeaf{
-			skuName: derivedUnallocatedSKUName,
-			info:    derivedSKUInfo{identity: derivedUnallocatedIdentity, brand: NoBrandLabelAr, costMissing: true},
-			pieces:  dt.units - placed, unallocated: true,
+		lines = append(lines, domain.DerivedSellInLine{SKUName: derivedUnallocatedSKUName, Pieces: units - placed, Unallocated: true})
+	}
+	return lines
+}
+
+func (c *Client) derivedMatchItemCodeLocked(normTenant, skuKey, skuName string, memo map[string]string) string {
+	ck := skuKey + "\x1f" + skuName
+	if v, ok := memo[ck]; ok {
+		return v
+	}
+	code := ""
+	if pm, ok := c.lookupProductMasterLocked(normTenant, skuKey, skuKey, skuName); ok {
+		code = pm.ItemCode
+	}
+	memo[ck] = code
+	return code
+}
+
+// derivedLeavesLocked turns the stored pieces of a target into valued leaves: brand, pack size and cost
+// come from the current Product Master (or the Sell-Out target's explicit unit price).
+func (c *Client) derivedLeavesLocked(normTenant string, t domain.TargetRecord, lines []domain.DerivedSellInLine, cache map[string]derivedSKUInfo) []derivedLeaf {
+	leaves := make([]derivedLeaf, 0, len(lines))
+	for _, l := range lines {
+		if l.Pieces <= 0 {
+			continue
+		}
+		info := derivedSKUInfo{identity: derivedUnallocatedIdentity, brand: NoBrandLabelAr, costMissing: true}
+		if !l.Unallocated {
+			info = c.derivedLineSKUInfoLocked(normTenant, l, cache)
+		}
+		leaves = append(leaves, c.newDerivedLeaf(t, derivedLeaf{
+			branchKey: l.BranchKey, branchName: l.BranchName,
+			skuKey: l.SKUKey, skuName: l.SKUName, category: l.Category,
+			info: info, pieces: l.Pieces, unallocated: l.Unallocated,
 		}))
 	}
 	return leaves

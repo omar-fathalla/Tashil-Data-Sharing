@@ -31,6 +31,9 @@ type sellOutMonthlyPhaser interface {
 // in-memory path.
 func (h *AnalyticsHandler) WithTargetBreakdownQuerier(q bqsink.TargetBreakdownQuerier) *AnalyticsHandler {
 	h.targetBreakdown = q
+	if s, ok := h.bqRepo.(derivedSellInBreakdownSetter); ok {
+		s.SetDerivedSellInBreakdown(h.derivedBreakdownFunc)
+	}
 	return h
 }
 

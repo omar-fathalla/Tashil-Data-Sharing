@@ -266,20 +266,67 @@ func (c *Client) inferChainUnitPriceAndTonsLocked(normTenant, targetType, chain 
 	return avgPrice, 0.001
 }
 
-// UpsertTarget creates or updates a Sell-Out or Sell-In target for a tenant and persists it to disk.
+// UpsertTarget creates or updates a Sell-Out target for a tenant and persists it to disk together with its
+// derived (materialized) Sell-In target. Sell-In targets cannot be written directly.
 func (c *Client) UpsertTarget(ctx context.Context, tenantID string, target domain.TargetRecord) (*domain.TargetRecord, error) {
-	if strings.EqualFold(strings.TrimSpace(target.TargetType), "sell_in") {
+	if strings.EqualFold(strings.TrimSpace(target.TargetType), "sell_in") || IsDerivedSellInTargetID(target.ID) {
 		return nil, ErrSellInTargetsDerived
 	}
+	normTenant := normalizeTenantKey(tenantID)
+	c.mu.RLock()
+	target = c.normalizeSellOutTargetLocked(normTenant, target)
+	c.mu.RUnlock()
+
+	// The derived Sell-In record is computed without the lock (its allocation may query BigQuery) and saved
+	// in the same write as the Sell-Out target below. Bulk imports defer it to one batch afterwards.
+	var derived *domain.TargetRecord
+	if !deferredSellInMaterialization(ctx) {
+		if recs, err := c.materializeDerivedSellIn(ctx, normTenant, []domain.TargetRecord{target}, c.derivedBreakdownFor(normTenant)); err == nil && len(recs) == 1 {
+			derived = &recs[0]
+		}
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.bumpSourceVersion()
 
-	normTenant := normalizeTenantKey(tenantID)
-	tType := strings.ToLower(strings.TrimSpace(target.TargetType))
-	if tType != "sell_in" {
-		tType = "sell_out"
+	existing := c.targets[normTenant]
+	updated := false
+	for i := range existing {
+		if existing[i].ID == target.ID ||
+			(existing[i].TargetType == target.TargetType &&
+				strings.EqualFold(existing[i].RetailerChain, target.RetailerChain) &&
+				existing[i].Year == target.Year &&
+				existing[i].Month == target.Month &&
+				strings.EqualFold(existing[i].BranchName, target.BranchName) &&
+				strings.EqualFold(existing[i].Category, target.Category)) {
+			target.ID = existing[i].ID
+			existing[i] = target
+			updated = true
+			break
+		}
 	}
+	if !updated {
+		existing = append(existing, target)
+	}
+	c.targets[normTenant] = existing
+	c.dropDerivedSellInLocked(normTenant, target.ID)
+	if derived != nil {
+		derived.ID = DerivedSellInTargetID(target.ID)
+		derived.SourceTargetID = target.ID
+		derived.SourceUpdatedAt = target.UpdatedAt
+		c.targets[normTenant] = append(c.targets[normTenant], *derived)
+	}
+	c.persistTenantTargetsLocked(normTenant)
+
+	res := target
+	return &res, nil
+}
+
+// normalizeSellOutTargetLocked fills the defaults of a Sell-Out target (chain, period, scope labels,
+// the missing quantity or value, deterministic id, timestamp). Caller holds c.mu (read).
+func (c *Client) normalizeSellOutTargetLocked(normTenant string, target domain.TargetRecord) domain.TargetRecord {
+	tType := "sell_out"
 	target.TargetType = tType
 	target.TenantID = normTenant
 
@@ -326,31 +373,8 @@ func (c *Client) UpsertTarget(ctx context.Context, tenantID string, target domai
 		target.ID = buildDeterministicTargetID(normTenant, tType, ch, target.Year, target.Month, br, cat)
 	}
 	target.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-
-	existing := c.targets[normTenant]
-	updated := false
-	for i := range existing {
-		if existing[i].ID == target.ID ||
-			(existing[i].TargetType == target.TargetType &&
-				strings.EqualFold(existing[i].RetailerChain, target.RetailerChain) &&
-				existing[i].Year == target.Year &&
-				existing[i].Month == target.Month &&
-				strings.EqualFold(existing[i].BranchName, target.BranchName) &&
-				strings.EqualFold(existing[i].Category, target.Category)) {
-			target.ID = existing[i].ID
-			existing[i] = target
-			updated = true
-			break
-		}
-	}
-	if !updated {
-		existing = append(existing, target)
-	}
-	c.targets[normTenant] = existing
-	c.persistTenantTargetsLocked(normTenant)
-
-	res := target
-	return &res, nil
+	target.Derived, target.SourceTargetID, target.SourceUpdatedAt, target.DerivedVersion, target.DerivedLines = false, "", "", 0, nil
+	return target
 }
 
 // DeleteTarget deletes a target record by ID for a tenant and updates disk storage.
@@ -383,6 +407,7 @@ func (c *Client) DeleteTarget(ctx context.Context, tenantID, targetID string) er
 		return fmt.Errorf("target not found: %s", targetID)
 	}
 	c.targets[normTenant] = kept
+	c.dropDerivedSellInLocked(normTenant, targetID)
 	c.persistTenantTargetsLocked(normTenant)
 	return nil
 }
