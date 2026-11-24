@@ -9808,6 +9808,10 @@ class ApiClient {
     return TargetsSummaryModel.empty(targetType);
   }
 
+  /// Client timeout for GET /targets?target_type=sell_in. Same ceiling as the other heavy
+  /// endpoints: a cold Cloud Run instance may backfill derived targets on the first read.
+  static Duration derivedSellInTargetsTimeout = const Duration(seconds: 60);
+
   /// Sell-In targets derived from the Sell-Out targets (read-only).
   ///
   /// [brands] filters on the Product Master brand; the no-brand group is the
@@ -9826,7 +9830,7 @@ class ApiClient {
     });
     final response = await BackendHttp
         .get(uri, headers: _headers)
-        .timeout(const Duration(seconds: 15));
+        .timeout(derivedSellInTargetsTimeout);
     if (response.statusCode == 200) {
       final data =
           jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
