@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
+	"github.com/tashil/data-sharing/backend/internal/service/gemini"
 )
 
 const dsiLegalEntity = "عائله فتح الله ماركت لتصنيع وتجاره السلع الغذائيه ش م م"
 
 // newBranchAttributionFixture mirrors production keys: Sell-Out stores are store ids (fat_smouha …) with
-// display names, while Sell-In plan rows name the chain's legal entity with an ERP branch code
-// (311350147 = سموحة in the Fathalla catalog) or the regional bucket.
+// display names, while Sell-In rows name the chain's legal entity with an ERP branch code (311350147 =
+// سموحة in the Fathalla catalog), or — GP SOP exports — «عائله فتح الله ماركت - <branch>».
 func newBranchAttributionFixture(t *testing.T) *Client {
 	t.Helper()
 	c := newDerivedFixture(t)
@@ -46,17 +47,35 @@ func branchByCode(rows []domain.TargetBranchBreakdown, code string) *domain.Targ
 	return nil
 }
 
-// Regression: the branch drill-down showed «—» for every branch although the target had 1.62M achieved
-// pieces, because Sell-In rows (ERP codes / regional buckets under the legal-entity name) never matched
-// a Sell-Out store id.
-func TestDerivedSellInBranchAchievementWithPlanFileKeys(t *testing.T) {
+func assertBranchesAddUp(t *testing.T, it domain.TargetComparisonItem) {
+	t.Helper()
+	var branchSum float64
+	for _, b := range it.Branches {
+		branchSum += b.ActualUnits
+		var skuSum float64
+		for _, s := range b.SKUs {
+			skuSum += s.ActualUnits
+		}
+		if !near(skuSum, b.ActualUnits) {
+			t.Fatalf("branch %s SKU actuals %v must add up to the branch actual %v", b.BranchName, skuSum, b.ActualUnits)
+		}
+	}
+	if !near(branchSum, it.ActualUnits) {
+		t.Fatalf("branch lines (incl. «غير محدد الفرع») %v must add up to the target actual %v", branchSum, it.ActualUnits)
+	}
+}
+
+// Regression: the branch drill-down showed «—» for every branch although the target had achieved
+// pieces, because Sell-In rows (ERP branch codes under the legal-entity name) never matched a Sell-Out
+// store id. Rows without a branch are never spread over the branches: they stay in «غير محدد الفرع».
+func TestDerivedSellInBranchAchievementByERPCodeAndUnassignedLine(t *testing.T) {
 	c := newBranchAttributionFixture(t)
 	dsiSellOutTarget(t, c, 2026, 0, 1200, 0)
 	if err := c.SetSellInRecords(context.Background(), dsiTenant, "plan.xlsx", []domain.SellInRecord{
-		planSellIn("p1", "311350147", "ALX", "الاسكندرية", "FGCL-0001", 10, 1200),             // سموحة: 120 pieces
-		planSellIn("p2", "مجمع الإقليم (Regional)", "ALX", "الاسكندرية", "FGCL-0001", 4, 480), // 48 pieces, ALX
-		planSellIn("p3", "مجمع الإقليم (Regional)", "TNT", "الغربية", "FGCL-0001", 2, 240),    // 24 pieces, TNT
-		planSellIn("p4", "مجمع الإقليم (Regional)", "ALX", "الاسكندرية", "FGCL-0003", 1, 120), // 6 pieces, ALX
+		planSellIn("p1", "311350147", "ALX", "الاسكندرية", "FGCL-0001", 10, 1200),                    // سموحة: 120 pieces
+		planSellIn("p2", gemini.SellInNoBranchPlaceholder, "ALX", "الاسكندرية", "FGCL-0001", 4, 480), // 48 pieces, no branch
+		planSellIn("p3", gemini.SellInNoBranchPlaceholder, "TNT", "الغربية", "FGCL-0001", 2, 240),    // 24 pieces, no branch
+		planSellIn("p4", "", "ALX", "الاسكندرية", "FGCL-0003", 1, 120),                               // 6 pieces, no branch
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -68,90 +87,89 @@ func TestDerivedSellInBranchAchievementWithPlanFileKeys(t *testing.T) {
 	smouha := branchByCode(it.Branches, "fat_smouha")
 	stanley := branchByCode(it.Branches, "fat_stanley")
 	tanta := branchByCode(it.Branches, "fat_tanta")
-	if smouha == nil || stanley == nil || tanta == nil {
-		t.Fatalf("expected the three Sell-Out branches: %+v", it.Branches)
+	none := branchByCode(it.Branches, DerivedUnassignedBranchCode)
+	if smouha == nil || stanley == nil || tanta == nil || none == nil {
+		t.Fatalf("expected the three Sell-Out branches and «غير محدد الفرع»: %+v", it.Branches)
 	}
-	// Targets (pieces): smouha P1 600 + P3 200, stanley P1 200, tanta P1 200.
-	// ALX P1 bucket (48) splits 600:200 → smouha 36, stanley 12; ALX P3 bucket (6) → smouha; TNT → tanta.
-	if !near(smouha.ActualUnits, 162) || !near(smouha.ActualAllocatedUnits, 42) {
-		t.Fatalf("smouha: direct 120 + allocated 42, got actual=%v allocated=%v", smouha.ActualUnits, smouha.ActualAllocatedUnits)
+	if !near(smouha.ActualUnits, 120) || !near(smouha.AchievementUnitsPct, 15) || smouha.Status == "no_data" {
+		t.Fatalf("smouha: ERP code 311350147 → 120 of 800 target pieces, got %+v", smouha)
 	}
-	if !near(stanley.ActualUnits, 12) || !near(stanley.ActualAllocatedUnits, 12) {
-		t.Fatalf("stanley: allocated 12, got %+v", stanley)
+	if stanley.ActualUnits != 0 || stanley.Status != "no_data" || tanta.ActualUnits != 0 || tanta.Status != "no_data" {
+		t.Fatalf("branches without their own Sell-In rows get nothing (no distribution): stanley=%+v tanta=%+v", stanley, tanta)
 	}
-	if !near(tanta.ActualUnits, 24) || tanta.RegionCode != "TNT" {
-		t.Fatalf("tanta: TNT bucket 24 pieces, got actual=%v region=%q", tanta.ActualUnits, tanta.RegionCode)
+	if !none.Unassigned || none.BranchName != DerivedUnassignedBranchName || !near(none.ActualUnits, 78) || none.TargetUnits != 0 {
+		t.Fatalf("«غير محدد الفرع» = 48+24+6 pieces with no target, got %+v", none)
 	}
-	if smouha.RegionCode != "ALX" {
-		t.Fatalf("smouha region from the chain catalog, got %q", smouha.RegionCode)
+	if last := it.Branches[len(it.Branches)-1]; !last.Unassigned {
+		t.Fatalf("«غير محدد الفرع» is the last line, got %+v", last)
 	}
-	var branchSum float64
-	for _, b := range it.Branches {
-		branchSum += b.ActualUnits
-		if b.AchievementUnitsPct <= 0 || b.Status == "no_data" {
-			t.Fatalf("branch %s must show achievement: %+v", b.BranchName, b)
-		}
-		var skuSum float64
-		for _, s := range b.SKUs {
-			skuSum += s.ActualUnits
-		}
-		if !near(skuSum, b.ActualUnits) {
-			t.Fatalf("branch %s SKU actuals %v must add up to the branch actual %v", b.BranchName, skuSum, b.ActualUnits)
-		}
+	if it.BranchesCount != 3 {
+		t.Fatalf("BranchesCount counts real branches only, got %d", it.BranchesCount)
 	}
-	if !near(branchSum, it.ActualUnits) {
-		t.Fatalf("branch actuals %v must add up to the target actual %v", branchSum, it.ActualUnits)
-	}
+	assertBranchesAddUp(t, it)
 	p1 := skuByCode(smouha.SKUs, "FGCL-0001")
-	if p1 == nil || !near(p1.ActualUnits, 156) || !near(p1.AchievementPct, 26) {
-		t.Fatalf("smouha P1: 120 direct + 36 allocated over a 600 target, got %+v", p1)
+	if p1 == nil || !near(p1.ActualUnits, 120) || !near(p1.AchievementPct, 20) {
+		t.Fatalf("smouha P1: 120 of a 600 target, got %+v", p1)
 	}
 	if smouha.SKUs[0].TargetUnits < smouha.SKUs[len(smouha.SKUs)-1].TargetUnits {
 		t.Fatalf("branch SKUs sorted by target pieces desc: %+v", smouha.SKUs)
 	}
 }
 
-func TestDerivedSellInBranchMatchesStoreIDAndCustomerBranchLabel(t *testing.T) {
+// GP SOP exports keep the store in Customer Name («عائله فتح الله ماركت - ستانلى») while the stored
+// customer branch code is an id of the full name (fat_auto_…); the branch part maps to the store.
+func TestDerivedSellInBranchFromGPSOPCustomerNameAndStoreID(t *testing.T) {
 	c := newBranchAttributionFixture(t)
 	dsiSellOutTarget(t, c, 2026, 0, 1200, 0)
-	gp := planSellIn("g1", "fat_auto_1234abcd", "ALX", "", "FGCL-0001", 1, 100) // GP SOP: id from the full name
-	gp.CustomerName = "فتح الله -  ستانلى"
-	byID := planSellIn("g2", "fat_tanta", "TNT", "", "FGCL-0001", 2, 200)
-	if err := c.SetSellInRecords(context.Background(), dsiTenant, "gp.xlsx", []domain.SellInRecord{gp, byID}); err != nil {
+	gp := planSellIn("g1", "fat_auto_e47e193d", "ALX", "", "FGCL-0001", 1, 100)
+	gp.CustomerName = "عائله فتح الله ماركت -  ستانلى"
+	care := planSellIn("g2", "fat_auto_70b8ed04", "TNT", "", "FGCL-0001", 1, 100)
+	care.CustomerName = "عائله فتح الله ماركت مواد عناية - طنطا"
+	byID := planSellIn("g3", "fat_tanta", "TNT", "", "FGCL-0001", 1, 100)
+	mini := planSellIn("g4", "fat_auto_121d9fe2", "ALX", "", "FGCL-0001", 1, 100)
+	mini.CustomerName = dsiLegalEntity + " - ميني"
+	if err := c.SetSellInRecords(context.Background(), dsiTenant, "gp.xlsx", []domain.SellInRecord{gp, care, byID, mini}); err != nil {
 		t.Fatal(err)
 	}
 	it := derivedSummary(t, c).Items[0]
-	stanley := branchByCode(it.Branches, "fat_stanley")
-	tanta := branchByCode(it.Branches, "fat_tanta")
-	smouha := branchByCode(it.Branches, "fat_smouha")
-	if !near(stanley.ActualUnits, 12) || stanley.ActualAllocatedUnits != 0 {
-		t.Fatalf("customer branch label «ستانلى» is a direct match: %+v", stanley)
+	if b := branchByCode(it.Branches, "fat_stanley"); b == nil || !near(b.ActualUnits, 12) {
+		t.Fatalf("«… - ستانلى» → fat_stanley, got %+v", b)
 	}
-	if !near(tanta.ActualUnits, 24) || tanta.ActualAllocatedUnits != 0 {
-		t.Fatalf("store id fat_tanta is a direct match: %+v", tanta)
+	if b := branchByCode(it.Branches, "fat_tanta"); b == nil || !near(b.ActualUnits, 24) {
+		t.Fatalf("«… مواد عناية - طنطا» and store id fat_tanta → fat_tanta, got %+v", b)
 	}
-	if smouha.ActualUnits != 0 || smouha.Status != "no_data" {
-		t.Fatalf("smouha has no Sell-In rows: %+v", smouha)
+	if b := branchByCode(it.Branches, DerivedUnassignedBranchCode); b == nil || !near(b.ActualUnits, 12) {
+		t.Fatalf("«… ش م م - ميني» is no known store → «غير محدد الفرع», got %+v", b)
 	}
+	if b := branchByCode(it.Branches, "fat_smouha"); b == nil || b.ActualUnits != 0 {
+		t.Fatalf("smouha has no Sell-In rows: %+v", b)
+	}
+	assertBranchesAddUp(t, it)
 }
 
-func TestDerivedSellInRegionWithoutBranchesSpreadsOverTheChain(t *testing.T) {
+// A Sell-In row naming a real store that has no Sell-Out target is its own branch line (target 0), not
+// «غير محدد الفرع» and not another branch.
+func TestDerivedSellInKnownStoreWithoutTargetGetsItsOwnLine(t *testing.T) {
 	c := newBranchAttributionFixture(t)
 	dsiSellOutTarget(t, c, 2026, 0, 1200, 0)
-	if err := c.SetSellInRecords(context.Background(), dsiTenant, "plan.xlsx", []domain.SellInRecord{
-		planSellIn("c1", "مجمع الإقليم (Regional)", "CIR", "القاهرة", "FGCL-0001", 10, 1000), // 120 pieces, no CIR branch
-	}); err != nil {
+	byCode := planSellIn("k1", "311350954", "BHR", "البحيرة", "FGCL-0001", 1, 100) // catalog: دمنهور الأندلس
+	byName := planSellIn("k2", "fat_auto_x", "BHR", "", "FGCL-0001", 1, 100)
+	byName.CustomerName = "عائله فتح الله ماركت - دمنهور الأندلس"
+	if err := c.SetSellInRecords(context.Background(), dsiTenant, "gp.xlsx", []domain.SellInRecord{byCode, byName}); err != nil {
 		t.Fatal(err)
 	}
 	it := derivedSummary(t, c).Items[0]
-	// P1 targets: smouha 600, stanley 200, tanta 200 → 72 / 24 / 24.
-	want := map[string]float64{"fat_smouha": 72, "fat_stanley": 24, "fat_tanta": 24}
-	for code, units := range want {
-		b := branchByCode(it.Branches, code)
-		if b == nil || !near(b.ActualUnits, units) || !near(b.ActualAllocatedUnits, units) {
-			t.Fatalf("%s: want %v allocated pieces, got %+v", code, units, b)
-		}
+	b := branchByCode(it.Branches, "fat_damanhour_andalus")
+	if b == nil || b.Unassigned || b.TargetUnits != 0 || !near(b.ActualUnits, 24) {
+		t.Fatalf("دمنهور الأندلس: one line with both rows (24 pieces) and no target, got %+v (all %+v)", b, it.Branches)
 	}
+	if branchByCode(it.Branches, DerivedUnassignedBranchCode) != nil {
+		t.Fatalf("no «غير محدد الفرع» line when every row names a store: %+v", it.Branches)
+	}
+	if it.BranchesCount != 4 {
+		t.Fatalf("BranchesCount = 3 target branches + 1 Sell-In-only branch, got %d", it.BranchesCount)
+	}
+	assertBranchesAddUp(t, it)
 }
 
 func TestDerivedSellInBranchAttributionRespectsBrandFilter(t *testing.T) {

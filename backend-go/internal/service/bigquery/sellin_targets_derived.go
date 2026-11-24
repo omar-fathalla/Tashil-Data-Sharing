@@ -385,9 +385,7 @@ type derivedBranchAgg struct {
 	actualCases  float64
 	actualValue  float64
 	actualTons   float64
-	// Part of the actuals split onto the branch from rows that name no branch.
-	allocatedPieces float64
-	allocatedValue  float64
+	unassigned   bool
 }
 
 type derivedBrandAgg struct {
@@ -405,7 +403,7 @@ type derivedSellInState struct {
 	provider func(tenantID string) DerivedBreakdownFunc
 	cache    map[string]derivedSummaryCacheEntry
 	flight   singleflight.Group
-	slugs    map[string]string // chain|branch label → canonical store id
+	slugs    map[string][2]string // chain|branch label → canonical store id, store name
 }
 
 type derivedSummaryCacheEntry struct {
@@ -1243,25 +1241,38 @@ func (c *Client) buildDerivedItem(normTenant string, dt *derivedTarget, brands [
 		return nil // nothing of this Sell-Out target belongs to the selected brands
 	}
 
-	// Actuals: header = every in-scope Sell-In row of the selected brands; branches (and their SKUs) get
-	// the rows that name them plus their share of the rows that name no branch (derivedBranchAttr).
+	// Actuals: header = every in-scope Sell-In row of the selected brands; a branch (and its SKUs) gets
+	// the rows that name it exactly (derivedBranchAttr); rows naming no branch go to «غير محدد الفرع».
 	var actPieces, actCases, actValue, actTons float64
 	var actRows int
 	branchList := make([]*derivedBranchAgg, 0, len(branchOrder))
 	for _, k := range branchOrder {
 		branchList = append(branchList, branches[k])
 	}
-	attr := c.newDerivedBranchAttr(derivedChainKey(t.RetailerChain), branchList, dt.rows)
-	addBranchActual := func(b *derivedBranchAgg, r *derivedSellInRow, share float64, allocated bool) {
-		p, cs, v, tn := r.pieces*share, r.cases*share, r.value*share, r.tons*share
+	attr := c.newDerivedBranchAttr(derivedChainKey(t.RetailerChain), branchList)
+	var unassigned *derivedBranchAgg
+	branchFor := func(r *derivedSellInRow) *derivedBranchAgg {
+		ref := attr.resolve(r)
+		if ref == nil {
+			if unassigned == nil {
+				unassigned = &derivedBranchAgg{key: DerivedUnassignedBranchCode, name: DerivedUnassignedBranchName, unassigned: true, skus: map[string]*derivedSKUAgg{}}
+			}
+			return unassigned
+		}
+		b := branches[ref.key]
+		if b == nil {
+			b = &derivedBranchAgg{key: ref.key, name: ref.name, skus: map[string]*derivedSKUAgg{}}
+			branches[ref.key] = b
+			branchList = append(branchList, b)
+		}
+		return b
+	}
+	addBranchActual := func(b *derivedBranchAgg, r *derivedSellInRow) {
+		p, cs, v, tn := r.pieces, r.cases, r.value, r.tons
 		b.actualPieces += p
 		b.actualCases += cs
 		b.actualValue += v
 		b.actualTons += tn
-		if allocated {
-			b.allocatedPieces += p
-			b.allocatedValue += v
-		}
 		bs := b.skus[r.identity]
 		if bs == nil {
 			bs = &derivedSKUAgg{identity: r.identity, name: r.name, brand: r.brand, itemCode: r.itemCode, barcode: r.barcode}
@@ -1290,15 +1301,10 @@ func (c *Client) buildDerivedItem(normTenant string, dt *derivedTarget, brands [
 		bg := getBrand(r.brand)
 		bg.actualPieces += r.pieces
 		bg.actualValue += r.value
-		if idx := attr.directIndex(r); idx >= 0 {
-			addBranchActual(branchList[idx], r, 1, false)
-			continue
-		}
-		for i, w := range attr.shares(r) {
-			if w > 0 {
-				addBranchActual(branchList[i], r, w, true)
-			}
-		}
+		addBranchActual(branchFor(r), r)
+	}
+	if unassigned != nil {
+		branchList = append(branchList, unassigned)
 	}
 
 	hasActuals := actRows > 0
@@ -1377,7 +1383,7 @@ func (c *Client) buildDerivedItem(normTenant string, dt *derivedTarget, brands [
 
 	// Branches.
 	item.Branches = make([]domain.TargetBranchBreakdown, 0, len(branchList))
-	for i, b := range branchList {
+	for _, b := range branchList {
 		active := 0
 		for _, id := range b.skuOrder {
 			if b.skus[id].pieces > 0 {
@@ -1385,18 +1391,16 @@ func (c *Client) buildDerivedItem(normTenant string, dt *derivedTarget, brands [
 			}
 		}
 		br := domain.TargetBranchBreakdown{
-			BranchCode:                b.key,
-			BranchName:                b.name,
-			RegionCode:                attr.regionCode(i),
-			ActiveSKUsCount:           active,
-			TargetUnits:               float64(b.pieces),
-			TargetRevenueEGP:          round2(b.value),
-			ActualUnits:               round2(b.actualPieces),
-			ActualRevenueEGP:          round2(b.actualValue),
-			ActualWeightTons:          round2(b.actualTons),
-			ActualAllocatedUnits:      round2(b.allocatedPieces),
-			ActualAllocatedRevenueEGP: round2(b.allocatedValue),
-			SKUs:                      make([]domain.TargetSKUBreakdown, 0, len(b.skuOrder)),
+			BranchCode:       b.key,
+			BranchName:       b.name,
+			ActiveSKUsCount:  active,
+			TargetUnits:      float64(b.pieces),
+			TargetRevenueEGP: round2(b.value),
+			ActualUnits:      round2(b.actualPieces),
+			ActualRevenueEGP: round2(b.actualValue),
+			ActualWeightTons: round2(b.actualTons),
+			Unassigned:       b.unassigned,
+			SKUs:             make([]domain.TargetSKUBreakdown, 0, len(b.skuOrder)),
 		}
 		if targetPieces > 0 {
 			br.ShareOfChainPct = math.Round(float64(b.pieces)/float64(targetPieces)*10000) / 100
@@ -1420,17 +1424,32 @@ func (c *Client) buildDerivedItem(normTenant string, dt *derivedTarget, brands [
 			if br.SKUs[i].TargetUnits != br.SKUs[j].TargetUnits {
 				return br.SKUs[i].TargetUnits > br.SKUs[j].TargetUnits
 			}
+			if br.SKUs[i].ActualUnits != br.SKUs[j].ActualUnits {
+				return br.SKUs[i].ActualUnits > br.SKUs[j].ActualUnits
+			}
 			return br.SKUs[i].SKUName < br.SKUs[j].SKUName
 		})
 		item.Branches = append(item.Branches, br)
 	}
 	sort.SliceStable(item.Branches, func(i, j int) bool {
-		if item.Branches[i].TargetUnits != item.Branches[j].TargetUnits {
-			return item.Branches[i].TargetUnits > item.Branches[j].TargetUnits
+		bi, bj := item.Branches[i], item.Branches[j]
+		if bi.Unassigned != bj.Unassigned {
+			return bj.Unassigned
 		}
-		return item.Branches[i].BranchName < item.Branches[j].BranchName
+		if bi.TargetUnits != bj.TargetUnits {
+			return bi.TargetUnits > bj.TargetUnits
+		}
+		if bi.ActualUnits != bj.ActualUnits {
+			return bi.ActualUnits > bj.ActualUnits
+		}
+		return bi.BranchName < bj.BranchName
 	})
-	item.BranchesCount = len(item.Branches)
+	item.BranchesCount = 0
+	for _, b := range item.Branches {
+		if !b.Unassigned {
+			item.BranchesCount++
+		}
+	}
 
 	// Brands (Product Master brand; «بدون براند» when missing).
 	item.Brands = make([]domain.TargetBrandBreakdown, 0, len(brandAggs))

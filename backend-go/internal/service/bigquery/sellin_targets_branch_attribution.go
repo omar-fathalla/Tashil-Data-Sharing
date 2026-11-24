@@ -8,55 +8,54 @@ import (
 )
 
 // Derived Sell-In target branches are Sell-Out stores (store_id such as fat_smouha, display name
-// «فرع فتح الله - سموحة»). Sell-In rows almost never carry that id: supplier plan files invoice the
-// chain's legal entity with the chain's ERP branch code (311350147, ALX-04058-0044 # 1) or the regional
-// bucket «مجمع الإقليم (Regional)», and GP SOP files carry a store id built from the customer name.
-// Branch actuals are therefore attributed in two steps:
+// «فرع فتح الله - سموحة»). A Sell-In row counts for a branch only through an exact key:
 //
-//  1. direct: the row's customer code / name resolves to the branch's canonical store id (same id, the
-//     chain branch catalog's ERP code, or the branch label of the customer name);
-//  2. allocated: every other row is split over the target's branches of the row's region (all branches
-//     when the region has none), weighted by each branch's target pieces of the row's SKU, else by the
-//     branch's total target pieces. Branch actuals then add up to the target's actuals.
+//   - its customer branch code is the store id, or the chain's ERP branch code of the store;
+//   - its customer name, or the branch part of «<customer> - <branch>» (GP SOP Customer Name),
+//     canonicalizes to the store id with gemini.BuildBranchStoreMetadata — the dictionary Sell-Out
+//     uploads use to name stores (exact / alias / abbreviation, never fuzzy).
+//
+// A row that names a known store without a target becomes its own branch line (target 0). A row with
+// no branch — an empty code, the legacy «مجمع الإقليم (Regional)» placeholder, or a label that is not
+// a known store — is reported under «غير محدد الفرع» and never distributed over the branches.
 
-const derivedBranchSlugCacheMax = 8192
+const (
+	derivedBranchSlugCacheMax = 8192
+
+	DerivedUnassignedBranchCode = "__unassigned__"
+	DerivedUnassignedBranchName = "غير محدد الفرع"
+)
 
 // derivedBranchSlug is the canonical store id of a branch label (gemini.BuildBranchStoreMetadata, the
-// same id Sell-Out uploads give the store). Memoized: labels repeat across rows, targets and reads.
-func (c *Client) derivedBranchSlug(chain, label string) string {
+// same id Sell-Out uploads give the store) and its display name. Memoized: labels repeat across rows,
+// targets and reads.
+func (c *Client) derivedBranchSlug(chain, label string) (string, string) {
 	label = strings.TrimSpace(label)
 	if label == "" {
-		return ""
+		return "", ""
 	}
 	key := chain + "\x1f" + label
 	c.derivedSI.mu.Lock()
 	if v, ok := c.derivedSI.slugs[key]; ok {
 		c.derivedSI.mu.Unlock()
-		return v
+		return v[0], v[1]
 	}
 	c.derivedSI.mu.Unlock()
-	id := strings.ToLower(gemini.BuildBranchStoreMetadata(chain, label).ID)
+	st := gemini.BuildBranchStoreMetadata(chain, label)
+	v := [2]string{strings.ToLower(st.ID), st.BranchName}
 	c.derivedSI.mu.Lock()
 	if c.derivedSI.slugs == nil || len(c.derivedSI.slugs) >= derivedBranchSlugCacheMax {
-		c.derivedSI.slugs = make(map[string]string)
+		c.derivedSI.slugs = make(map[string][2]string)
 	}
-	c.derivedSI.slugs[key] = id
+	c.derivedSI.slugs[key] = v
 	c.derivedSI.mu.Unlock()
-	return id
+	return v[0], v[1]
 }
 
-// derivedKnownBranchGovernorate is the governorate of a branch label known to the store catalog
-// (empty for auto-created stores, whose governorate is only a default).
-func derivedKnownBranchGovernorate(chain, label string) string {
-	label = strings.TrimSpace(label)
-	if label == "" {
-		return ""
-	}
-	st := gemini.BuildBranchStoreMetadata(chain, label)
-	if strings.Contains(st.ID, "_auto_") {
-		return ""
-	}
-	return st.Governorate
+// derivedKnownStoreID reports whether id names a store of the branch dictionary (not an id hashed from
+// an unknown label, not the Sell-Out «غير موزع على فرع» bucket).
+func derivedKnownStoreID(id string) bool {
+	return id != "" && !strings.Contains(id, "_auto_") && !strings.HasSuffix(id, "_unallocated")
 }
 
 // derivedChainCatalog returns the chain's ERP branch catalog (codes used by Sell-In plan files).
@@ -78,214 +77,120 @@ func derivedBranchCodeKeys(code string) []string {
 	if s == "" {
 		return nil
 	}
-	keys := []string{"code:" + s}
+	keys := []string{s}
 	if i := strings.Index(s, "-"); i > 0 {
 		rest := s[i+1:]
 		if rest != "" && strings.IndexFunc(rest, func(r rune) bool { return !unicode.IsDigit(r) }) < 0 {
-			keys = append(keys, "code:"+rest)
+			keys = append(keys, rest)
 		}
 	}
 	return keys
 }
 
-func derivedRegionKey(region, governorate string) string {
-	if r := strings.ToUpper(strings.TrimSpace(region)); r != "" {
-		return r
-	}
-	if g := normalizeArabicNameForLookup(governorate); g != "" {
-		return "gov:" + g
-	}
-	return ""
+type derivedBranchRef struct {
+	key  string // target branch key, or the canonical store id of a branch without a target
+	name string
 }
 
-// derivedBranchAttr attributes the Sell-In rows of one derived target to its branches.
+// derivedBranchAttr resolves the Sell-In rows of one derived target to branches.
 type derivedBranchAttr struct {
 	c        *Client
 	chain    string
-	branches []*derivedBranchAgg
-	ids      map[string]int // canonical store id / catalog code → branch index
-	region   []string       // branch index → region key ("" = unknown)
-	byRegion map[string][]int
-	all      []int
-	direct   map[string]int // row chain|code|name → branch index (-1 = none)
-	weights  map[string][]float64
+	byID     map[string]derivedBranchRef // target branch key / canonical store id → branch
+	catalog  map[string]derivedBranchRef // ERP branch code → branch
+	resolved map[string]*derivedBranchRef
 }
 
-func (c *Client) newDerivedBranchAttr(chain string, branches []*derivedBranchAgg, rows []*derivedSellInRow) *derivedBranchAttr {
-	a := &derivedBranchAttr{
-		c: c, chain: chain, branches: branches,
-		ids:      map[string]int{},
-		region:   make([]string, len(branches)),
-		byRegion: map[string][]int{},
-		direct:   map[string]int{},
-		weights:  map[string][]float64{},
-	}
-	if len(branches) == 0 {
-		return a
-	}
+func (c *Client) newDerivedBranchAttr(chain string, branches []*derivedBranchAgg) *derivedBranchAttr {
 	slugChain := chain
 	if slugChain == "" {
 		slugChain = "fathalla"
 	}
-	put := func(id string, idx int) {
-		if id == "" {
-			return
-		}
-		if _, taken := a.ids[id]; !taken {
-			a.ids[id] = idx
+	a := &derivedBranchAttr{
+		c: c, chain: slugChain,
+		byID:     map[string]derivedBranchRef{},
+		catalog:  map[string]derivedBranchRef{},
+		resolved: map[string]*derivedBranchRef{},
+	}
+	put := func(m map[string]derivedBranchRef, k string, ref derivedBranchRef) {
+		if _, taken := m[k]; k != "" && !taken {
+			m[k] = ref
 		}
 	}
-	for i, b := range branches {
-		a.all = append(a.all, i)
-		put("id:"+strings.ToLower(strings.TrimSpace(b.key)), i)
-		put("id:"+c.derivedBranchSlug(slugChain, b.name), i)
+	for _, b := range branches {
+		ref := derivedBranchRef{key: b.key, name: b.name}
+		put(a.byID, strings.ToLower(strings.TrimSpace(b.key)), ref)
+		if id, _ := c.derivedBranchSlug(slugChain, b.name); derivedKnownStoreID(id) {
+			put(a.byID, id, ref)
+		}
 	}
 	for _, e := range derivedChainCatalog(chain) {
-		idx, ok := a.ids["id:"+c.derivedBranchSlug(slugChain, e.Name)]
+		id, name := c.derivedBranchSlug(slugChain, e.Name)
+		ref, ok := a.byID[id]
 		if !ok {
-			continue
+			if !derivedKnownStoreID(id) {
+				continue
+			}
+			ref = derivedBranchRef{key: id, name: name}
 		}
 		for _, k := range derivedBranchCodeKeys(e.Code) {
-			put(k, idx)
-		}
-		if a.region[idx] == "" {
-			a.region[idx] = derivedRegionKey(e.RegionCode, e.Governorate)
-		}
-	}
-
-	// Branches the catalog does not place take the region of their direct rows, else the region the
-	// Sell-In rows use for the branch's known governorate.
-	regionVotes := make([]map[string]int, len(branches))
-	govVotes := map[string]map[string]int{}
-	for _, r := range rows {
-		rk := derivedRegionKey(r.region, r.governorate)
-		if g := normalizeArabicNameForLookup(r.governorate); g != "" && rk != "" {
-			if govVotes[g] == nil {
-				govVotes[g] = map[string]int{}
-			}
-			govVotes[g][rk]++
-		}
-		if idx := a.directIndex(r); idx >= 0 && rk != "" && a.region[idx] == "" {
-			if regionVotes[idx] == nil {
-				regionVotes[idx] = map[string]int{}
-			}
-			regionVotes[idx][rk]++
-		}
-	}
-	for i, b := range branches {
-		if a.region[i] != "" {
-			continue
-		}
-		if rk := topVote(regionVotes[i]); rk != "" {
-			a.region[i] = rk
-			continue
-		}
-		if g := normalizeArabicNameForLookup(derivedKnownBranchGovernorate(slugChain, b.name)); g != "" {
-			if rk := topVote(govVotes[g]); rk != "" {
-				a.region[i] = rk
-			}
-		}
-	}
-	for i, rk := range a.region {
-		if rk != "" {
-			a.byRegion[rk] = append(a.byRegion[rk], i)
+			put(a.catalog, k, ref)
 		}
 	}
 	return a
 }
 
-func topVote(votes map[string]int) string {
-	best, n := "", 0
-	for k, v := range votes {
-		if v > n || (v == n && k < best) {
-			best, n = k, v
-		}
+// storeRef maps a canonical store id to the target branch holding it, else to its own branch line.
+func (a *derivedBranchAttr) storeRef(id, name string) *derivedBranchRef {
+	if ref, ok := a.byID[id]; ok {
+		return &ref
 	}
-	return best
+	if derivedKnownStoreID(id) {
+		return &derivedBranchRef{key: id, name: name}
+	}
+	return nil
 }
 
-// regionCode is the region code of a branch ("" when unknown or only a governorate).
-func (a *derivedBranchAttr) regionCode(i int) string {
-	if i < 0 || i >= len(a.region) || strings.HasPrefix(a.region[i], "gov:") {
-		return ""
-	}
-	return a.region[i]
-}
-
-// rowIDs lists the canonical ids a Sell-In row may name its branch by.
-func (a *derivedBranchAttr) rowIDs(r *derivedSellInRow) []string {
+// resolve returns the branch a Sell-In row names, or nil when it names none (→ «غير محدد الفرع»).
+func (a *derivedBranchAttr) resolve(r *derivedSellInRow) *derivedBranchRef {
 	chain := r.chain
 	if chain == "" {
 		chain = a.chain
 	}
-	var ids []string
-	if code := strings.TrimSpace(r.customerCode); code != "" {
-		ids = append(ids, "id:"+code)
-		ids = append(ids, derivedBranchCodeKeys(code)...)
-		ids = append(ids, "id:"+a.c.derivedBranchSlug(chain, code))
+	memo := chain + "\x1f" + r.customerCode + "\x1f" + r.customerName
+	if ref, ok := a.resolved[memo]; ok {
+		return ref
 	}
-	if name := strings.TrimSpace(r.customerName); name != "" {
-		ids = append(ids, "id:"+a.c.derivedBranchSlug(chain, name))
-		if _, branch := gemini.ParseChainBranchCell(name); branch != "" && branch != name {
-			ids = append(ids, "id:"+a.c.derivedBranchSlug(chain, branch))
-		}
-	}
-	return ids
+	ref := a.resolveUncached(chain, r)
+	a.resolved[memo] = ref
+	return ref
 }
 
-// directIndex returns the branch a row names directly, or -1.
-func (a *derivedBranchAttr) directIndex(r *derivedSellInRow) int {
-	if len(a.branches) == 0 {
-		return -1
-	}
-	key := r.chain + "\x1f" + r.customerCode + "\x1f" + r.customerName
-	if idx, ok := a.direct[key]; ok {
-		return idx
-	}
-	idx := -1
-	for _, id := range a.rowIDs(r) {
-		if i, ok := a.ids[id]; ok {
-			idx = i
-			break
+func (a *derivedBranchAttr) resolveUncached(chain string, r *derivedSellInRow) *derivedBranchRef {
+	if code := strings.TrimSpace(r.customerCode); code != "" && !gemini.IsSellInNoBranchPlaceholder(code) {
+		if ref, ok := a.byID[code]; ok {
+			return &ref
+		}
+		for _, k := range derivedBranchCodeKeys(code) {
+			if ref, ok := a.catalog[k]; ok {
+				return &ref
+			}
+		}
+		if id, name := a.c.derivedBranchSlug(chain, code); derivedKnownStoreID(id) {
+			return a.storeRef(id, name)
 		}
 	}
-	a.direct[key] = idx
-	return idx
-}
-
-// shares splits a row that names no branch over the branches of its region (all branches when the
-// region has none) by target pieces of the row's SKU, else by total target pieces. nil = no branch.
-func (a *derivedBranchAttr) shares(r *derivedSellInRow) []float64 {
-	rk := derivedRegionKey(r.region, r.governorate)
-	key := rk + "\x1f" + r.identity
-	if w, ok := a.weights[key]; ok {
-		return w
+	name := strings.TrimSpace(r.customerName)
+	if name == "" {
+		return nil
 	}
-	pool := a.byRegion[rk]
-	if len(pool) == 0 {
-		pool = a.all
-	}
-	w := make([]float64, len(a.branches))
-	var sum float64
-	for _, i := range pool {
-		if s := a.branches[i].skus[r.identity]; s != nil && s.pieces > 0 {
-			w[i] = float64(s.pieces)
-			sum += w[i]
+	if _, branch := gemini.ParseChainBranchCell(name); branch != "" && branch != name {
+		if id, label := a.c.derivedBranchSlug(chain, branch); derivedKnownStoreID(id) {
+			return a.storeRef(id, label)
 		}
 	}
-	if sum == 0 {
-		for _, i := range pool {
-			w[i] = float64(a.branches[i].pieces)
-			sum += w[i]
-		}
+	if id, label := a.c.derivedBranchSlug(chain, name); derivedKnownStoreID(id) {
+		return a.storeRef(id, label)
 	}
-	if sum == 0 {
-		w = nil
-	} else {
-		for i := range w {
-			w[i] /= sum
-		}
-	}
-	a.weights[key] = w
-	return w
+	return nil
 }
