@@ -488,6 +488,28 @@ type TargetRecord struct {
 	// ExplicitUnitPriceEGP optionally overrides the Product Master cost price per piece when a Sell-Out
 	// target is valued for its derived Sell-In target. Zero (default) = use the Product Master cost.
 	ExplicitUnitPriceEGP float64 `json:"explicit_unit_price_egp,omitempty"`
+
+	// Materialized derived Sell-In target (TargetType "sell_in", ID derived_si_from_{SourceTargetID}),
+	// written by the server whenever its Sell-Out target is saved. Only quantities are stored: value
+	// (pieces x cost) and cases (pieces / pack) are computed on read from the current Product Master.
+	Derived         bool                `json:"derived,omitempty"`
+	SourceTargetID  string              `json:"source_target_id,omitempty"`
+	SourceUpdatedAt string              `json:"source_updated_at,omitempty"`
+	DerivedVersion  int                 `json:"derived_version,omitempty"`
+	DerivedLines    []DerivedSellInLine `json:"derived_lines,omitempty"`
+}
+
+// DerivedSellInLine is the target quantity (pieces) of one branch x SKU of a materialized Sell-In target.
+type DerivedSellInLine struct {
+	BranchKey  string `json:"branch_key,omitempty"`
+	BranchName string `json:"branch_name,omitempty"`
+	SKUKey     string `json:"sku_key,omitempty"`
+	SKUName    string `json:"sku_name,omitempty"`
+	// ItemCode is the Product Master item matched when the line was materialized ("" = unmatched).
+	ItemCode    string `json:"item_code,omitempty"`
+	Category    string `json:"category,omitempty"`
+	Pieces      int64  `json:"pieces"`
+	Unallocated bool   `json:"unallocated,omitempty"`
 }
 
 // TargetComparisonItem combines a saved TargetRecord with real-time Actual performance and comprehensive hierarchical drill-down (Chain -> Branch -> SKU).

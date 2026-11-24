@@ -15,11 +15,12 @@ func (c *Client) ReplaceSellInRecords(tenantID string, records []domain.SellInRe
 	norm := normalizeTenantKey(tenantID)
 	out := make([]domain.SellInRecord, len(records))
 	copy(out, records)
+	memo := sellInMatchMemo{}
 	for i := range out {
 		if out[i].TenantID == "" {
 			out[i].TenantID = norm
 		}
-		c.enrichSellInRecordLocked(&out[i])
+		c.enrichSellInRecordMemoLocked(&out[i], memo)
 	}
 	c.sellInRecords[norm] = out
 }

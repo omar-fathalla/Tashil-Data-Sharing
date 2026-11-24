@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:tashil_web/core/data/result.dart';
 import 'package:tashil_web/core/network/api_client.dart';
+import 'package:tashil_web/core/network/backend_http.dart';
 import 'package:tashil_web/core/theme/app_theme.dart';
 import 'package:tashil_web/features/sell_out_analytics/data/target_repository.dart';
 import 'package:tashil_web/features/sell_out_analytics/domain/sell_in_targets_export.dart';
@@ -492,6 +497,34 @@ void main() {
           find.byKey(const ValueKey('sellin_targets_error')), findsOneWidget);
       expect(find.byKey(const ValueKey('sellin_targets_empty')), findsNothing);
     });
+
+    testWidgets('a slow (20s) response still renders the targets (60s timeout)',
+        (tester) async {
+      expect(ApiClient.derivedSellInTargetsTimeout,
+          const Duration(seconds: 60));
+      addTearDown(BackendHttp.cache.clear);
+      var sellInCalls = 0;
+      final server = MockClient((req) async {
+        if (req.url.queryParameters['target_type'] != 'sell_in') {
+          return http.Response('[]', 200);
+        }
+        sellInCalls++;
+        await Future<void>.delayed(const Duration(seconds: 20));
+        return http.Response(jsonEncode(_summaryJson([_item()])), 200,
+            headers: {'content-type': 'application/json; charset=utf-8'});
+      });
+
+      await http.runWithClient(() async {
+        await _pump(tester, _NetworkRepo());
+        await tester.pump(const Duration(seconds: 21));
+        await tester.pumpAndSettle();
+      }, () => server);
+
+      expect(sellInCalls, 1);
+      expect(find.byKey(const ValueKey('sellin_targets_error')), findsNothing);
+      expect(find.text('تعذّر تحميل مستهدفات Sell-In.'), findsNothing);
+      expect(find.text('250,000 قطعة'), findsOneWidget);
+    });
   });
 
   group('SellInTargetsExport', () {
@@ -570,6 +603,18 @@ void main() {
       expect(legacy.availableBrands, isEmpty);
     });
   });
+}
+
+/// Loads Sell-In targets through the real [ApiClient] (HTTP served by a [MockClient]).
+class _NetworkRepo extends TargetRepository {
+  _NetworkRepo()
+      : super(ApiClient(
+            tenantId: 'tenant-sellin-derived-slow', allowMockFallback: false));
+
+  @override
+  Future<Result<List<RetailChainModel>>> loadChains(
+          {bool forceRefresh = false}) async =>
+      const Success(<RetailChainModel>[]);
 }
 
 class _FailingRepo extends TargetRepository {

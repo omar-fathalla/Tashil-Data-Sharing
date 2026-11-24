@@ -187,6 +187,28 @@ func requestedSellInBrands(q map[string][]string) []string {
 	return out
 }
 
+// derivedSellInBreakdownSetter lets the repository materialize derived Sell-In targets from the BigQuery
+// Sell-Out allocation when it saves a Sell-Out target. Optional on the repo.
+type derivedSellInBreakdownSetter interface {
+	SetDerivedSellInBreakdown(p func(tenantID string) bigquery.DerivedBreakdownFunc)
+}
+
+// derivedSellInMaterializer materializes the derived Sell-In targets in one batch after a bulk import of
+// Sell-Out targets. Optional on the repo; without it the next Sell-In read backfills them.
+type derivedSellInMaterializer interface {
+	MaterializeDerivedSellInTargets(ctx context.Context, tenantID string) error
+}
+
+// upsertSellOutTargetsBatch saves many Sell-Out targets and materializes their derived Sell-In targets
+// once at the end (parallel allocations) instead of once per row.
+func upsertSellOutTargetsBatch(ctx context.Context, repo bigquery.Repository, tenantID string, upsert func(ctx context.Context) int) int {
+	n := upsert(bigquery.WithDeferredSellInMaterialization(ctx))
+	if m, ok := repo.(derivedSellInMaterializer); ok && n > 0 {
+		_ = m.MaterializeDerivedSellInTargets(ctx, tenantID)
+	}
+	return n
+}
+
 // derivedBreakdownFunc feeds the derived Sell-In targets with the BigQuery Sell-Out allocation when configured.
 func (h *AnalyticsHandler) derivedBreakdownFunc(tenantID string) bigquery.DerivedBreakdownFunc {
 	if h.targetBreakdown == nil {
@@ -274,12 +296,18 @@ func (h *AnalyticsHandler) HandleTargets(w http.ResponseWriter, r *http.Request)
 						return
 					}
 				}
-				for _, item := range list {
-					if item.TargetType == "" {
-						item.TargetType = targetType
+				upsertSellOutTargetsBatch(r.Context(), h.bqRepo, tenantID, func(ctx context.Context) int {
+					n := 0
+					for _, item := range list {
+						if item.TargetType == "" {
+							item.TargetType = targetType
+						}
+						if _, err := h.bqRepo.UpsertTarget(ctx, tenantID, item); err == nil {
+							n++
+						}
 					}
-					_, _ = h.bqRepo.UpsertTarget(r.Context(), tenantID, item)
-				}
+					return n
+				})
 			}
 		} else {
 			var single domain.TargetRecord
@@ -398,7 +426,9 @@ func (h *AnalyticsHandler) HandleUploadTargetsFile(w http.ResponseWriter, r *htt
 		return
 	}
 
-	importedCount := importTargetRowsToRepo(r, h.bqRepo, tenantID, targetType, defaultChain, defaultYear, rows)
+	importedCount := upsertSellOutTargetsBatch(r.Context(), h.bqRepo, tenantID, func(ctx context.Context) int {
+		return importTargetRowsToRepo(r.WithContext(ctx), h.bqRepo, tenantID, targetType, defaultChain, defaultYear, rows)
+	})
 	summary, _ := h.bqRepo.GetTargetsSummary(r.Context(), tenantID, targetType, "", 0)
 
 	w.Header().Set("Content-Type", "application/json")

@@ -13,6 +13,7 @@ import (
 
 	"github.com/tashil/data-sharing/backend/internal/domain"
 	"github.com/tashil/data-sharing/backend/internal/middleware"
+	"github.com/tashil/data-sharing/backend/internal/service/bigquery"
 )
 
 const dsiHandlerTenant = "tenant-dsi-h"
@@ -172,6 +173,55 @@ func TestSellInTargetsGetIsDerivedFromSellOut(t *testing.T) {
 		if rec.Code != http.StatusOK || len(f.Items) != 1 || len(f.AppliedBrands) == 0 {
 			t.Fatalf("brand filter %s: HTTP %d %+v", q, rec.Code, f)
 		}
+	}
+}
+
+func TestSellOutWritesMaterializeDerivedSellInRecords(t *testing.T) {
+	t.Setenv("TASHIL_TARGETS_DIR", t.TempDir())
+	h, repo := setupTestAnalyticsHandler()
+	ctx := context.Background()
+	derivedOf := func(soID string) (*domain.TargetRecord, bool) {
+		return repo.GetTarget(ctx, dsiHandlerTenant, bigquery.DerivedSellInTargetID(soID))
+	}
+
+	single := seedSellOutTargetViaAPI(t, h, 3)
+	if d, ok := derivedOf(single); !ok || !d.Derived || d.TargetType != "sell_in" || d.TargetUnits != 500 || d.SourceTargetID != single {
+		t.Fatalf("POST stores the derived Sell-In record: %+v %v", d, ok)
+	}
+
+	body := `{"targets":[` +
+		`{"target_type":"sell_out","retailer_chain":"fathalla","year":2026,"month":4,"target_units":300,"target_revenue_egp":6000},` +
+		`{"target_type":"sell_out","retailer_chain":"fathalla","year":2026,"month":5,"target_units":200,"target_revenue_egp":4000}]}`
+	rec := httptest.NewRecorder()
+	h.HandleTargets(rec, ownerRequest(http.MethodPost, "/api/v1/analytics/targets?target_type=sell_out", []byte(body), "application/json"))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("batch POST: HTTP %d %s", rec.Code, rec.Body.String())
+	}
+	var s domain.TargetsSummaryResponse
+	if err := json.NewDecoder(rec.Body).Decode(&s); err != nil {
+		t.Fatal(err)
+	}
+	batched := 0
+	for _, it := range s.Items {
+		if it.Month == 4 || it.Month == 5 {
+			d, ok := derivedOf(it.ID)
+			if !ok || d.TargetUnits != it.TargetUnits {
+				t.Fatalf("batch POST materializes month %d: %+v %v", it.Month, d, ok)
+			}
+			batched++
+		}
+	}
+	if batched != 2 {
+		t.Fatalf("batch items: %+v", s.Items)
+	}
+
+	rec = httptest.NewRecorder()
+	h.HandleTargets(rec, ownerRequest(http.MethodDelete, "/api/v1/analytics/targets?target_type=sell_out&id="+url.QueryEscape(single), nil, ""))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Sell-Out delete: HTTP %d %s", rec.Code, rec.Body.String())
+	}
+	if _, ok := derivedOf(single); ok {
+		t.Fatal("deleting the Sell-Out target removes its derived Sell-In record")
 	}
 }
 

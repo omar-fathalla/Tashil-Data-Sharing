@@ -44,11 +44,12 @@ func (c *Client) SetSellInRecords(ctx context.Context, tenantID, filename string
 	}
 	incomingPeriods := make(map[chainYearMonth]bool)
 	incomingChains := make(map[string]bool)
+	memo := sellInMatchMemo{}
 	for i := range records {
 		if records[i].TenantID == "" {
 			records[i].TenantID = normTenant
 		}
-		c.enrichSellInRecordLocked(&records[i])
+		c.enrichSellInRecordMemoLocked(&records[i], memo)
 		ch := strings.ToLower(strings.TrimSpace(records[i].RetailerChain))
 		if ch == "" {
 			ch = "fathalla"

@@ -1013,10 +1013,16 @@ func (c *Client) lookupProductMasterFullLocked(tenantID, itemCode, barcode, skuN
 	bestIdx := -1
 	bestScore := -1e9
 
+	qTokenAllSet := make(map[string]bool, len(qTokens))
+	for _, t := range qTokens {
+		qTokenAllSet[t] = true
+	}
+	itemTokens := c.productMasterItemTokens(normTenant, base.Items)
+
 	for i := range base.Items {
 		it := &base.Items[i]
-		itTokens := normalizeArabicFMCGTokens(it.OfficialName)
-		itBrand := extractCanonicalBrand(it.Brand, itTokens)
+		tok := &itemTokens[i]
+		itBrand := tok.brand
 
 		score := 0.0
 		// 1. Brand alignment
@@ -1031,7 +1037,7 @@ func (c *Client) lookupProductMasterFullLocked(tenantID, itemCode, barcode, skuN
 		}
 
 		// 2. Weight / Volume alignment (strict measure enforcement)
-		itMeasures, itNums := extractNormalizedMeasures(itTokens)
+		itMeasures, itNums := tok.measures, tok.nums
 		if len(qMeasures) > 0 || len(qNums) > 0 {
 			measureMatched := false
 			for _, m := range itMeasures {
@@ -1070,10 +1076,7 @@ func (c *Client) lookupProductMasterFullLocked(tenantID, itemCode, barcode, skuN
 		}
 
 		// 4. Core product keywords overlap
-		itTokenSet := make(map[string]bool, len(itTokens))
-		for _, t := range itTokens {
-			itTokenSet[t] = true
-		}
+		itTokenSet := tok.tokenSet
 		matchedCore := 0
 		for _, qt := range qCoreTokens {
 			if itTokenSet[qt] {
@@ -1093,10 +1096,6 @@ func (c *Client) lookupProductMasterFullLocked(tenantID, itemCode, barcode, skuN
 			}
 		}
 		// Penalize if candidate is a specialized product or multi-item bundle not requested in query
-		qTokenAllSet := make(map[string]bool, len(qTokens))
-		for _, t := range qTokens {
-			qTokenAllSet[t] = true
-		}
 		for _, special := range []string{"عبايات", "الباشا", "التوفير", "بكره", "رول", "اوتوماتيك", "تابلوه", "كاوتش", "فوم", "تواليت", "شرنك", "شنطه", "+"} {
 			if itTokenSet[special] && !qTokenAllSet[special] {
 				score -= 18.0
@@ -1259,6 +1258,12 @@ func (c *Client) enrichPricingItemLocked(item *domain.PricingComplianceItem) {
 }
 
 func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
+	c.enrichSellInRecordMemoLocked(r, nil)
+}
+
+// enrichSellInRecordMemoLocked enriches one Sell-In row. A non-nil memo reuses Product Master matches
+// across the rows of one batch (valid only while the caller holds c.mu and the Product Master is unchanged).
+func (c *Client) enrichSellInRecordMemoLocked(r *domain.SellInRecord, memo sellInMatchMemo) {
 	r.RetailerChain = resolveSellInChainFromCustomer(activeCustomerChainRules(), r.CustomerName, r.RetailerChain)
 	actualCasePriceExcl := 0.0
 	if math.Abs(r.NetQtyCases) > 0.001 && math.Abs(r.NetValueEGP) > 0.01 {
@@ -1272,7 +1277,7 @@ func (c *Client) enrichSellInRecordLocked(r *domain.SellInRecord) {
 	}
 	prof, hasProf := c.chainDiscountProfile(normalizeTenantKey(r.TenantID), chainKey)
 
-	pm, ok := c.lookupProductMasterWithPriceLocked(r.TenantID, r.ItemCode, r.Barcode, r.ItemName, r.PromotionType, actualCasePriceExcl)
+	pm, ok := memo.lookup(c, r.TenantID, r.ItemCode, r.Barcode, r.ItemName, r.PromotionType, actualCasePriceExcl)
 	if ok {
 		r.ItemCode = pm.ItemCode
 		if pm.Barcode != "" {
@@ -1392,8 +1397,9 @@ func (c *Client) enrichAllTenantDataLocked(tenantID string) {
 	}
 	normTenant := normalizeTenantKey(tenantID)
 	if recs, ok := c.sellInRecords[normTenant]; ok {
+		memo := sellInMatchMemo{}
 		for i := range recs {
-			c.enrichSellInRecordLocked(&recs[i])
+			c.enrichSellInRecordMemoLocked(&recs[i], memo)
 		}
 		c.sellInRecords[normTenant] = recs
 	}
