@@ -404,6 +404,10 @@ type TargetBranchBreakdown struct {
 	// Derived Sell-In targets only: TargetUnits/ActualUnits are pieces; cases are nil without a pack size.
 	TargetCases *float64 `json:"target_cases,omitempty"`
 	ActualCases *float64 `json:"actual_cases,omitempty"`
+	// Derived Sell-In targets only: the part of ActualUnits / ActualRevenueEGP split onto the branch from
+	// Sell-In rows that name no branch (regional buckets), pro rata to its target pieces.
+	ActualAllocatedUnits      float64 `json:"actual_allocated_units,omitempty"`
+	ActualAllocatedRevenueEGP float64 `json:"actual_allocated_revenue_egp,omitempty"`
 }
 
 // TargetBrandBreakdown summarizes the chain target allocation by Brand & Sector (MT vs CC).

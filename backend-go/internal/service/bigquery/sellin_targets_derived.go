@@ -96,6 +96,8 @@ type derivedSellInRow struct {
 	tons         float64
 	brand        string
 	identity     string
+	itemCode     string
+	barcode      string
 	name         string
 	customerName string
 	customerCode string
@@ -309,6 +311,8 @@ func (c *Client) derivedSellInRowsLocked(ctx context.Context, normTenant string,
 			tons:         rec.WeightTons,
 			brand:        info.brand,
 			identity:     info.identity,
+			itemCode:     info.itemCode,
+			barcode:      info.barcode,
 			name:         strings.TrimSpace(rec.ItemName),
 			customerName: strings.ToLower(strings.TrimSpace(rec.CustomerName)),
 			customerCode: strings.ToLower(strings.TrimSpace(rec.CustomerBranchCode)),
@@ -381,6 +385,9 @@ type derivedBranchAgg struct {
 	actualCases  float64
 	actualValue  float64
 	actualTons   float64
+	// Part of the actuals split onto the branch from rows that name no branch.
+	allocatedPieces float64
+	allocatedValue  float64
 }
 
 type derivedBrandAgg struct {
@@ -398,6 +405,7 @@ type derivedSellInState struct {
 	provider func(tenantID string) DerivedBreakdownFunc
 	cache    map[string]derivedSummaryCacheEntry
 	flight   singleflight.Group
+	slugs    map[string]string // chain|branch label → canonical store id
 }
 
 type derivedSummaryCacheEntry struct {
@@ -1235,37 +1243,35 @@ func (c *Client) buildDerivedItem(normTenant string, dt *derivedTarget, brands [
 		return nil // nothing of this Sell-Out target belongs to the selected brands
 	}
 
-	// Actuals: header = every in-scope Sell-In row of the selected brands; SKU / branch rows best-effort.
+	// Actuals: header = every in-scope Sell-In row of the selected brands; branches (and their SKUs) get
+	// the rows that name them plus their share of the rows that name no branch (derivedBranchAttr).
 	var actPieces, actCases, actValue, actTons float64
 	var actRows int
-	assign := map[string]int{}
 	branchList := make([]*derivedBranchAgg, 0, len(branchOrder))
 	for _, k := range branchOrder {
 		branchList = append(branchList, branches[k])
 	}
-	branchOf := func(r *derivedSellInRow) int {
-		key := r.customerCode + "|" + r.customerName
-		if idx, ok := assign[key]; ok {
-			return idx
+	attr := c.newDerivedBranchAttr(derivedChainKey(t.RetailerChain), branchList, dt.rows)
+	addBranchActual := func(b *derivedBranchAgg, r *derivedSellInRow, share float64, allocated bool) {
+		p, cs, v, tn := r.pieces*share, r.cases*share, r.value*share, r.tons*share
+		b.actualPieces += p
+		b.actualCases += cs
+		b.actualValue += v
+		b.actualTons += tn
+		if allocated {
+			b.allocatedPieces += p
+			b.allocatedValue += v
 		}
-		idx := -1
-		for i, b := range branchList {
-			if r.customerCode != "" && strings.EqualFold(r.customerCode, strings.TrimSpace(b.key)) {
-				idx = i
-				break
-			}
+		bs := b.skus[r.identity]
+		if bs == nil {
+			bs = &derivedSKUAgg{identity: r.identity, name: r.name, brand: r.brand, itemCode: r.itemCode, barcode: r.barcode}
+			b.skus[r.identity] = bs
+			b.skuOrder = append(b.skuOrder, r.identity)
 		}
-		if idx < 0 && r.customerName != "" {
-			for i, b := range branchList {
-				bn := strings.ToLower(strings.TrimSpace(b.name))
-				if bn != "" && (strings.Contains(r.customerName, bn) || strings.Contains(bn, r.customerName)) {
-					idx = i
-					break
-				}
-			}
-		}
-		assign[key] = idx
-		return idx
+		bs.actualPieces += p
+		bs.actualCases += cs
+		bs.actualValue += v
+		bs.actualTons += tn
 	}
 	for _, r := range dt.rows {
 		if !derivedBrandSelected(r.brand, brands) {
@@ -1284,16 +1290,13 @@ func (c *Client) buildDerivedItem(normTenant string, dt *derivedTarget, brands [
 		bg := getBrand(r.brand)
 		bg.actualPieces += r.pieces
 		bg.actualValue += r.value
-		if idx := branchOf(r); idx >= 0 {
-			b := branchList[idx]
-			b.actualPieces += r.pieces
-			b.actualCases += r.cases
-			b.actualValue += r.value
-			b.actualTons += r.tons
-			if bs := b.skus[r.identity]; bs != nil {
-				bs.actualPieces += r.pieces
-				bs.actualCases += r.cases
-				bs.actualValue += r.value
+		if idx := attr.directIndex(r); idx >= 0 {
+			addBranchActual(branchList[idx], r, 1, false)
+			continue
+		}
+		for i, w := range attr.shares(r) {
+			if w > 0 {
+				addBranchActual(branchList[i], r, w, true)
 			}
 		}
 	}
@@ -1374,17 +1377,26 @@ func (c *Client) buildDerivedItem(normTenant string, dt *derivedTarget, brands [
 
 	// Branches.
 	item.Branches = make([]domain.TargetBranchBreakdown, 0, len(branchList))
-	for _, b := range branchList {
+	for i, b := range branchList {
+		active := 0
+		for _, id := range b.skuOrder {
+			if b.skus[id].pieces > 0 {
+				active++
+			}
+		}
 		br := domain.TargetBranchBreakdown{
-			BranchCode:       b.key,
-			BranchName:       b.name,
-			ActiveSKUsCount:  len(b.skuOrder),
-			TargetUnits:      float64(b.pieces),
-			TargetRevenueEGP: round2(b.value),
-			ActualUnits:      round2(b.actualPieces),
-			ActualRevenueEGP: round2(b.actualValue),
-			ActualWeightTons: round2(b.actualTons),
-			SKUs:             make([]domain.TargetSKUBreakdown, 0, len(b.skuOrder)),
+			BranchCode:                b.key,
+			BranchName:                b.name,
+			RegionCode:                attr.regionCode(i),
+			ActiveSKUsCount:           active,
+			TargetUnits:               float64(b.pieces),
+			TargetRevenueEGP:          round2(b.value),
+			ActualUnits:               round2(b.actualPieces),
+			ActualRevenueEGP:          round2(b.actualValue),
+			ActualWeightTons:          round2(b.actualTons),
+			ActualAllocatedUnits:      round2(b.allocatedPieces),
+			ActualAllocatedRevenueEGP: round2(b.allocatedValue),
+			SKUs:                      make([]domain.TargetSKUBreakdown, 0, len(b.skuOrder)),
 		}
 		if targetPieces > 0 {
 			br.ShareOfChainPct = math.Round(float64(b.pieces)/float64(targetPieces)*10000) / 100
