@@ -19,6 +19,19 @@ type SellInParseReport struct {
 	// QtyUOMFallbackRows is the number of piece-UOM lines with no U of M2,
 	// so Product Master UnitsPerCarton will be used at enrich time (if present).
 	QtyUOMFallbackRows int `json:"qty_uom_fallback_rows,omitempty"`
+	// PlanSource is true when the workbook is a Plan (file name or first sheet «Sell_In_Plan…»): its rows
+	// are stamped SourceKind=plan and never counted as Sell-In actuals.
+	PlanSource bool `json:"plan_source,omitempty"`
+}
+
+// SellInNoBranchPlaceholder is the label older raw-plan parses stored as the customer branch code when
+// the row's branch column was empty. It names no branch.
+const SellInNoBranchPlaceholder = "مجمع الإقليم (Regional)"
+
+// IsSellInNoBranchPlaceholder reports whether a stored customer branch code is the legacy no-branch label.
+func IsSellInNoBranchPlaceholder(code string) bool {
+	c := normalizeHeaderLabel(code)
+	return c == normalizeHeaderLabel(SellInNoBranchPlaceholder) || c == normalizeHeaderLabel("مجمع الإقليم")
 }
 
 // SellInLayoutError: required headers were not found, so nothing is read by position.

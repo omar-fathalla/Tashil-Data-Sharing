@@ -15,6 +15,9 @@ func (c *Client) ReplaceSellInRecords(tenantID string, records []domain.SellInRe
 	norm := normalizeTenantKey(tenantID)
 	out := make([]domain.SellInRecord, len(records))
 	copy(out, records)
+	// Plan rows older loads may still carry (stored by file name) are diverted to the Plan store.
+	out, planRecords := splitSellInPlan("", out)
+	c.putSellInPlanLocked(norm, planRecords)
 	memo := sellInMatchMemo{}
 	for i := range out {
 		if out[i].TenantID == "" {

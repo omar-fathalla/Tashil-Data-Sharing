@@ -5,12 +5,42 @@ import (
 	"time"
 )
 
+// SellInSourceKindPlan marks rows read from a Plan workbook.
+const SellInSourceKindPlan = "plan"
+
+// sellInPlanMarker is the token a Plan workbook carries in its file name or first sheet name
+// (Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx, sheet «Sell_In_Plan_2026»).
+const sellInPlanMarker = "sell_in_plan"
+
+func normalizePlanMarkerName(name string) string {
+	n := strings.ToLower(strings.TrimSpace(name))
+	if i := strings.LastIndexAny(n, `/\`); i >= 0 {
+		n = n[i+1:]
+	}
+	return strings.NewReplacer(" ", "_", "-", "_").Replace(n)
+}
+
+// IsSellInPlanName reports whether a file or sheet name carries the Plan marker «Sell_In_Plan».
+// Exact token match on the name only; row values are never inspected.
+func IsSellInPlanName(name string) bool {
+	return strings.Contains(normalizePlanMarkerName(name), sellInPlanMarker)
+}
+
+// IsSellInPlan reports whether the record comes from a Plan workbook: stamped by the parser
+// (Plan sheet) or loaded with a Plan source file name (older stored rows).
+func (r SellInRecord) IsSellInPlan() bool {
+	return r.SourceKind == SellInSourceKindPlan || IsSellInPlanName(r.SourceFilename)
+}
+
 // SellInRecord represents an atomic row from a Supplier Sell-In & Forecasting Plan workbook
 // (such as Adco_Fathalla_Sell_In_Plan_2026_Clean.xlsx or plan 10 aswak.xlsx).
 type SellInRecord struct {
 	RecordID           string    `json:"record_id"`
 	BatchID            string    `json:"batch_id,omitempty"`
 	SourceFilename     string    `json:"source_filename,omitempty"`
+	// SourceKind is "plan" for rows read from a Plan workbook (see IsSellInPlan). Plan rows are not Sell-In
+	// actuals: they never enter the Sell-In store, totals or achievement.
+	SourceKind         string    `json:"source_kind,omitempty"`
 	TenantID           string    `json:"tenant_id"`
 	RetailerChain      string    `json:"retailer_chain"`       // e.g. fathalla
 	Year               int       `json:"year"`                 // e.g. 2026
@@ -404,6 +434,9 @@ type TargetBranchBreakdown struct {
 	// Derived Sell-In targets only: TargetUnits/ActualUnits are pieces; cases are nil without a pack size.
 	TargetCases *float64 `json:"target_cases,omitempty"`
 	ActualCases *float64 `json:"actual_cases,omitempty"`
+	// Derived Sell-In targets only: the «غير محدد الفرع» line — Sell-In rows that name no branch (or a
+	// branch that is not a known store). Never distributed over the branches; not in BranchesCount.
+	Unassigned bool `json:"unassigned,omitempty"`
 }
 
 // TargetBrandBreakdown summarizes the chain target allocation by Brand & Sector (MT vs CC).

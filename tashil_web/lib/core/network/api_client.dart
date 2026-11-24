@@ -14070,6 +14070,10 @@ class TargetBranchBreakdownModel {
   final double? targetCases;
   final double? actualCases;
 
+  /// Derived Sell-In only: the «غير محدد الفرع» line (Sell-In rows that name
+  /// no branch). Never distributed over the branches.
+  final bool unassigned;
+
   const TargetBranchBreakdownModel({
     required this.branchCode,
     required this.branchName,
@@ -14097,6 +14101,7 @@ class TargetBranchBreakdownModel {
     required this.skus,
     this.targetCases,
     this.actualCases,
+    this.unassigned = false,
   });
 
   factory TargetBranchBreakdownModel.fromJson(Map<String, dynamic> json) {
@@ -14131,6 +14136,7 @@ class TargetBranchBreakdownModel {
       skus: skusList,
       targetCases: (json['target_cases'] as num?)?.toDouble(),
       actualCases: (json['actual_cases'] as num?)?.toDouble(),
+      unassigned: json['unassigned'] as bool? ?? false,
     );
   }
 }

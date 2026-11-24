@@ -19,6 +19,7 @@ type snapshotState struct {
 	WorkbookMeta                     map[string]TenantWorkbookAnalytics               `json:"workbook_meta"`
 	SellInRecords                    map[string][]domain.SellInRecord                 `json:"sell_in_records"`
 	SellInFilename                   map[string]string                                `json:"sell_in_filename"`
+	SellInPlanRecords                map[string][]domain.SellInRecord                 `json:"sell_in_plan_records,omitempty"`
 	Targets                          map[string][]domain.TargetRecord                 `json:"targets"`
 	ProductMaster                    map[string]*domain.ProductMasterSummaryResponse  `json:"product_master"`
 	BaselineProductMaster            map[string]*domain.ProductMasterSummaryResponse  `json:"baseline_product_master"`
@@ -36,6 +37,7 @@ func (c *Client) liveSnapshotStateLocked() *snapshotState {
 		WorkbookMeta:                     c.workbookMeta,
 		SellInRecords:                    c.sellInRecords,
 		SellInFilename:                   c.sellInFilename,
+		SellInPlanRecords:                c.sellInPlanRecords,
 		Targets:                          c.targets,
 		ProductMaster:                    c.productMaster,
 		BaselineProductMaster:            c.baselineProductMaster,
@@ -83,6 +85,14 @@ func (c *Client) ImportSnapshot(raw []byte) error {
 	c.workbookMeta = st.WorkbookMeta
 	c.sellInRecords = st.SellInRecords
 	c.sellInFilename = st.SellInFilename
+	c.sellInPlanRecords = st.SellInPlanRecords
+	// A snapshot written before Plan rows were separated may hold them among the Sell-In rows.
+	for tenant, recs := range c.sellInRecords {
+		if real, plan := splitSellInPlan("", recs); len(plan) > 0 {
+			c.sellInRecords[tenant] = real
+			c.putSellInPlanLocked(tenant, plan)
+		}
+	}
 	c.targets = st.Targets
 	c.productMaster = st.ProductMaster
 	c.baselineProductMaster = st.BaselineProductMaster
@@ -107,6 +117,9 @@ func (c *Client) ensureSnapshotMapsLocked() {
 	}
 	if c.sellInFilename == nil {
 		c.sellInFilename = make(map[string]string)
+	}
+	if c.sellInPlanRecords == nil {
+		c.sellInPlanRecords = make(map[string][]domain.SellInRecord)
 	}
 	if c.targets == nil {
 		c.targets = make(map[string][]domain.TargetRecord)

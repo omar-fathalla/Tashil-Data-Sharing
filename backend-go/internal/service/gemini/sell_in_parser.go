@@ -125,6 +125,9 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 func ParseSellInPlanWorkbookWithReport(tenantID, filename string, rawContent []byte, targetChains ...string) ([]domain.SellInRecord, *SellInParseReport, error) {
 	report := &SellInParseReport{}
 	recs, err := parseSellInPlanWorkbook(tenantID, filename, rawContent, report, targetChains...)
+	if err == nil && IsSellInPlanWorkbookSource(filename, rawContent) {
+		stampSellInPlanSource(recs, report)
+	}
 	return recs, report, err
 }
 
@@ -421,7 +424,7 @@ func parseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, repor
 			rec.CustomerName = strings.TrimSpace(getCol(r, rawPlanCols["customer"]))
 			rec.CustomerBranchCode = strings.TrimSpace(getCol(r, rawPlanCols["branch_code"]))
 			if rec.CustomerBranchCode == "" {
-				rec.CustomerBranchCode = "مجمع الإقليم (Regional)"
+				rec.CustomerBranchCode = SellInNoBranchPlaceholder
 			}
 			rec.SalesRep = strings.TrimSpace(getCol(r, rawPlanCols["sales_rep"]))
 			if rec.SalesRep == "" {

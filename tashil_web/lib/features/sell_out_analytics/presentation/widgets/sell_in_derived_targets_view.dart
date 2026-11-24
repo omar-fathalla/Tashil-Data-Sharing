@@ -63,6 +63,8 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
   final Set<String> _brands = <String>{};
   String? _selectedTargetId;
   bool _showAllSkus = false;
+  final Set<String> _expandedBranches = <String>{};
+  final Set<String> _branchShowAll = <String>{};
 
   static const _skuPreview = 25;
 
@@ -135,7 +137,7 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
       _loading = false;
       if (!res.items.any((i) => i.id == _selectedTargetId)) {
         _selectedTargetId = null;
-        _showAllSkus = false;
+        _resetDrillDown();
       }
     });
   }
@@ -808,7 +810,7 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
         selected: selected,
         onSelectChanged: (_) => setState(() {
           _selectedTargetId = selected ? null : item.id;
-          _showAllSkus = false;
+          _resetDrillDown();
         }),
         cells: [
           cell(_line(_colMax, 0, item.chainDisplayName,
@@ -950,126 +952,12 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
     final period = TargetTableFormat.period(
         year: t.year, month: t.month, monthLabel: t.monthLabel);
 
-    final branchRows = t.branches.map((b) {
-      final has = b.actualUnits != 0 || b.actualRevenueEgp != 0;
-      Widget c(int i, String s, {String? tip, TextStyle? style}) =>
-          _line(_branchCaps, i, s, tooltip: tip, style: style);
-      return DataRow(
-        key: ValueKey('sellin_branch_${b.branchCode}_${b.branchName}'),
-        cells: [
-          DataCell(Center(
-              child: c(0, b.branchName,
-                  tip: b.branchName,
-                  style: const TextStyle(fontWeight: FontWeight.w800)))),
-          DataCell(Center(
-              child: c(1, TargetTableFormat.count(b.targetUnits),
-                  tip:
-                      '${CurrencyFormatter.formatNumber(b.targetUnits.round())} قطعة'))),
-          DataCell(Center(
-              child: c(2, _casesText(b.targetCases),
-                  tip: _casesExact(b.targetCases)))),
-          DataCell(Center(
-              child: c(3, has ? TargetTableFormat.count(b.actualUnits) : '—',
-                  tip: has
-                      ? '${CurrencyFormatter.formatNumber(b.actualUnits.round())} قطعة'
-                      : null))),
-          DataCell(Center(
-              child: c(
-                  4, has ? '${b.achievementUnitsPct.toStringAsFixed(1)}%' : '—',
-                  style: has
-                      ? TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: _pctColor(context, b.achievementUnitsPct))
-                      : null))),
-          DataCell(Center(
-              child: c(5, TargetTableFormat.moneyNumber(b.targetRevenueEgp),
-                  tip: TargetTableFormat.moneyExact(b.targetRevenueEgp)))),
-          DataCell(Center(
-              child: c(6,
-                  has ? TargetTableFormat.moneyNumber(b.actualRevenueEgp) : '—',
-                  tip: has
-                      ? TargetTableFormat.moneyExact(b.actualRevenueEgp)
-                      : null))),
-          DataCell(Center(
-              child: c(7,
-                  has ? '${b.achievementRevPct.toStringAsFixed(1)}%' : '—'))),
-        ],
-      );
-    }).toList();
-
     final skus = t.chainSkuTotals;
     final shownSkus = _showAllSkus ? skus : skus.take(_skuPreview).toList();
-    final skuRows = shownSkus.map((s) {
-      final has = t.hasActuals;
-      Widget c(int i, String x, {String? tip, TextStyle? style}) =>
-          _line(_skuCaps, i, x, tooltip: tip, style: style);
-      final brand = SellInTargetsExport.brandOf(s);
-      return DataRow(
-        key: ValueKey('sellin_sku_${s.itemCode}_${s.skuName}'),
-        cells: [
-          DataCell(Center(
-              child: c(0, s.skuName,
-                  tip: s.skuName,
-                  style: const TextStyle(fontWeight: FontWeight.w800)))),
-          DataCell(Center(
-              child: c(1, brand,
-                  tip: brand,
-                  style: brand == kNoBrandLabelAr
-                      ? TextStyle(color: cs.onSurfaceVariant)
-                      : null))),
-          DataCell(Center(
-              child: c(2, TargetTableFormat.count(s.targetUnits),
-                  tip:
-                      '${CurrencyFormatter.formatNumber(s.targetUnits.round())} قطعة'))),
-          DataCell(Center(
-              child: c(3, s.packSizeMissing ? '—' : _casesText(s.targetCases),
-                  tip: s.packSizeMissing
-                      ? 'لا يوجد حجم عبوة في Product Master'
-                      : _casesExact(s.targetCases)))),
-          DataCell(Center(
-              child: c(4, has ? TargetTableFormat.count(s.actualUnits) : '—',
-                  tip: has
-                      ? '${CurrencyFormatter.formatNumber(s.actualUnits.round())} قطعة'
-                      : null))),
-          DataCell(Center(
-              child: c(
-                  5,
-                  has && s.targetUnits > 0
-                      ? '${(s.actualUnits / s.targetUnits * 100).toStringAsFixed(1)}%'
-                      : '—',
-                  style: has && s.targetUnits > 0
-                      ? TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: _pctColor(
-                              context, s.actualUnits / s.targetUnits * 100))
-                      : null))),
-          DataCell(Center(
-              child: c(
-                  6,
-                  s.costMissing
-                      ? '—'
-                      : TargetTableFormat.moneyNumber(s.targetRevenueEgp),
-                  tip: s.costMissing
-                      ? 'لا يوجد سعر تكلفة في Product Master'
-                      : TargetTableFormat.moneyExact(s.targetRevenueEgp)))),
-          DataCell(Center(
-              child: c(
-                  7,
-                  has && !s.costMissing
-                      ? TargetTableFormat.moneyNumber(s.actualRevenueEgp)
-                      : '—',
-                  tip: has && !s.costMissing
-                      ? TargetTableFormat.moneyExact(s.actualRevenueEgp)
-                      : null))),
-          DataCell(Center(
-              child: c(
-                  8,
-                  has && !s.costMissing && s.targetRevenueEgp > 0
-                      ? '${(s.actualRevenueEgp / s.targetRevenueEgp * 100).toStringAsFixed(1)}%'
-                      : '—'))),
-        ],
-      );
-    }).toList();
+    final skuRows = _skuRows(context, shownSkus,
+        hasActuals: t.hasActuals, keyPrefix: 'sellin_sku');
+    final branchCount = t.branches.where((b) => !b.unassigned).length;
+    final hasUnassigned = t.branches.any((b) => b.unassigned);
 
     return Container(
       key: const ValueKey('sellin_targets_detail'),
@@ -1097,37 +985,53 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
                 tooltip: 'إغلاق التفاصيل',
                 onPressed: () => setState(() {
                   _selectedTargetId = null;
-                  _showAllSkus = false;
+                  _resetDrillDown();
                 }),
                 icon: const Icon(AppIcons.close),
               ),
             ],
           ),
           M3Spacing.gapSM,
-          Text('الفروع (${t.branches.length})',
-              style: theme.textTheme.labelLarge
-                  ?.copyWith(fontWeight: FontWeight.w800)),
+          Wrap(
+            spacing: M3Spacing.sm,
+            runSpacing: M3Spacing.xs,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('الفروع ($branchCount)',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              if (t.branches.isNotEmpty)
+                OutlinedButton.icon(
+                  key: const ValueKey('sellin_branches_export_all'),
+                  onPressed: () => _exportBranches(t),
+                  icon: const Icon(Icons.table_view_rounded,
+                      size: M3ToolbarButton.iconSize),
+                  label: const Text('تصدير كل الفروع'),
+                  style: M3ToolbarButton.style,
+                ),
+            ],
+          ),
+          if (t.branches.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: M3Spacing.xxs),
+              child: Text(
+                hasUnassigned
+                    ? 'اضغط على فرع لعرض أصنافه. مسحوبات Sell-In التي لا تحمل فرعاً محدداً '
+                        'تظهر في سطر «غير محدد الفرع» ولا توزَّع على الفروع.'
+                    : 'اضغط على فرع لعرض أصنافه.',
+                key: const ValueKey('sellin_branches_hint'),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ),
           const SizedBox(height: M3Spacing.xs),
-          if (branchRows.isEmpty)
+          if (t.branches.isEmpty)
             Text('لا توجد فروع.',
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: cs.onSurfaceVariant))
           else
-            _table(
-              key: const ValueKey('sellin_branches_table'),
-              caps: _branchCaps,
-              headers: const [
-                'الفرع',
-                'مستهدف قطعة',
-                'مستهدف كرتونة',
-                'محقق قطعة',
-                'تحقيق الكمية',
-                'مستهدف ج.م',
-                'محقق ج.م',
-                'تحقيق القيمة',
-              ],
-              rows: branchRows,
-            ),
+            _buildBranchAccordion(context, t),
           M3Spacing.gapMD,
           Text('الأصناف (${skus.length})',
               style: theme.textTheme.labelLarge
@@ -1141,17 +1045,7 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
             _table(
               key: const ValueKey('sellin_skus_table'),
               caps: _skuCaps,
-              headers: const [
-                'الصنف',
-                'العلامة التجارية',
-                'مستهدف قطعة',
-                'مستهدف كرتونة',
-                'محقق قطعة',
-                'تحقيق الكمية',
-                'مستهدف ج.م',
-                'محقق ج.م',
-                'تحقيق القيمة',
-              ],
+              headers: _skuHeaders,
               rows: skuRows,
             ),
           if (skus.length > _skuPreview)
@@ -1168,5 +1062,428 @@ class _SellInDerivedTargetsViewState extends State<SellInDerivedTargetsView> {
         ],
       ),
     );
+  }
+
+  static const _branchHeaders = [
+    'الفرع',
+    'مستهدف قطعة',
+    'مستهدف كرتونة',
+    'محقق قطعة',
+    'تحقيق الكمية',
+    'مستهدف ج.م',
+    'محقق ج.م',
+    'تحقيق القيمة',
+  ];
+
+  static const _skuHeaders = [
+    'الصنف',
+    'العلامة التجارية',
+    'مستهدف قطعة',
+    'مستهدف كرتونة',
+    'محقق قطعة',
+    'تحقيق الكمية',
+    'مستهدف ج.م',
+    'محقق ج.م',
+    'تحقيق القيمة',
+  ];
+
+  String _branchId(TargetBranchBreakdownModel b) =>
+      '${b.branchCode}\u001f${b.branchName}';
+
+  void _resetDrillDown() {
+    _showAllSkus = false;
+    _expandedBranches.clear();
+    _branchShowAll.clear();
+  }
+
+  void _exportBranches(TargetComparisonModel t,
+      {TargetBranchBreakdownModel? branch}) {
+    final export = SellInTargetsExport.branches(
+        t, branch == null ? t.branches : [branch],
+        brands: _brands);
+    if (export.rows.isEmpty) {
+      M3Feedback.showError(context, 'لا توجد أصناف للتصدير.');
+      return;
+    }
+    final csv = ExcelExportService.generateCsv(
+        headers: export.headers, rows: export.rows);
+    ExcelExportService.downloadCsv(
+        SellInTargetsExport.branchFileName(t, branch: branch), csv);
+    M3Feedback.showSuccess(
+        context,
+        branch == null
+            ? 'تم تصدير أصناف كل الفروع (${export.rows.length} صف).'
+            : 'تم تصدير أصناف ${branch.branchName} (${export.rows.length} صف).');
+  }
+
+  /// One row of cells sized like the branch table columns (fills the width).
+  Widget _branchCells(List<Widget> cells) => Row(
+        children: [
+          for (final (i, w) in cells.indexed)
+            Expanded(
+              flex: _branchCaps[i].round(),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: M3Spacing.xxs / 2),
+                child: Center(child: w),
+              ),
+            ),
+        ],
+      );
+
+  /// Branches as an inline accordion: tapping a branch expands its SKUs
+  /// (built only while expanded) with a per-branch export.
+  Widget _buildBranchAccordion(BuildContext context, TargetComparisonModel t) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final headingStyle = theme.textTheme.labelMedium
+        ?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600);
+    return ClipRRect(
+      key: const ValueKey('sellin_branches_table'),
+      borderRadius: M3Shape.radiusMd,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: M3Spacing.xxs),
+            color: cs.surfaceContainerHigh.withOpacity(0.5),
+            child: _branchCells([
+              for (final h in _branchHeaders)
+                M3TableText(h, maxLines: 2, style: headingStyle),
+            ]),
+          ),
+          for (final b in t.branches) _buildBranchRow(context, t, b),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBranchRow(BuildContext context, TargetComparisonModel t,
+      TargetBranchBreakdownModel b) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final id = _branchId(b);
+    final open = _expandedBranches.contains(id);
+    final has = SellInTargetsExport.branchHasActuals(b);
+    Widget c(int i, String s, {String? tip, TextStyle? style, Key? key}) =>
+        _line(_branchCaps, i, s, tooltip: tip, style: style, key: key);
+
+    final hasTarget = b.targetUnits > 0;
+    final actualTip = !has
+        ? 'لا توجد مسحوبات Sell-In لهذا الفرع'
+        : b.unassigned
+            ? '${CurrencyFormatter.formatNumber(b.actualUnits.round())} قطعة\n'
+                'مسحوبات Sell-In بدون فرع محدد في الملف — لا توزَّع على الفروع'
+            : '${CurrencyFormatter.formatNumber(b.actualUnits.round())} قطعة';
+    final muted = TextStyle(color: cs.onSurfaceVariant);
+
+    final cells = <Widget>[
+      _cap(
+        _branchCaps,
+        0,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              size: 18.0,
+              color: cs.primary,
+            ),
+            const SizedBox(width: 2.0),
+            if (b.unassigned) ...[
+              Icon(Icons.help_outline_rounded,
+                  key: const ValueKey('sellin_branch_unassigned_icon'),
+                  size: 16.0,
+                  color: cs.onSurfaceVariant),
+              const SizedBox(width: 2.0),
+            ],
+            Flexible(
+              child: Tooltip(
+                message: b.unassigned
+                    ? 'مسحوبات Sell-In بدون فرع محدد في الملف (مثل «مجمع الإقليم»). '
+                        'تظهر هنا كما هي ولا توزَّع على الفروع.'
+                    : b.branchName,
+                child: Text(
+                  b.branchName,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: b.unassigned
+                      ? TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontStyle: FontStyle.italic,
+                          color: cs.onSurfaceVariant)
+                      : const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      c(1, b.unassigned ? '—' : TargetTableFormat.count(b.targetUnits),
+          tip: b.unassigned
+              ? 'لا يوجد مستهدف لمسحوبات بدون فرع'
+              : '${CurrencyFormatter.formatNumber(b.targetUnits.round())} قطعة',
+          style: b.unassigned ? muted : null),
+      c(2, _casesText(b.targetCases), tip: _casesExact(b.targetCases)),
+      c(3, has ? TargetTableFormat.count(b.actualUnits) : '—',
+          key: ValueKey('sellin_branch_actual_${b.branchCode}'),
+          tip: actualTip,
+          style: has
+              ? TextStyle(fontWeight: FontWeight.w800, color: cs.primary)
+              : TextStyle(color: cs.onSurfaceVariant)),
+      c(4,
+          has && hasTarget
+              ? '${b.achievementUnitsPct.toStringAsFixed(1)}%'
+              : '—',
+          key: ValueKey('sellin_branch_qty_pct_${b.branchCode}'),
+          tip: has && hasTarget ? b.statusAr : null,
+          style: has && hasTarget
+              ? TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: _pctColor(context, b.achievementUnitsPct))
+              : muted),
+      c(5, b.unassigned ? '—' : TargetTableFormat.moneyNumber(b.targetRevenueEgp),
+          tip: b.unassigned
+              ? null
+              : TargetTableFormat.moneyExact(b.targetRevenueEgp),
+          style: b.unassigned ? muted : null),
+      c(6, has ? TargetTableFormat.moneyNumber(b.actualRevenueEgp) : '—',
+          key: ValueKey('sellin_branch_actual_value_${b.branchCode}'),
+          tip: has ? TargetTableFormat.moneyExact(b.actualRevenueEgp) : null,
+          style: has
+              ? TextStyle(color: cs.primary)
+              : TextStyle(color: cs.onSurfaceVariant)),
+      c(7,
+          has && b.targetRevenueEgp > 0
+              ? '${b.achievementRevPct.toStringAsFixed(1)}%'
+              : '—',
+          key: ValueKey('sellin_branch_value_pct_${b.branchCode}'),
+          style: has && b.targetRevenueEgp > 0
+              ? TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: _pctColor(context, b.achievementRevPct))
+              : TextStyle(color: cs.onSurfaceVariant)),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Divider(height: 1.0, color: cs.outlineVariant.withOpacity(0.4)),
+        Material(
+          color: open
+              ? cs.primaryContainer.withOpacity(0.28)
+              : b.unassigned
+                  ? cs.surfaceContainerHigh.withOpacity(0.35)
+                  : Colors.transparent,
+          child: Semantics(
+            button: true,
+            expanded: open,
+            child: InkWell(
+              key: ValueKey('sellin_branch_${b.branchCode}_${b.branchName}'),
+              onTap: () => setState(() {
+                if (!_expandedBranches.remove(id)) _expandedBranches.add(id);
+              }),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: M3Spacing.xxs, vertical: M3Spacing.xxs),
+                child: _branchCells(cells),
+              ),
+            ),
+          ),
+        ),
+        if (open) _buildBranchSkus(context, t, b),
+      ],
+    );
+  }
+
+  Widget _buildBranchSkus(BuildContext context, TargetComparisonModel t,
+      TargetBranchBreakdownModel b) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final id = _branchId(b);
+    final skus = SellInTargetsExport.branchSkus(b, brands: _brands);
+    final showAll = _branchShowAll.contains(id);
+    final shown = showAll ? skus : skus.take(_skuPreview).toList();
+    return Container(
+      key: ValueKey('sellin_branch_skus_${b.branchCode}'),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          M3Spacing.sm, M3Spacing.xs, M3Spacing.sm, M3Spacing.sm),
+      color: cs.primaryContainer.withOpacity(0.12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: M3Spacing.sm,
+            runSpacing: M3Spacing.xs,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('أصناف ${b.branchName} (${skus.length})',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+              OutlinedButton.icon(
+                key: ValueKey('sellin_branch_export_${b.branchCode}'),
+                onPressed:
+                    skus.isEmpty ? null : () => _exportBranches(t, branch: b),
+                icon: const Icon(Icons.table_view_rounded,
+                    size: M3ToolbarButton.iconSize),
+                label: const Text('تصدير الفرع'),
+                style: M3ToolbarButton.style,
+              ),
+            ],
+          ),
+          const SizedBox(height: M3Spacing.xs),
+          if (skus.isEmpty)
+            Text('لا توجد أصناف لهذا الفرع.',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant))
+          else
+            _table(
+              key: ValueKey('sellin_branch_skus_table_${b.branchCode}'),
+              caps: _skuCaps,
+              headers: _skuHeaders,
+              rows: _skuRows(context, shown,
+                  hasActuals: SellInTargetsExport.branchHasActuals(b),
+                  keyPrefix: 'sellin_branch_sku_${b.branchCode}'),
+            ),
+          if (skus.length > _skuPreview)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                key: ValueKey('sellin_branch_skus_toggle_${b.branchCode}'),
+                onPressed: () => setState(() {
+                  if (!_branchShowAll.remove(id)) _branchShowAll.add(id);
+                }),
+                child: Text(showAll
+                    ? 'عرض أول $_skuPreview صنف فقط'
+                    : 'عرض كل الأصناف (${skus.length})'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// SKU rows (chain totals or one branch): name + code, brand, quantity
+  /// first, then value. A missing cost price is flagged, never estimated.
+  List<DataRow> _skuRows(
+    BuildContext context,
+    List<TargetSKUBreakdownModel> skus, {
+    required bool hasActuals,
+    required String keyPrefix,
+  }) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final caution = M3StatusColors.of(context).accents.caution;
+    return skus.map((s) {
+      final has = hasActuals;
+      Widget c(int i, String x, {String? tip, TextStyle? style}) =>
+          _line(_skuCaps, i, x, tooltip: tip, style: style);
+      final brand = SellInTargetsExport.brandOf(s);
+      final code = s.itemCode.trim();
+      final qtyPct = has && s.targetUnits > 0
+          ? s.actualUnits / s.targetUnits * 100
+          : null;
+      final valPct = has && !s.costMissing && s.targetRevenueEgp > 0
+          ? s.actualRevenueEgp / s.targetRevenueEgp * 100
+          : null;
+      final dim = TextStyle(color: cs.onSurfaceVariant);
+      return DataRow(
+        key: ValueKey('${keyPrefix}_${s.itemCode}_${s.skuName}'),
+        cells: [
+          DataCell(Center(
+            child: _cap(
+              _skuCaps,
+              0,
+              Tooltip(
+                message: code.isEmpty ? s.skuName : '${s.skuName}\n$code',
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(s.skuName,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w800)),
+                    if (code.isNotEmpty)
+                      Text(code,
+                          maxLines: 1,
+                          softWrap: false,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            ),
+          )),
+          DataCell(Center(
+              child: c(1, brand,
+                  tip: brand, style: brand == kNoBrandLabelAr ? dim : null))),
+          DataCell(Center(
+              child: c(2, TargetTableFormat.count(s.targetUnits),
+                  tip:
+                      '${CurrencyFormatter.formatNumber(s.targetUnits.round())} قطعة'))),
+          DataCell(Center(
+              child: c(3, s.packSizeMissing ? '—' : _casesText(s.targetCases),
+                  tip: s.packSizeMissing
+                      ? 'لا يوجد حجم عبوة في Product Master'
+                      : _casesExact(s.targetCases)))),
+          DataCell(Center(
+              child: c(4, has ? TargetTableFormat.count(s.actualUnits) : '—',
+                  tip: has
+                      ? '${CurrencyFormatter.formatNumber(s.actualUnits.round())} قطعة'
+                      : null))),
+          DataCell(Center(
+              child: c(5, qtyPct == null ? '—' : '${qtyPct.toStringAsFixed(1)}%',
+                  style: qtyPct == null
+                      ? null
+                      : TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: _pctColor(context, qtyPct))))),
+          DataCell(Center(
+            child: s.costMissing
+                ? Tooltip(
+                    key: ValueKey('${keyPrefix}_cost_missing_${s.itemCode}'),
+                    message:
+                        'لا يوجد سعر تكلفة في Product Master — القيمة غير مقدّرة',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            size: 14.0, color: caution),
+                        const SizedBox(width: 2.0),
+                        Text('—', style: dim),
+                      ],
+                    ),
+                  )
+                : c(6, TargetTableFormat.moneyNumber(s.targetRevenueEgp),
+                    tip: TargetTableFormat.moneyExact(s.targetRevenueEgp)),
+          )),
+          DataCell(Center(
+              child: c(
+                  7,
+                  has && !s.costMissing
+                      ? TargetTableFormat.moneyNumber(s.actualRevenueEgp)
+                      : '—',
+                  tip: has && !s.costMissing
+                      ? TargetTableFormat.moneyExact(s.actualRevenueEgp)
+                      : null))),
+          DataCell(Center(
+              child: c(
+                  8, valPct == null ? '—' : '${valPct.toStringAsFixed(1)}%',
+                  style: valPct == null
+                      ? null
+                      : TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: _pctColor(context, valPct))))),
+        ],
+      );
+    }).toList();
   }
 }

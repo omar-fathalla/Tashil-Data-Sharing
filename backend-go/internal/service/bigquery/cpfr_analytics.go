@@ -37,6 +37,12 @@ func (c *Client) SetSellInRecords(ctx context.Context, tenantID, filename string
 
 	normTenant := normalizeTenantKey(tenantID)
 	normFile := strings.TrimSpace(filename)
+	// Plan workbook rows are not Sell-In: they go to the Plan store and take no part in the merge below.
+	records, planRecords := splitSellInPlan(normFile, records)
+	c.putSellInPlanLocked(normTenant, planRecords)
+	if len(records) == 0 && len(planRecords) > 0 {
+		return nil
+	}
 	type chainYearMonth struct {
 		chain string
 		year  int
