@@ -1575,6 +1575,19 @@ func (p *Processor) ProcessSellInPlan(ctx context.Context, tenantID, filename st
 		mappingConfidence = payload.MappingConfidence
 	}
 
+	if gemini.IsSellInPlanWorkbookSource(filename, fileBytes) {
+		// A Plan workbook is not Sell-In actuals: its rows are stamped and kept out of Sell-In totals,
+		// achievement and the durable Sell-In table (the Brand Master reads them from the Plan store).
+		for i := range records {
+			records[i].SourceKind = domain.SellInSourceKindPlan
+		}
+		warnings = append(warnings, UploadIssue{
+			Code:      "plan_file_not_sell_in",
+			Severity:  "info",
+			MessageAR: "الملف ده خطة (Sell_In_Plan) مش مسحوبات فعلية. اتحفظ لصفحة ماستر البراندات بس ومش داخل في إجماليات أو تحقيق السيل إن.",
+		})
+	}
+
 	if err := resolveSellInPeriod(ctx, records); err != nil {
 		return nil, err
 	}

@@ -30,7 +30,8 @@ func newBranchAttributionFixture(t *testing.T) *Client {
 	return c
 }
 
-func planSellIn(id, branchCode, region, gov, code string, cases, value float64) domain.SellInRecord {
+// realSellIn is a row of a real Sell-In export (not a Plan workbook).
+func realSellIn(id, branchCode, region, gov, code string, cases, value float64) domain.SellInRecord {
 	return domain.SellInRecord{
 		RecordID: id, TenantID: dsiTenant, RetailerChain: "fathalla", Year: 2026, MonthNum: 3,
 		RegionCode: region, Governorate: gov, CustomerName: dsiLegalEntity, CustomerBranchCode: branchCode,
@@ -71,11 +72,11 @@ func assertBranchesAddUp(t *testing.T, it domain.TargetComparisonItem) {
 func TestDerivedSellInBranchAchievementByERPCodeAndUnassignedLine(t *testing.T) {
 	c := newBranchAttributionFixture(t)
 	dsiSellOutTarget(t, c, 2026, 0, 1200, 0)
-	if err := c.SetSellInRecords(context.Background(), dsiTenant, "plan.xlsx", []domain.SellInRecord{
-		planSellIn("p1", "311350147", "ALX", "الاسكندرية", "FGCL-0001", 10, 1200),                    // سموحة: 120 pieces
-		planSellIn("p2", gemini.SellInNoBranchPlaceholder, "ALX", "الاسكندرية", "FGCL-0001", 4, 480), // 48 pieces, no branch
-		planSellIn("p3", gemini.SellInNoBranchPlaceholder, "TNT", "الغربية", "FGCL-0001", 2, 240),    // 24 pieces, no branch
-		planSellIn("p4", "", "ALX", "الاسكندرية", "FGCL-0003", 1, 120),                               // 6 pieces, no branch
+	if err := c.SetSellInRecords(context.Background(), dsiTenant, "in26.xlsx", []domain.SellInRecord{
+		realSellIn("p1", "311350147", "ALX", "الاسكندرية", "FGCL-0001", 10, 1200),                    // سموحة: 120 pieces
+		realSellIn("p2", gemini.SellInNoBranchPlaceholder, "ALX", "الاسكندرية", "FGCL-0001", 4, 480), // 48 pieces, no branch
+		realSellIn("p3", gemini.SellInNoBranchPlaceholder, "TNT", "الغربية", "FGCL-0001", 2, 240),    // 24 pieces, no branch
+		realSellIn("p4", "", "ALX", "الاسكندرية", "FGCL-0003", 1, 120),                               // 6 pieces, no branch
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -121,14 +122,14 @@ func TestDerivedSellInBranchAchievementByERPCodeAndUnassignedLine(t *testing.T) 
 func TestDerivedSellInBranchFromGPSOPCustomerNameAndStoreID(t *testing.T) {
 	c := newBranchAttributionFixture(t)
 	dsiSellOutTarget(t, c, 2026, 0, 1200, 0)
-	gp := planSellIn("g1", "fat_auto_e47e193d", "ALX", "", "FGCL-0001", 1, 100)
+	gp := realSellIn("g1", "fat_auto_e47e193d", "ALX", "", "FGCL-0001", 1, 100)
 	gp.CustomerName = "عائله فتح الله ماركت -  ستانلى"
-	care := planSellIn("g2", "fat_auto_70b8ed04", "TNT", "", "FGCL-0001", 1, 100)
+	care := realSellIn("g2", "fat_auto_70b8ed04", "TNT", "", "FGCL-0001", 1, 100)
 	care.CustomerName = "عائله فتح الله ماركت مواد عناية - طنطا"
-	byID := planSellIn("g3", "fat_tanta", "TNT", "", "FGCL-0001", 1, 100)
-	mini := planSellIn("g4", "fat_auto_121d9fe2", "ALX", "", "FGCL-0001", 1, 100)
+	byID := realSellIn("g3", "fat_tanta", "TNT", "", "FGCL-0001", 1, 100)
+	mini := realSellIn("g4", "fat_auto_121d9fe2", "ALX", "", "FGCL-0001", 1, 100)
 	mini.CustomerName = dsiLegalEntity + " - ميني"
-	if err := c.SetSellInRecords(context.Background(), dsiTenant, "gp.xlsx", []domain.SellInRecord{gp, care, byID, mini}); err != nil {
+	if err := c.SetSellInRecords(context.Background(), dsiTenant, "in25.xlsx", []domain.SellInRecord{gp, care, byID, mini}); err != nil {
 		t.Fatal(err)
 	}
 	it := derivedSummary(t, c).Items[0]
@@ -152,10 +153,10 @@ func TestDerivedSellInBranchFromGPSOPCustomerNameAndStoreID(t *testing.T) {
 func TestDerivedSellInKnownStoreWithoutTargetGetsItsOwnLine(t *testing.T) {
 	c := newBranchAttributionFixture(t)
 	dsiSellOutTarget(t, c, 2026, 0, 1200, 0)
-	byCode := planSellIn("k1", "311350954", "BHR", "البحيرة", "FGCL-0001", 1, 100) // catalog: دمنهور الأندلس
-	byName := planSellIn("k2", "fat_auto_x", "BHR", "", "FGCL-0001", 1, 100)
+	byCode := realSellIn("k1", "311350954", "BHR", "البحيرة", "FGCL-0001", 1, 100) // catalog: دمنهور الأندلس
+	byName := realSellIn("k2", "fat_auto_x", "BHR", "", "FGCL-0001", 1, 100)
 	byName.CustomerName = "عائله فتح الله ماركت - دمنهور الأندلس"
-	if err := c.SetSellInRecords(context.Background(), dsiTenant, "gp.xlsx", []domain.SellInRecord{byCode, byName}); err != nil {
+	if err := c.SetSellInRecords(context.Background(), dsiTenant, "in25.xlsx", []domain.SellInRecord{byCode, byName}); err != nil {
 		t.Fatal(err)
 	}
 	it := derivedSummary(t, c).Items[0]
@@ -175,9 +176,9 @@ func TestDerivedSellInKnownStoreWithoutTargetGetsItsOwnLine(t *testing.T) {
 func TestDerivedSellInBranchAttributionRespectsBrandFilter(t *testing.T) {
 	c := newBranchAttributionFixture(t)
 	dsiSellOutTarget(t, c, 2026, 0, 1200, 0)
-	if err := c.SetSellInRecords(context.Background(), dsiTenant, "plan.xlsx", []domain.SellInRecord{
-		planSellIn("f1", "311350147", "ALX", "الاسكندرية", "FGCL-0001", 10, 1200),
-		planSellIn("f2", "311350147", "ALX", "الاسكندرية", "FGCL-0003", 1, 120),
+	if err := c.SetSellInRecords(context.Background(), dsiTenant, "in26.xlsx", []domain.SellInRecord{
+		realSellIn("f1", "311350147", "ALX", "الاسكندرية", "FGCL-0001", 10, 1200),
+		realSellIn("f2", "311350147", "ALX", "الاسكندرية", "FGCL-0003", 1, 120),
 	}); err != nil {
 		t.Fatal(err)
 	}

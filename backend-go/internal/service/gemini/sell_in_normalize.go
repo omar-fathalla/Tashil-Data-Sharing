@@ -19,9 +19,9 @@ type SellInParseReport struct {
 	// QtyUOMFallbackRows is the number of piece-UOM lines with no U of M2,
 	// so Product Master UnitsPerCarton will be used at enrich time (if present).
 	QtyUOMFallbackRows int `json:"qty_uom_fallback_rows,omitempty"`
-	// NoBranchRows is the number of rows whose branch could not be read (no branch code / branch name
-	// column value, no «<customer> - <branch>» store). They are shown as «غير محدد الفرع».
-	NoBranchRows int `json:"no_branch_rows,omitempty"`
+	// PlanSource is true when the workbook is a Plan (file name or first sheet «Sell_In_Plan…»): its rows
+	// are stamped SourceKind=plan and never counted as Sell-In actuals.
+	PlanSource bool `json:"plan_source,omitempty"`
 }
 
 // SellInNoBranchPlaceholder is the label older raw-plan parses stored as the customer branch code when
@@ -32,31 +32,6 @@ const SellInNoBranchPlaceholder = "مجمع الإقليم (Regional)"
 func IsSellInNoBranchPlaceholder(code string) bool {
 	c := normalizeHeaderLabel(code)
 	return c == normalizeHeaderLabel(SellInNoBranchPlaceholder) || c == normalizeHeaderLabel("مجمع الإقليم")
-}
-
-// rawPlanBranchCode reads a raw ERP plan row's branch: the branch code column, else the store id of the
-// branch name column, else the store of a «<customer> - <branch>» customer cell. Only labels the branch
-// dictionary knows become store ids (no fuzzy guess); "" when the row names no branch.
-func rawPlanBranchCode(chain, code, name, customer string) string {
-	if c := strings.TrimSpace(code); c != "" && !IsSellInNoBranchPlaceholder(c) {
-		return c
-	}
-	if n := collapseSpace(name); n != "" && !IsSellInNoBranchPlaceholder(n) {
-		if st := BuildBranchStoreMetadata(chain, n); isKnownStoreID(st.ID) {
-			return st.ID
-		}
-		return n
-	}
-	if _, branch := ParseChainBranchCell(customer); branch != "" && branch != collapseSpace(customer) {
-		if st := BuildBranchStoreMetadata(chain, branch); isKnownStoreID(st.ID) {
-			return st.ID
-		}
-	}
-	return ""
-}
-
-func isKnownStoreID(id string) bool {
-	return id != "" && !strings.Contains(id, "_auto_") && !strings.HasSuffix(id, "_unallocated")
 }
 
 // SellInLayoutError: required headers were not found, so nothing is read by position.
@@ -342,8 +317,7 @@ var rawPlanHeaderSpecs = []headerSpec{
 	{"period_week", false, []string{"\\", "week", "period"}},
 	{"ton", false, []string{"Ton", "tons"}},
 	{"city", false, []string{"city", "المحافظه"}},
-	{"branch_code", false, []string{"exp city", "branch code", "customer branch code", "ship to code", "ship-to code", "store code", "كود الفرع", "كود فرع العميل"}},
-	{"branch_name", false, []string{"customer branch", "customer branch name", "branch name", "ship to", "ship to name", "ship-to", "ship-to name", "store", "store name", "اسم الفرع", "فرع العميل"}},
+	{"branch_code", false, []string{"exp city", "branch code"}},
 	{"sales_rep", false, []string{"10", "sales rep"}},
 	{"promotion", false, []string{"Promotion"}},
 	{"officer", false, []string{"officer"}},

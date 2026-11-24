@@ -125,6 +125,9 @@ func ParseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, targe
 func ParseSellInPlanWorkbookWithReport(tenantID, filename string, rawContent []byte, targetChains ...string) ([]domain.SellInRecord, *SellInParseReport, error) {
 	report := &SellInParseReport{}
 	recs, err := parseSellInPlanWorkbook(tenantID, filename, rawContent, report, targetChains...)
+	if err == nil && IsSellInPlanWorkbookSource(filename, rawContent) {
+		stampSellInPlanSource(recs, report)
+	}
 	return recs, report, err
 }
 
@@ -290,9 +293,6 @@ func parseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, repor
 			rec.ParentCustomer = strings.TrimSpace(getCol(r, 11))
 			rec.CustomerName = strings.TrimSpace(getCol(r, 12))
 			rec.CustomerBranchCode = strings.TrimSpace(getCol(r, 13))
-			if rec.CustomerBranchCode == "" || IsSellInNoBranchPlaceholder(rec.CustomerBranchCode) {
-				report.NoBranchRows++
-			}
 			rec.Brand = strings.TrimSpace(getCol(r, 14))
 			rec.ProductFamily = strings.TrimSpace(getCol(r, 15))
 			rec.SubCategory = strings.TrimSpace(getCol(r, 16))
@@ -422,10 +422,9 @@ func parseSellInPlanWorkbook(tenantID, filename string, rawContent []byte, repor
 				rec.Governorate = inferGovernorateFromRegion(rec.RegionCode)
 			}
 			rec.CustomerName = strings.TrimSpace(getCol(r, rawPlanCols["customer"]))
-			rec.CustomerBranchCode = rawPlanBranchCode(rec.RetailerChain,
-				getCol(r, rawPlanCols["branch_code"]), getCol(r, rawPlanCols["branch_name"]), rec.CustomerName)
+			rec.CustomerBranchCode = strings.TrimSpace(getCol(r, rawPlanCols["branch_code"]))
 			if rec.CustomerBranchCode == "" {
-				report.NoBranchRows++
+				rec.CustomerBranchCode = SellInNoBranchPlaceholder
 			}
 			rec.SalesRep = strings.TrimSpace(getCol(r, rawPlanCols["sales_rep"]))
 			if rec.SalesRep == "" {

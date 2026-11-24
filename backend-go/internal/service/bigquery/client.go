@@ -164,6 +164,7 @@ type Client struct {
 	workbookMeta                     map[string]TenantWorkbookAnalytics
 	sellInRecords                    map[string][]domain.SellInRecord
 	sellInFilename                   map[string]string
+	sellInPlanRecords                map[string][]domain.SellInRecord // Plan workbook rows: Brand Master only, never Sell-In
 	targets                          map[string][]domain.TargetRecord
 	productMaster                    map[string]*domain.ProductMasterSummaryResponse
 	baselineProductMaster            map[string]*domain.ProductMasterSummaryResponse
@@ -1390,6 +1391,7 @@ func (c *Client) ClearTenantData(ctx context.Context, tenantID string) error {
 		c.pricingItems = make([]domain.PricingComplianceItem, 0)
 		c.workbookMeta = make(map[string]TenantWorkbookAnalytics)
 		c.sellInRecords = make(map[string][]domain.SellInRecord)
+		c.sellInPlanRecords = make(map[string][]domain.SellInRecord)
 		c.cleanedTenants["*"] = true
 		return nil
 	}
@@ -1399,6 +1401,8 @@ func (c *Client) ClearTenantData(ctx context.Context, tenantID string) error {
 	delete(c.workbookMeta, slug)
 	delete(c.sellInRecords, slug)
 	delete(c.sellInRecords, "tenant-"+slug)
+	delete(c.sellInPlanRecords, slug)
+	delete(c.sellInPlanRecords, "tenant-"+slug)
 
 	var keptRecords []domain.SellOutFact
 	for _, r := range c.records {
@@ -1437,14 +1441,26 @@ func (c *Client) RemoveSellInFileRecords(ctx context.Context, tenantID, batchID,
 	c.bumpSourceVersion()
 
 	normTenant := normalizeTenantKey(tenantID)
+	normFile := strings.TrimSpace(filename)
+	normBatch := strings.TrimSpace(batchID)
+	normChain := strings.ToLower(strings.TrimSpace(chain))
+
+	if plan := c.sellInPlanRecords[normTenant]; len(plan) > 0 {
+		keptPlan := make([]domain.SellInRecord, 0, len(plan))
+		for _, r := range plan {
+			if (normBatch != "" && r.BatchID == normBatch) ||
+				(normFile != "" && strings.EqualFold(strings.TrimSpace(r.SourceFilename), normFile)) {
+				continue
+			}
+			keptPlan = append(keptPlan, r)
+		}
+		c.sellInPlanRecords[normTenant] = keptPlan
+	}
+
 	existing := c.sellInRecords[normTenant]
 	if len(existing) == 0 {
 		return nil
 	}
-
-	normFile := strings.TrimSpace(filename)
-	normBatch := strings.TrimSpace(batchID)
-	normChain := strings.ToLower(strings.TrimSpace(chain))
 
 	kept := make([]domain.SellInRecord, 0, len(existing))
 	for _, r := range existing {

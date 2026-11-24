@@ -282,10 +282,24 @@ func PlanSellIn(meta Meta, records []domain.SellInRecord, now time.Time) Plan {
 // StreamSellIn is PlanSellIn with rows built lazily while loading (bounded memory for large files).
 func StreamSellIn(meta Meta, records []domain.SellInRecord, now time.Time) Plan {
 	meta.TenantID = NormalizeTenant(meta.TenantID)
-	records = validSellInPeriods(records)
+	records = validSellInPeriods(withoutSellInPlan(meta, records))
 	return Plan{Kind: KindSellIn, Meta: meta, Table: SellInSpec(), N: len(records),
 		RowAt:       func(i int) map[string]interface{} { return sellInRow(meta, &records[i], now) },
 		DeleteWhere: archiveDeleteWhere, Params: baseParams(meta)}
+}
+
+// withoutSellInPlan drops rows read from a Plan workbook: the plan is not Sell-In actuals and must not be
+// written to sell_in_records. meta.SourceFile covers rows that carry no file name of their own.
+func withoutSellInPlan(meta Meta, records []domain.SellInRecord) []domain.SellInRecord {
+	planUpload := domain.IsSellInPlanName(meta.SourceFile)
+	kept := make([]domain.SellInRecord, 0, len(records))
+	for i := range records {
+		if records[i].IsSellInPlan() || (planUpload && records[i].SourceFilename == "") {
+			continue
+		}
+		kept = append(kept, records[i])
+	}
+	return kept
 }
 
 // PlanProductMaster builds a snapshot write plan: re-uploading the same sheet (same batch or filename) replaces its rows;
